@@ -16,25 +16,29 @@ const SP = {
   art:   id => `${SP_BASE}/other/official-artwork/${id}.png`,
   png:   id => `${SP_BASE}/${id}.png`,
 };
-// ลำดับรูปที่จะลอง (เอาตัวเล็ก/ขยับก่อน แล้วค่อยตัวใหญ่/นิ่ง)
+// ลำดับรูปที่จะลอง — เอา "showdown" (สไปรต์ขยับแบบ PokeMeow) เป็นหลัก
+// ถ้าไม่มี ค่อยลอง gen5 ขยับ (ตัวเก่า) แล้วค่อยภาพนิ่ง (artwork)
 function spriteChain(id, shiny) {
-  return id <= 649
-    ? (shiny ? [SP.anim5s(id), SP.gif(id), SP.shiny(id), SP.art(id), SP.png(id)]
-             : [SP.anim5(id), SP.gif(id), SP.art(id), SP.png(id)])
-    : (shiny ? [SP.shiny(id), SP.gif(id), SP.art(id), SP.png(id)]
-             : [SP.gif(id), SP.art(id), SP.png(id)]);
+  const anim = shiny
+    ? [SP.shiny(id), (id <= 649 ? SP.anim5s(id) : null), SP.art(id), SP.png(id)]
+    : [SP.gif(id), (id <= 649 ? SP.anim5(id) : null), SP.art(id), SP.png(id)];
+  return anim.filter(Boolean);
 }
 // ตัว fallback: เมื่อรูปโหลดไม่ได้ ไล่ไปรูปถัดไปในลิสต์
 window.__sf = function (img) {
   const fb = (img.dataset.fb || '').split('|').filter(Boolean);
   if (fb.length) { img.dataset.fb = fb.slice(1).join('|'); img.src = fb[0]; }
 };
-// ภาพไอเทม (บอล/เบอร์รี่) จาก PokeAPI — ถ้าโหลดไม่ได้ให้ลบ img ทิ้งเผยอีโมจิด้านหลังแทน
+// ภาพไอเทม (บอล/เบอร์รี่) จาก PokeAPI — แสดงภาพอย่างเดียว ถ้าโหลดไม่ได้ค่อยสลับเป็นอีโมจิ (ไม่ซ้อน)
 const ITEM_BASE = 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/';
+window.__itemFail = function (img, emoji) {
+  const s = document.createElement('span');
+  s.className = img.className; s.textContent = emoji;
+  img.replaceWith(s);
+};
 function itemIcon(emoji, img, extraCls) {
   if (!img) return `<span class="item-ico ${extraCls || ''}">${emoji}</span>`;
-  // emoji อยู่ข้างหลังเป็น fallback: ระหว่างโหลด/ถ้าโหลดไม่ได้ จะเห็นอีโมจิแทน
-  return `<span class="item-ico ${extraCls || ''}">${emoji}<img src="${ITEM_BASE}${img}.png" onerror="this.remove()" alt=""></span>`;
+  return `<img class="item-ico ${extraCls || ''}" src="${ITEM_BASE}${img}.png" onerror="__itemFail(this,'${emoji}')" alt="">`;
 }
 const SPAWN_MIN = 9000, SPAWN_MAX = 16000;
 const FLEE_MS = 45000;
