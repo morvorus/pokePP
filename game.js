@@ -433,6 +433,13 @@ function migrateSave() {
 function save() {
   if (state) state.lastSeen = Date.now();
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { console.warn(e); }
+  cloudSyncDebounced();
+}
+let _cloudTimer = null;
+function cloudSyncDebounced() {
+  if (!(window.Cloud && Cloud.loggedIn())) return;
+  clearTimeout(_cloudTimer);
+  _cloudTimer = setTimeout(() => { Cloud.push(state).then(() => updateCloudStatus()).catch(() => {}); }, 4000);
 }
 
 // ================================================================
@@ -1608,6 +1615,7 @@ function renderMenu() {
   $('#profileBox').innerHTML = renderProfile();
   $('#profileBox').querySelectorAll('.party-mini[data-uid]').forEach(el =>
     el.onclick = () => openIndividualModal(el.dataset.uid));
+  renderCloudUI();
   renderIdle();
   renderGyms();
   renderCharms();
@@ -2265,6 +2273,94 @@ function renderCurrentView() {
 }
 
 // ================================================================
+//  CLOUD SAVE / LOGIN
+// ================================================================
+async function initCloud() {
+  if (!(window.Cloud && Cloud.enabled)) { renderCloudUI(); return; }
+  await Cloud.restoreSession();
+  if (Cloud.loggedIn()) {
+    const cloud = await Cloud.pull();
+    if (cloud && cloud.data) applyCloudSave(cloud.data, true);
+    else await Cloud.push(state);   // บัญชีใหม่ → ดันเซฟปัจจุบันขึ้น
+  }
+  Cloud.onAuth(() => renderCloudUI());
+  renderCloudUI();
+}
+function applyCloudSave(data, silent) {
+  state = Object.assign(newSave(), data);
+  migrateSave();
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
+  ensureDailyQuests(); fillDexFilter();
+  renderRegionBanner(); renderTopbar(); renderBallBar(); clearSpawn(); scheduleSpawn(1500);
+  renderCurrentView();
+  if (!silent) toast('☁️ โหลดเซฟจากคลาวด์แล้ว', 'good');
+}
+async function cloudSignIn() {
+  const email = ($('#clEmail').value || '').trim(), pw = $('#clPw').value || '';
+  if (!email || !pw) { toast('กรอกอีเมล + รหัสผ่าน', 'bad'); return; }
+  toast('⏳ กำลังเข้าสู่ระบบ...', '');
+  const r = await Cloud.signIn(email, pw);
+  if (r.error) { toast('❌ ' + r.error, 'bad'); return; }
+  const cloud = await Cloud.pull();
+  if (cloud && cloud.data) applyCloudSave(cloud.data, false);
+  else { await Cloud.push(state); toast('✅ เข้าสู่ระบบ (ดันเซฟปัจจุบันขึ้นคลาวด์)', 'good'); }
+  renderCloudUI();
+}
+async function cloudSignUp() {
+  const email = ($('#clEmail').value || '').trim(), pw = $('#clPw').value || '';
+  if (!email || pw.length < 6) { toast('อีเมลถูกต้อง + รหัสผ่าน ≥ 6 ตัว', 'bad'); return; }
+  toast('⏳ กำลังสมัคร...', '');
+  const r = await Cloud.signUp(email, pw);
+  if (r.error) { toast('❌ ' + r.error, 'bad'); return; }
+  if (r.needConfirm) { toast('📧 สมัครแล้ว! ยืนยันอีเมลก่อนเข้าสู่ระบบ', 'good'); renderCloudUI(); return; }
+  await Cloud.push(state);
+  toast('✅ สมัคร + ล็อกอินแล้ว เซฟขึ้นคลาวด์', 'good');
+  renderCloudUI();
+}
+async function cloudSignOut() {
+  await Cloud.signOut(); renderCloudUI(); toast('ออกจากระบบแล้ว (เซฟในเครื่องยังอยู่)', '');
+}
+async function cloudSyncNow() {
+  if (!Cloud.loggedIn()) return;
+  toast('⏳ กำลัง sync...', '');
+  const r = await Cloud.push(state);
+  toast(r.error ? '❌ ' + r.error : '☁️ อัปโหลดเซฟขึ้นคลาวด์แล้ว', r.error ? 'bad' : 'good');
+  updateCloudStatus();
+}
+function renderCloudUI() {
+  const box = $('#cloudBox'); if (!box) return;
+  if (!(window.Cloud && Cloud.enabled)) {
+    box.innerHTML = `<div class="set-row"><div class="sr-label">☁️ ยังไม่ได้ตั้งค่าคลาวด์
+      <div class="sr-sub">เล่นแบบออฟไลน์อยู่ · เปิดใช้ Cloud Save ได้โดยตั้งค่า Supabase (ดู CLOUD_SETUP.md)</div></div></div>`;
+    return;
+  }
+  if (Cloud.loggedIn()) {
+    box.innerHTML = `<div class="set-row">
+        <div class="sr-label">☁️ ล็อกอินแล้ว<div class="sr-sub" id="clStatus">${Cloud.email()}</div></div>
+        <button class="set-btn" id="clSyncBtn">Sync</button></div>
+      <div class="set-row"><div class="sr-label">ออกจากระบบ<div class="sr-sub">เซฟในเครื่องยังอยู่</div></div>
+        <button class="set-btn danger" id="clOutBtn">ออก</button></div>`;
+    $('#clSyncBtn').onclick = cloudSyncNow;
+    $('#clOutBtn').onclick = cloudSignOut;
+  } else {
+    box.innerHTML = `<div class="set-row" style="flex-direction:column;align-items:stretch">
+        <div class="sr-label">เข้าสู่ระบบเพื่อเซฟข้ามเครื่อง<div class="sr-sub">เซฟบนคลาวด์ ไม่หาย เล่นต่อเครื่องอื่นได้</div></div>
+        <input class="save-io" id="clEmail" placeholder="อีเมล" style="min-height:auto;padding:10px;margin-top:8px" autocomplete="username">
+        <input class="save-io" id="clPw" type="password" placeholder="รหัสผ่าน (≥6 ตัว)" style="min-height:auto;padding:10px;margin-top:6px" autocomplete="current-password">
+        <div class="action-row" style="margin-top:8px">
+          <button class="set-btn" id="clInBtn">เข้าสู่ระบบ</button>
+          <button class="set-btn" id="clUpBtn" style="background:var(--good);color:#062611">สมัครใหม่</button>
+        </div></div>`;
+    $('#clInBtn').onclick = cloudSignIn;
+    $('#clUpBtn').onclick = cloudSignUp;
+  }
+}
+function updateCloudStatus() {
+  const el = $('#clStatus');
+  if (el && Cloud.loggedIn()) el.textContent = `${Cloud.email()} · sync ${new Date().toLocaleTimeString('th-TH')}`;
+}
+
+// ================================================================
 //  INIT
 // ================================================================
 function init() {
@@ -2306,5 +2402,7 @@ function init() {
 
   if (!state.tutorialDone) setTimeout(showTutorial, 400);
   if (state.settings.music) document.addEventListener('pointerdown', () => startMusic(), { once: true });
+
+  initCloud();   // เชื่อมคลาวด์ (ถ้าตั้งค่าไว้)
 }
 document.addEventListener('DOMContentLoaded', init);
