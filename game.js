@@ -165,6 +165,27 @@ const GYMS = [
   { id: 'champ', name: 'แชมป์เปี้ยน', emoji: '👑', type: null,   lvl: 84, count: 4, reward: 8000 },
 ];
 
+// ค่าคงที่กลไกเสริม
+const AMULET_MAX = 10, AMULET_PRICE = 1200;     // Amulet Coin: +5%/ชิ้น สูงสุด +50%
+const STREAK_MILESTONE = 10;                     // ทุก 10 สตรีค = กล่องสุ่ม 1 กล่อง
+const FRIEND_MAX = 100;
+// Catchbot: จับอัตโนมัติตอนออฟไลน์ (ไม่นับสตรีค/เควส)
+const catchbotRate = c => 3 + (c.pkLvl || 0) * 2;        // จับ/ชั่วโมง
+const catchbotHours = c => 2 + (c.durLvl || 0);          // ชั่วโมงสูงสุดต่อรอบ
+const catchbotCoins = c => 8 + (c.profLvl || 0) * 4;     // เหรียญ/ตัว
+const catchbotUpCost = lvl => (lvl + 1) * 600;           // ค่าอัปเกรดต่อระดับ
+// กล่องสุ่ม (Lockbox) — ตารางรางวัลถ่วงน้ำหนัก
+const LOCKBOX_REWARDS = [
+  { w: 30, act: () => { const n = rand(3, 8); state.balls.great = (state.balls.great || 0) + n; return `${n} Great Ball`; } },
+  { w: 22, act: () => { const n = rand(1, 3); state.balls.ultra = (state.balls.ultra || 0) + n; return `${n} Ultra Ball`; } },
+  { w: 20, act: () => { const n = rand(200, 600); state.coins += n; return `${n} เหรียญ`; } },
+  { w: 12, act: () => { const n = rand(1, 2); state.candies = (state.candies || 0) + n; return `${n} Rare Candy`; } },
+  { w: 8, act: () => { state.berries.golden = (state.berries.golden || 0) + 1; return 'Golden Razz'; } },
+  { w: 5, act: () => { state.eggs.push({ kind: 'rare', progressStart: state.totalCaught }); return 'ไข่หายาก'; } },
+  { w: 2, act: () => { state.charms.shiny = (state.charms.shiny || 0) + 1; return 'Shiny Charm'; } },
+  { w: 1, act: () => { state.balls.master = (state.balls.master || 0) + 1; return 'Master Ball! 🟣'; } },
+];
+
 const EGG_PRICE = 450, STONE_PRICE = 600, EGG_HATCH_CATCHES = 15;
 
 // ไข่หลายชนิด — ฟักแล้วสุ่มจาก pool ต่างกัน + โอกาส shiny ต่างกัน
@@ -365,6 +386,11 @@ function newSave() {
     fishReadyAt: 0,      // คูลดาวน์ตกปลา (timestamp)
     safariTickets: 0,    // ตั๋ว Safari
     safari: { left: 0 }, // จำนวน spawn บูสต์ที่เหลือใน Safari
+    amulets: 0,          // Amulet Coin (+5%/ชิ้น สูงสุด 10)
+    streaks: { common: 0, uncommon: 0, rare: 0, superrare: 0, legendary: 0 },  // สตรีคจับต่อเนื่องรายระดับ
+    bestStreaks: {},     // สตรีคสูงสุดที่เคยทำ
+    lockboxes: 0,        // กล่องสุ่ม
+    catchbot: { pkLvl: 0, durLvl: 0, profLvl: 0, active: false, startedAt: 0 },
     heldInv: {},         // คลัง Held Item ที่ยังไม่ได้สวม {key:count}
     gymsBeaten: {},      // {gymId:true} ยิมที่ชนะแล้ว
     selBall: 'poke',
@@ -606,6 +632,7 @@ function setBuddy(uid) {
 }
 function gainXp(amount) {
   const b = getBuddy(); if (!b) return;
+  amount = Math.round(amount * (1 + (b.friend || 0) / 500));   // มิตรภาพสูง = XP มากขึ้น (สูงสุด +20%)
   b.xp += amount; let leveled = false;
   while (b.xp >= xpForLevel(b.level) && b.level < 100) { b.xp -= xpForLevel(b.level); b.level++; leveled = true; }
   if (leveled) { toast(`⬆️ <b>${MON_BY_ID[b.id].name}</b> ขึ้น Lv.${b.level}`, 'good'); tryEvolveByLevel(b); }
@@ -999,7 +1026,8 @@ function onCatchSuccess(ballKey) {
   state.seen[mon.id] = true;
   state.totalCaught++;
 
-  const coins = Math.round(TIER_COIN[tier] * (1 + level / 100) * (shiny ? 3 : 1));
+  const amuletMul = 1 + Math.min(state.amulets || 0, AMULET_MAX) * 0.05;   // Amulet Coin
+  const coins = Math.round(TIER_COIN[tier] * (1 + level / 100) * (shiny ? 3 : 1) * amuletMul);
   const xp = Math.round(TIER_XP[tier] * (1 + level / 50) * (boostActive('xp') ? CHARMS.xp.mult : 1));
   state.coins += coins;
 
@@ -1008,6 +1036,8 @@ function onCatchSuccess(ballKey) {
   toast(`🎉 จับ ${shiny ? '✨' : ''}<b>${mon.name}</b> Lv.${level} ได้! +${coins}🪙`, 'good');
   logMsg(`✅ จับ <b>${mon.name}</b> (${shiny ? 'Shiny' : TIER_LABEL[tier]}) Lv.${level} · IV ${ivPercent(ind)}% · +${coins}🪙`, 'good');
   gainXp(xp);
+  addStreak(tier);            // สตรีคจับต่อเนื่อง
+  addFriendship(2);           // มิตรภาพหัวหน้าทีม
   updateQuestProgress(mon, tier);
   checkEggHatch();
   checkRegionUnlocks();
@@ -1016,9 +1046,27 @@ function onCatchSuccess(ballKey) {
   clearSpawn(); save(); renderTopbar(); renderCurrentView(); renderBallBar();
   scheduleSpawn();
 }
+// ---------- สตรีค + มิตรภาพ ----------
+function addStreak(tier) {
+  state.streaks[tier] = (state.streaks[tier] || 0) + 1;
+  const s = state.streaks[tier];
+  if (s > (state.bestStreaks[tier] || 0)) state.bestStreaks[tier] = s;
+  if (s % STREAK_MILESTONE === 0) {
+    state.lockboxes = (state.lockboxes || 0) + 1;
+    toast(`🔥 สตรีค ${TIER_LABEL[tier]} ครบ ${s}! ได้ 🎁 กล่องสุ่ม`, 'good');
+    logMsg(`🔥 สตรีค ${TIER_LABEL[tier]} ${s} ต่อเนื่อง! รับกล่องสุ่ม 🎁`, 'big');
+  }
+}
+function resetStreak(tier) { if (state.streaks[tier]) state.streaks[tier] = 0; }
+function addFriendship(n) {
+  const b = getBuddy(); if (!b) return;
+  b.friend = Math.min(FRIEND_MAX, (b.friend || 0) + n);
+}
 function onCatchFail(ballKey) {
+  const tier = currentSpawn.tier;
   const fledChance = 0.12 + currentSpawn.throws * 0.03;
-  logMsg(`❌ <b>${currentSpawn.mon.name}</b> ดิ้นหลุด! (เสีย ${BALLS[ballKey].name})`, 'bad');
+  resetStreak(tier);          // จับพลาด = สตรีคระดับนี้รีเซ็ต
+  logMsg(`❌ <b>${currentSpawn.mon.name}</b> ดิ้นหลุด! (เสีย ${BALLS[ballKey].name}) · สตรีค ${TIER_LABEL[tier]} รีเซ็ต`, 'bad');
   save(); renderBallBar();
   if (Math.random() < fledChance) {
     toast(`💨 ${currentSpawn.mon.name} หนีไปแล้ว!`, 'bad');
@@ -1282,6 +1330,7 @@ function openIndividualModal(uid) {
       <span class="pill">${ind.nature} nature</span>
       <span class="pill rarity-${ind.shiny ? 'shiny' : ind.tier}" style="color:#fff">${ind.shiny ? 'Shiny' : TIER_LABEL[ind.tier]}</span>
       <span class="pill">IV ${ivPercent(ind)}%</span>
+      <span class="pill" title="มิตรภาพ ${ind.friend || 0}/${FRIEND_MAX}">${'❤️'.repeat(Math.ceil((ind.friend || 0) / 20)) || '🤍'} ${ind.friend || 0}</span>
     </div>
     <div class="tags" style="justify-content:center;margin-bottom:12px">
       ${typeBadges(m.types)}</div>
@@ -1390,6 +1439,7 @@ function renderShop() {
     { emoji: '🥭', img: 'nanab-berry', name: 'Golden Razz ×1', desc: 'เพิ่มโอกาสจับ +32%', price: BERRIES.golden.price, act: () => addBerries('golden', 1, BERRIES.golden.price) },
     { emoji: '🍬', img: 'rare-candy', name: 'Rare Candy ×3', desc: 'เลเวลอัพทันที (ใช้กับตัวใดก็ได้ในคลัง)', price: 450, act: () => { if (spend(450)) { state.candies = (state.candies || 0) + 3; toast('🍬 +3 Rare Candy', 'good'); postBuy(); } } },
     { emoji: '🎫', name: 'ตั๋ว Safari', desc: `เข้า Safari Zone ${SAFARI_SPAWNS} ตัวหายากสุดๆ (กดปุ่ม Safari หน้าล่า)`, price: 800, act: () => { if (spend(800)) { state.safariTickets = (state.safariTickets || 0) + 1; toast('🎫 +1 ตั๋ว Safari', 'good'); postBuy(); } } },
+    { emoji: '🪙', img: 'amulet-coin', name: `Amulet Coin (${state.amulets || 0}/${AMULET_MAX})`, desc: 'เงินที่ได้จากการจับ +5% ต่อชิ้น สูงสุด +50%', price: AMULET_PRICE, act: () => { if ((state.amulets || 0) >= AMULET_MAX) { toast('มี Amulet Coin เต็มแล้ว', ''); return; } if (spend(AMULET_PRICE)) { state.amulets = (state.amulets || 0) + 1; toast(`🪙 Amulet Coin +1 (เงิน +${state.amulets * 5}%)`, 'good'); postBuy(); } } },
     { emoji: '🥚', name: EGG_KINDS.mystery.name, desc: `ฟักเมื่อจับครบ ${EGG_KINDS.mystery.catches} ตัว · สุ่มทุกระดับ`, price: EGG_KINDS.mystery.price, act: () => buyEgg('mystery') },
     { emoji: '🥚', name: EGG_KINDS.rare.name, desc: `ฟักครบ ${EGG_KINDS.rare.catches} ตัว · ออก Rare/Super Rare`, price: EGG_KINDS.rare.price, act: () => buyEgg('rare') },
     { emoji: '🥚', name: EGG_KINDS.gold.name + ' ✨', desc: `ฟักครบ ${EGG_KINDS.gold.catches} ตัว · ออก Super Rare/Legendary · ลุ้น Shiny สูง`, price: EGG_KINDS.gold.price, act: () => buyEgg('gold') },
@@ -1558,6 +1608,7 @@ function renderMenu() {
   $('#profileBox').innerHTML = renderProfile();
   $('#profileBox').querySelectorAll('.party-mini[data-uid]').forEach(el =>
     el.onclick = () => openIndividualModal(el.dataset.uid));
+  renderIdle();
   renderGyms();
   renderCharms();
   renderDexRewards();
@@ -1628,6 +1679,41 @@ function renderMenu() {
   $('#btnReset').onclick = () => { if (confirm('รีเซ็ตเกมทั้งหมด? ข้อมูลจะหายถาวร')) resetGame(); };
 }
 
+function renderIdle() {
+  const box = $('#idleBox'); if (!box) return;
+  const c = state.catchbot;
+  const running = c.active;
+  box.innerHTML = `
+    <div class="set-row" style="flex-direction:column;align-items:stretch">
+      <div class="sr-label">🤖 Catchbot ${running ? '<span style="color:var(--good)">· กำลังทำงาน</span>' : ''}
+        <div class="sr-sub">จับ ~${catchbotRate(c)} ตัว/ชม. · สูงสุด ${catchbotHours(c)} ชม. · ${catchbotCoins(c)}🪙/ตัว · เก็บผลตอนเปิดเกมกลับมา (ไม่นับสตรีค/เควส)</div></div>
+      <div class="action-row" style="margin-top:8px">
+        <button class="set-btn" id="cbToggle">${running ? '⏹️ เก็บผลตอนนี้' : '▶️ เปิด Catchbot'}</button>
+      </div>
+      <div class="stat-grid" style="margin-top:8px">
+        <button class="stat-tile" id="cbUpPk" style="border:none;cursor:pointer;text-align:left">
+          <div class="st-num">จับ Lv.${c.pkLvl}</div><div class="st-lbl">อัป ${catchbotUpCost(c.pkLvl)}🪙</div></button>
+        <button class="stat-tile" id="cbUpDur" style="border:none;cursor:pointer;text-align:left">
+          <div class="st-num">เวลา Lv.${c.durLvl}</div><div class="st-lbl">อัป ${catchbotUpCost(c.durLvl)}🪙</div></button>
+        <button class="stat-tile" id="cbUpProf" style="border:none;cursor:pointer;text-align:left">
+          <div class="st-num">เงิน Lv.${c.profLvl}</div><div class="st-lbl">อัป ${catchbotUpCost(c.profLvl)}🪙</div></button>
+      </div>
+    </div>
+    <div class="set-row">
+      <div class="sr-label">🎁 กล่องสุ่ม (Lockbox) × ${state.lockboxes || 0}<div class="sr-sub">ได้จากสตรีคครบทุก ${STREAK_MILESTONE} · เปิดสุ่มรางวัล</div></div>
+      <button class="set-btn" id="lbOpen" ${(state.lockboxes || 0) <= 0 ? 'disabled' : ''}>เปิด</button>
+    </div>`;
+  $('#cbToggle').onclick = () => { running ? (afterCatchbotCollect()) : activateCatchbot(); };
+  $('#cbUpPk').onclick = () => upgradeCatchbot('pkLvl');
+  $('#cbUpDur').onclick = () => upgradeCatchbot('durLvl');
+  $('#cbUpProf').onclick = () => upgradeCatchbot('profLvl');
+  $('#lbOpen').onclick = openLockbox;
+}
+function afterCatchbotCollect() {
+  const r = collectCatchbot();
+  toast(r ? `🤖 เก็บผล Catchbot: ${r}` : '🤖 ยังไม่มีผลผลิต', r ? 'good' : '');
+  renderTopbar(); renderMenu();
+}
 function renderGyms() {
   const box = $('#gymBox'); if (!box) return;
   box.innerHTML = GYMS.map((g, i) => {
@@ -1742,21 +1828,73 @@ function applyOfflineRewards() {
   const now = Date.now();
   const idleMs = now - (state.lastSeen || now);
   state.lastSeen = now;
+  const bot = collectCatchbot();     // เก็บผลผลิต catchbot (ถ้าเปิดไว้)
   const idleMin = Math.floor(idleMs / 60000);
-  if (idleMin < 5) return;
-  const coins = Math.min(idleMin * 2, 900);           // 2🪙/นาที สูงสุด 900
-  const balls = Math.min(Math.floor(idleMin / 30), 10); // 1🔴 ต่อ 30 นาที สูงสุด 10
-  state.coins += coins; state.balls.poke += balls;
+  if (idleMin < 5 && !bot) return;
+  let coins = 0, balls = 0;
+  if (idleMin >= 5) {
+    coins = Math.min(idleMin * 2, 900);
+    balls = Math.min(Math.floor(idleMin / 30), 10);
+    state.coins += coins; state.balls.poke += balls;
+  }
   save();
   const hrs = Math.floor(idleMin / 60), mins = idleMin % 60;
   const timeStr = (hrs ? hrs + ' ชม. ' : '') + mins + ' นาที';
   $('#modalBox').innerHTML = `<div class="wb-box">
     <div class="wb-ico">🎁</div>
     <h3>ยินดีต้อนรับกลับ!</h3>
-    <p style="color:var(--muted);font-size:13px">คุณหายไป ${timeStr} · ทีมเก็บของให้ระหว่างนั้น</p>
-    <div style="font-size:16px;margin:14px 0;font-weight:800">+${coins} 🪙${balls ? ` · +${balls} 🔴` : ''}</div>
+    <p style="color:var(--muted);font-size:13px">คุณหายไป ${timeStr}</p>
+    ${(coins || balls) ? `<div style="font-size:15px;margin:10px 0;font-weight:800">+${coins} 🪙${balls ? ` · +${balls} 🔴` : ''}</div>` : ''}
+    ${bot ? `<div style="font-size:14px;margin:8px 0;color:#8ef0a5">🤖 Catchbot: ${bot}</div>` : ''}
     <div class="modal-actions"><button class="btn-primary" id="wbOk">รับเลย!</button></div></div>`;
   openModal(); $('#wbOk').onclick = closeModal;
+}
+// ---------- Catchbot ----------
+function collectCatchbot() {
+  const c = state.catchbot; if (!c || !c.active || !c.startedAt) return null;
+  const hours = Math.min(catchbotHours(c), (Date.now() - c.startedAt) / 3600000);
+  const n = Math.floor(hours * catchbotRate(c));
+  c.active = false; c.startedAt = 0;
+  if (n <= 0) return null;
+  const coins = n * catchbotCoins(c);
+  state.coins += coins;
+  // จับตัว common/uncommon (ไม่นับสตรีค/เควส)
+  const pool = MONSTERS.filter(m => m._tier === 'common' || m._tier === 'uncommon');
+  for (let i = 0; i < n; i++) {
+    const mon = pick(pool);
+    state.caught.push(makeIndividual(mon.id, rand(2, 12), mon._tier, false));
+    state.seen[mon.id] = true; state.totalCaught++;
+  }
+  save();
+  return `จับ ${n} ตัว + ${coins}🪙`;
+}
+function activateCatchbot() {
+  const c = state.catchbot;
+  if (c.active) { toast('🤖 Catchbot ทำงานอยู่แล้ว', ''); return; }
+  c.active = true; c.startedAt = Date.now();
+  save(); renderMenu();
+  toast(`🤖 เปิด Catchbot! จับ ~${catchbotRate(c)}/ชม. สูงสุด ${catchbotHours(c)} ชม. — เก็บผลตอนกลับมา`, 'good');
+}
+function upgradeCatchbot(axis) {
+  const c = state.catchbot;
+  const lvl = c[axis] || 0, cost = catchbotUpCost(lvl);
+  if (!spend(cost)) return;
+  c[axis] = lvl + 1;
+  save(); renderMenu(); renderTopbar();
+  toast('🤖 อัปเกรด Catchbot แล้ว', 'good');
+}
+// ---------- Lockbox ----------
+function openLockbox() {
+  if ((state.lockboxes || 0) <= 0) { toast('❌ ไม่มีกล่องสุ่ม', 'bad'); return; }
+  state.lockboxes--;
+  const total = LOCKBOX_REWARDS.reduce((s, r) => s + r.w, 0);
+  let roll = Math.random() * total, chosen = LOCKBOX_REWARDS[0];
+  for (const r of LOCKBOX_REWARDS) { if ((roll -= r.w) < 0) { chosen = r; break; } }
+  const desc = chosen.act();
+  save(); renderTopbar(); renderMenu(); renderBallBar();
+  toast(`🎁 เปิดกล่องได้: <b>${desc}</b>!`, 'good');
+  logMsg(`🎁 เปิดกล่องสุ่มได้ <b>${desc}</b>`, 'big');
+  playSfx('rare');
 }
 
 // ================================================================
@@ -1791,6 +1929,11 @@ function renderProfile() {
       <div class="stat-tile"><div class="st-num">${avgIv()}%</div><div class="st-lbl">IV เฉลี่ย</div></div>
       <div class="stat-tile"><div class="st-num">${playH}ชม ${playM}น</div><div class="st-lbl">⏱️ เวลาเล่น</div></div>
     </div>
+    <div style="margin-top:10px;font-size:12px;font-weight:700">🔥 สตรีคจับต่อเนื่อง</div>
+    <div class="party-strip" style="gap:4px">
+      ${TIER_ORDER.map(t => `<span class="pill" style="font-size:10px">${TIER_EMOJI[t]} ${state.streaks[t] || 0}</span>`).join('')}
+    </div>
+    <div style="margin-top:6px;font-size:11px;color:var(--muted)">🪙 Amulet Coin ${state.amulets || 0}/${AMULET_MAX} (เงิน +${(state.amulets || 0) * 5}%)</div>
     <div style="margin-top:10px;font-size:12px;font-weight:700">👥 ทีม (${state.party.length}/6)</div>
     ${partyStrip}</div>`;
 }
