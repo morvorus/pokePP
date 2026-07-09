@@ -167,6 +167,13 @@ const GYMS = [
 
 const EGG_PRICE = 450, STONE_PRICE = 600, EGG_HATCH_CATCHES = 15;
 
+// ไข่หลายชนิด — ฟักแล้วสุ่มจาก pool ต่างกัน + โอกาส shiny ต่างกัน
+const EGG_KINDS = {
+  mystery: { name: 'ไข่ปริศนา', catches: 15, price: 450, shinyMul: 3, tiers: null },
+  rare:    { name: 'ไข่หายาก', catches: 22, price: 1200, shinyMul: 4, tiers: ['rare', 'superrare'] },
+  gold:    { name: 'ไข่ทอง',   catches: 30, price: 3000, shinyMul: 8, tiers: ['superrare', 'legendary'] },
+};
+
 // ตารางธาตุแพ้ทาง (attacker -> {defender: multiplier}) เฉพาะที่ไม่ใช่ 1x
 const TYPE_CHART = {
   normal: { rock: .5, ghost: 0, steel: .5 },
@@ -356,6 +363,8 @@ function newSave() {
     candies: 0,          // Rare Candy (เลเวลอัพทันที)
     fishTokens: 0,       // เหรียญตกปลา
     fishReadyAt: 0,      // คูลดาวน์ตกปลา (timestamp)
+    safariTickets: 0,    // ตั๋ว Safari
+    safari: { left: 0 }, // จำนวน spawn บูสต์ที่เหลือใน Safari
     heldInv: {},         // คลัง Held Item ที่ยังไม่ได้สวม {key:count}
     gymsBeaten: {},      // {gymId:true} ยิมที่ชนะแล้ว
     selBall: 'poke',
@@ -696,6 +705,19 @@ function pickFromRegion(r, tier) {
 }
 function doSpawn() {
   clearTimeout(spawnTimer);   // กัน spawn ซ้อน
+  // Safari Zone: spawn บูสต์ตัวหายากมาก จำกัดจำนวนครั้ง
+  if (state.safari && state.safari.left > 0) {
+    state.safari.left--;
+    const legChance = LEGENDARY_CHANCE * 8;   // เจอเลเจนดารีง่ายขึ้นมากใน Safari
+    let mon;
+    if (Math.random() < legChance) mon = pick(MONSTERS.filter(m => m._tier === 'legendary'));
+    else { let t = rollRarity(3); const pool = MONSTERS.filter(m => m._tier === t); mon = pick(pool.length ? pool : MONSTERS); }
+    const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier() * 2;
+    beginSpawn(mon, shiny, false);
+    renderRegionBanner();
+    if (state.safari.left <= 0) { toast('🎫 หมดเวลา Safari แล้ว', ''); }
+    return;
+  }
   const r = region();
   const luck = r.boost + (isEventActive() ? 1 : 0);
   let mon;
@@ -760,6 +782,16 @@ function fish() {
   }
   save(); renderTopbar(); updateFishBtn();
 }
+const SAFARI_SPAWNS = 8;
+function enterSafari() {
+  if (state.safari && state.safari.left > 0) { toast('🎫 อยู่ใน Safari อยู่แล้ว', ''); return; }
+  if ((state.safariTickets || 0) <= 0) { toast('❌ ไม่มีตั๋ว Safari (ซื้อที่ร้าน)', 'bad'); return; }
+  state.safariTickets--;
+  state.safari = { left: SAFARI_SPAWNS };
+  toast(`🎫 เข้า Safari Zone! ${SAFARI_SPAWNS} ตัวถัดไปหายากสุดๆ`, 'good');
+  logMsg(`🎫 เข้า Safari Zone (${SAFARI_SPAWNS} ตัว) — ลุ้นตัวหายาก/เลเจนดารี!`, 'big');
+  clearSpawn(); scheduleSpawn(1200); renderTopbar();
+}
 function updateFishBtn() {
   const btn = $('#fishBtn'); if (!btn) return;
   const left = Math.ceil(((state.fishReadyAt || 0) - Date.now()) / 1000);
@@ -787,7 +819,8 @@ function renderRegionBanner() {
   const w = WEATHERS[getWeather(r.id)];
   const timeIco = timeOfDay() === 'night' ? '🌙' : '☀️';
   const ev = isEventActive() ? ' · <b style="color:var(--accent)">✨อีเวนต์ x2</b>' : '';
-  $('#rbLvl').innerHTML = `${timeIco} · ${w.emoji}${w.name}${ev}`;
+  const safari = (state.safari && state.safari.left > 0) ? ` · <b style="color:#ffd76b">🎫 Safari เหลือ ${state.safari.left}</b>` : '';
+  $('#rbLvl').innerHTML = `${timeIco} · ${w.emoji}${w.name}${ev}${safari}`;
   const card = $('#spawnCard');
   card.style.background = r.bg;
   card.classList.toggle('night', timeOfDay() === 'night');
@@ -1268,6 +1301,7 @@ function openIndividualModal(uid) {
       ${(state.candies > 0 && ind.level < 100) ? `<button class="btn-primary" id="mCandy">🍬 Rare Candy (มี ${state.candies})</button>` : ''}
       <button class="btn-ghost" id="mNick">✏️ ตั้งชื่อเล่น</button>
       <button class="btn-ghost" id="mLock">${ind.locked ? '🔒 ล็อกอยู่' : '🔓 ล็อก'}</button>
+      <button class="btn-primary" id="mTrade" ${ind.locked ? 'disabled' : ''}>🔄 เทรด NPC</button>
       <button class="btn-danger" id="mRelease" ${ind.locked ? 'disabled' : ''}>ปล่อย</button>
       <button class="btn-ghost" id="mClose">ปิด</button>
     </div>`;
@@ -1276,6 +1310,7 @@ function openIndividualModal(uid) {
   const bb = $('#mBuddy'); if (bb && !isBuddy) bb.onclick = () => { setBuddy(uid); openIndividualModal(uid); renderCurrentView(); };
   const pt = $('#mParty'); if (pt) pt.onclick = () => { inParty(uid) ? removeFromParty(uid) : addToParty(uid); openIndividualModal(uid); renderCurrentView(); };
   const rl = $('#mRelease'); if (rl && !ind.locked) rl.onclick = () => releaseIndividual(uid);
+  const tr = $('#mTrade'); if (tr && !ind.locked) tr.onclick = () => tradeNpc(uid);
   const lk = $('#mLock'); if (lk) lk.onclick = () => { ind.locked = !ind.locked; save(); openIndividualModal(uid); };
   const sn = $('#mStone'); if (sn) sn.onclick = () => {
     if ((state.stones || 0) <= 0) { toast('❌ ไม่มีหินวิวัฒนาการ', 'bad'); return; }
@@ -1296,6 +1331,31 @@ function openIndividualModal(uid) {
   const un = $('#hUnequip'); if (un) un.onclick = () => { unequipHeld(uid); openIndividualModal(uid); };
   $('#modalBox').querySelectorAll('[data-held]').forEach(b =>
     b.onclick = () => { equipHeld(uid, b.dataset.held); openIndividualModal(uid); });
+}
+function tradeNpc(uid) {
+  const idx = state.caught.findIndex(c => c.uid === uid);
+  if (idx < 0) return;
+  const ind = state.caught[idx];
+  if (ind.locked) { toast('🔒 ตัวนี้ถูกล็อกอยู่', 'bad'); return; }
+  if (inParty(uid)) { toast('❌ เอาออกจากทีมก่อนเทรด', 'bad'); return; }
+  if (!confirm(`เทรด ${MON_BY_ID[ind.id].name} กับ NPC เพื่อสุ่มตัวใหม่? (ตัวเดิมจะหายไป)`)) return;
+  // สุ่มตัวใหม่: ระดับเดียวกันหรือลุ้นอัปเกรด, เลเวลใกล้เคียง
+  let tierIdx = TIER_ORDER.indexOf(ind.tier);
+  if (Math.random() < 0.25 && tierIdx < TIER_ORDER.length - 1) tierIdx++;   // 25% ได้ระดับสูงขึ้น
+  const tier = TIER_ORDER[tierIdx];
+  const pool = MONSTERS.filter(m => m._tier === tier);
+  const mon = pick(pool.length ? pool : MONSTERS);
+  const shiny = Math.random() < SHINY_CHANCE * 2;
+  const level = clamp(ind.level + rand(-3, 3), 1, 100);
+  state.caught.splice(idx, 1);
+  state.party = state.party.filter(u => u !== uid);
+  state.buddyUid = state.party[0] || null;
+  const nu = makeIndividual(mon.id, level, mon._tier, shiny);
+  state.caught.push(nu); state.seen[mon.id] = true;
+  save(); renderTopbar();
+  toast(`🔄 เทรดได้ ${shiny ? '✨' : ''}<b>${mon.name}</b> (${TIER_LABEL[mon._tier]}) Lv.${level}!`, 'good');
+  logMsg(`🔄 เทรด ${MON_BY_ID[ind.id].name} → <b>${mon.name}</b> (${TIER_LABEL[mon._tier]})`, 'big');
+  checkAchievements(); closeModal(); openIndividualModal(nu.uid); renderCurrentView();
 }
 function releaseIndividual(uid) {
   const idx = state.caught.findIndex(c => c.uid === uid);
@@ -1329,7 +1389,10 @@ function renderShop() {
     { emoji: '🍓', img: 'razz-berry', name: 'Razz Berry ×3', desc: 'โยนก่อนปา เพิ่มโอกาสจับ +13%', price: BERRIES.razz.price * 3, act: () => addBerries('razz', 3, BERRIES.razz.price * 3) },
     { emoji: '🥭', img: 'nanab-berry', name: 'Golden Razz ×1', desc: 'เพิ่มโอกาสจับ +32%', price: BERRIES.golden.price, act: () => addBerries('golden', 1, BERRIES.golden.price) },
     { emoji: '🍬', img: 'rare-candy', name: 'Rare Candy ×3', desc: 'เลเวลอัพทันที (ใช้กับตัวใดก็ได้ในคลัง)', price: 450, act: () => { if (spend(450)) { state.candies = (state.candies || 0) + 3; toast('🍬 +3 Rare Candy', 'good'); postBuy(); } } },
-    { emoji: '🥚', name: 'ไข่ปริศนา', desc: `ฟักเมื่อจับครบ ${EGG_HATCH_CATCHES} ตัว`, price: EGG_PRICE, act: buyEgg },
+    { emoji: '🎫', name: 'ตั๋ว Safari', desc: `เข้า Safari Zone ${SAFARI_SPAWNS} ตัวหายากสุดๆ (กดปุ่ม Safari หน้าล่า)`, price: 800, act: () => { if (spend(800)) { state.safariTickets = (state.safariTickets || 0) + 1; toast('🎫 +1 ตั๋ว Safari', 'good'); postBuy(); } } },
+    { emoji: '🥚', name: EGG_KINDS.mystery.name, desc: `ฟักเมื่อจับครบ ${EGG_KINDS.mystery.catches} ตัว · สุ่มทุกระดับ`, price: EGG_KINDS.mystery.price, act: () => buyEgg('mystery') },
+    { emoji: '🥚', name: EGG_KINDS.rare.name, desc: `ฟักครบ ${EGG_KINDS.rare.catches} ตัว · ออก Rare/Super Rare`, price: EGG_KINDS.rare.price, act: () => buyEgg('rare') },
+    { emoji: '🥚', name: EGG_KINDS.gold.name + ' ✨', desc: `ฟักครบ ${EGG_KINDS.gold.catches} ตัว · ออก Super Rare/Legendary · ลุ้น Shiny สูง`, price: EGG_KINDS.gold.price, act: () => buyEgg('gold') },
     { emoji: '💎', name: 'หินวิวัฒนาการ', desc: 'วิวัฒนาการตัวที่ต้องใช้ไอเทม', price: STONE_PRICE, act: () => { if (spend(STONE_PRICE)) { state.stones = (state.stones || 0) + 1; toast('💎 +1 หินวิวัฒนาการ', 'good'); postBuy(); } } },
     { emoji: CHARMS.shiny.emoji, img: CHARMS.shiny.img, name: 'Shiny Charm', desc: CHARMS.shiny.desc + ' · 30 นาที (กดใช้ในเมนู)', price: CHARMS.shiny.price, act: () => buyCharm('shiny') },
     { emoji: CHARMS.catch.emoji, img: CHARMS.catch.img, name: 'Catch Charm', desc: CHARMS.catch.desc + ' · 30 นาที', price: CHARMS.catch.price, act: () => buyCharm('catch') },
@@ -1372,7 +1435,10 @@ function unequipHeld(uid) {
   state.heldInv[ind.held] = (state.heldInv[ind.held] || 0) + 1; ind.held = null;
   save(); toast('ถอดไอเทมแล้ว', '');
 }
-function buyEgg() { if (spend(EGG_PRICE)) { state.eggs.push({ progressStart: state.totalCaught }); toast(`🥚 ได้ไข่! จับอีก ${EGG_HATCH_CATCHES} ตัวเพื่อฟัก`, 'good'); postBuy(); } }
+function buyEgg(kind) {
+  const k = kind || 'mystery', e = EGG_KINDS[k];
+  if (spend(e.price)) { state.eggs.push({ kind: k, progressStart: state.totalCaught }); toast(`🥚 ได้${e.name}! จับอีก ${e.catches} ตัวเพื่อฟัก`, 'good'); postBuy(); }
+}
 
 // ================================================================
 //  EGGS
@@ -1380,16 +1446,18 @@ function buyEgg() { if (spend(EGG_PRICE)) { state.eggs.push({ progressStart: sta
 function checkEggHatch() {
   let hatched = false;
   state.eggs = state.eggs.filter(egg => {
-    if (state.totalCaught - egg.progressStart >= EGG_HATCH_CATCHES) {
-      const tier = weightedTier(1);
-      const pool = MONSTERS.filter(m => m._tier === tier);
-      const mon = pick(pool.length ? pool : MONSTERS);
-      const shiny = Math.random() < SHINY_CHANCE * 3;   // ไข่มีโอกาส shiny สูงกว่า
+    const e = EGG_KINDS[egg.kind || 'mystery'];
+    if (state.totalCaught - egg.progressStart >= e.catches) {
+      let mon;
+      const tp = e.tiers ? MONSTERS.filter(m => e.tiers.includes(m._tier)) : null;
+      if (tp && tp.length) mon = pick(tp);
+      else { const tier = weightedTier(1); const p = MONSTERS.filter(m => m._tier === tier); mon = pick(p.length ? p : MONSTERS); }
+      const shiny = Math.random() < SHINY_CHANCE * (e.shinyMul || 3);
       const ind = makeIndividual(mon.id, rand(3, 12), mon._tier, shiny);
       state.caught.push(ind); state.seen[mon.id] = true; state.totalCaught++;
-      toast(`🥚➡️ ไข่ฟักเป็น ${shiny ? '✨' : ''}<b>${mon.name}</b>!`, 'good');
-      logMsg(`🥚 ไข่ฟักเป็น <b>${mon.name}</b> (${TIER_LABEL[mon._tier]})`, 'big');
-      hatched = true; return false;
+      toast(`🥚➡️ ${e.name}ฟักเป็น ${shiny ? '✨' : ''}<b>${mon.name}</b>!`, 'good');
+      logMsg(`🥚 ${e.name}ฟักเป็น <b>${mon.name}</b> (${TIER_LABEL[mon._tier]})`, 'big');
+      playSfx('rare'); hatched = true; return false;
     }
     return true;
   });
@@ -1457,11 +1525,12 @@ function renderEggs() {
       <div class="si-name">ยังไม่มีไข่</div><div class="si-desc">ซื้อได้ที่ร้านค้า</div></div></div>`; return;
   }
   box.innerHTML = state.eggs.map((egg, i) => {
-    const prog = clamp(state.totalCaught - egg.progressStart, 0, EGG_HATCH_CATCHES);
+    const e = EGG_KINDS[egg.kind || 'mystery'];
+    const prog = clamp(state.totalCaught - egg.progressStart, 0, e.catches);
     return `<div class="egg-item"><div class="emoji">🥚</div><div class="eb">
-      <div class="si-name">ไข่ #${i + 1}</div>
-      <div class="quest-bar"><div class="quest-fill" style="width:${prog / EGG_HATCH_CATCHES * 100}%"></div></div>
-      <div class="si-desc">ฟักเมื่อจับครบ: ${prog}/${EGG_HATCH_CATCHES} ตัว</div></div></div>`;
+      <div class="si-name">${e.name}${egg.kind === 'gold' ? ' ✨' : ''}</div>
+      <div class="quest-bar"><div class="quest-fill" style="width:${prog / e.catches * 100}%"></div></div>
+      <div class="si-desc">ฟักเมื่อจับครบ: ${prog}/${e.catches} ตัว${e.tiers ? ' · ออกตัว ' + e.tiers.map(t => TIER_LABEL[t]).join('/') : ''}</div></div></div>`;
   }).join('');
 }
 
@@ -2068,6 +2137,7 @@ function init() {
 
   $('#battleBtn').addEventListener('click', () => startBattle(false));
   $('#fishBtn').addEventListener('click', fish);
+  $('#safariBtn').addEventListener('click', enterSafari);
   updateFishBtn();
   setInterval(updateFishBtn, 1000);
   $('#toMapBtn').addEventListener('click', () => switchView('map'));
