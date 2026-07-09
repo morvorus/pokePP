@@ -33,9 +33,10 @@ const SPAWN_MIN = 9000, SPAWN_MAX = 16000;
 const FLEE_MS = 45000;
 const SHINY_CHANCE = 1 / 380;
 
-// รางวัลเงิน/XP ตามระดับ
-const TIER_COIN = { common: 10, uncommon: 22, rare: 55, superrare: 130, legendary: 320 };
-const TIER_XP   = { common: 14, uncommon: 26, rare: 55, superrare: 110, legendary: 240 };
+// รางวัลเงิน/XP ตามระดับ (ค่าเหรียญอิงตาม PokeMeow)
+const TIER_COIN = { common: 10, uncommon: 25, rare: 60, superrare: 200, legendary: 1000 };
+const TIER_XP   = { common: 14, uncommon: 26, rare: 55, superrare: 120, legendary: 300 };
+const LEGENDARY_CHANCE = 1 / 666;   // สุ่มแยกอิสระแบบ PokeMeow
 const TIER_LABEL = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', superrare: 'Super Rare', legendary: 'Legendary' };
 const TIER_ORDER = ['common', 'uncommon', 'rare', 'superrare', 'legendary'];
 
@@ -573,24 +574,46 @@ function shinyMultiplier() {
   if (timeOfDay() === 'night') m *= 1.3;
   return m;
 }
-function doSpawn() {
-  clearTimeout(spawnTimer);   // กัน spawn ซ้อน
-  const r = region();
-  let boost = r.boost + (isEventActive() ? 1 : 0);   // อีเวนต์ดันโอกาสตัวหายาก
-  let tier = weightedTier(Math.min(2, boost));
-  // ถ้าเขตนี้ไม่มีตัวระดับนั้น ลดระดับลงเรื่อยๆ
+// ชั้น2 แบบ PokeMeow: Common 40% · Uncommon 30% · Rare 27% · Super Rare 3% (legendary แยกอิสระ)
+// luck สูง (เขต boost/อีเวนต์) ดันโอกาสตัวหายากขึ้น
+function rollRarity(luck) {
+  const srP = 3 + luck * 3;        // super rare
+  const raP = 27 + luck * 5;       // rare
+  const unP = 30;                  // uncommon
+  const roll = Math.random() * 100;
+  if (roll < srP) return 'superrare';
+  if (roll < srP + raP) return 'rare';
+  if (roll < srP + raP + unP) return 'uncommon';
+  return 'common';                 // ที่เหลือ ~40%
+}
+function pickFromRegion(r, tier) {
+  // ลดระดับถ้าเขตนี้ไม่มีตัว tier นั้น
   let ti = TIER_ORDER.indexOf(tier);
-  while (ti >= 0 && (!r._byTier[TIER_ORDER[ti]] || !r._byTier[TIER_ORDER[ti]].length)) ti--;
-  tier = TIER_ORDER[Math.max(0, ti)];
-  let pool = r._byTier[tier];
+  while (ti >= 0 && !(r._byTier[TIER_ORDER[ti]] || []).length) ti--;
+  let pool = ti >= 0 ? r._byTier[TIER_ORDER[ti]] : null;
   if (!pool || !pool.length) pool = r._pool.length ? r._pool : MONSTERS;
   // เอนไปตามอากาศ/เวลา: 55% พยายามเลือกตัวธาตุที่ถูกบูสต์
   const boostTypes = spawnBoostTypes();
-  let mon;
   if (boostTypes.size && Math.random() < 0.55) {
     const sub = pool.filter(m => m.types.some(t => boostTypes.has(t)));
-    mon = sub.length ? pick(sub) : pick(pool);
-  } else mon = pick(pool);
+    if (sub.length) return pick(sub);
+  }
+  return pick(pool);
+}
+function doSpawn() {
+  clearTimeout(spawnTimer);   // กัน spawn ซ้อน
+  const r = region();
+  const luck = r.boost + (isEventActive() ? 1 : 0);
+  let mon;
+  // ชั้น1: legendary สุ่มแยกอิสระ (1/666 ปรับตามเขต/อีเวนต์)
+  const legChance = LEGENDARY_CHANCE * (1 + r.boost * 0.6) * (isEventActive() ? 2 : 1);
+  const legPool = r._byTier.legendary.length ? r._byTier.legendary : MONSTERS.filter(m => m._tier === 'legendary');
+  if (Math.random() < legChance && legPool.length) {
+    mon = pick(legPool);
+  } else {
+    mon = pickFromRegion(r, rollRarity(luck));
+  }
+  // ชั้น shiny: overlay สุ่มแยกอิสระ (ซ้อนตัวที่สุ่มได้)
   const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier();
   const level = levelFor(mon._tier);
   const maxHp = wildMaxHp(mon, level);
@@ -804,7 +827,7 @@ function onCatchSuccess(ballKey) {
   state.seen[mon.id] = true;
   state.totalCaught++;
 
-  const coins = Math.round(TIER_COIN[tier] * (1 + level / 40) * (shiny ? 3 : 1));
+  const coins = Math.round(TIER_COIN[tier] * (1 + level / 100) * (shiny ? 3 : 1));
   const xp = Math.round(TIER_XP[tier] * (1 + level / 50));
   state.coins += coins;
 
@@ -855,6 +878,17 @@ function selectRegion(id) {
   toast(`${r.emoji} เดินทางสู่ <b>${r.name}</b>`, 'good');
 }
 
+// % โอกาสเจอแต่ละระดับของเขต (ตามระบบ PokeMeow — ใช้แสดงในแผนที่)
+function regionRates(r) {
+  const luck = r.boost;
+  const superrare = 3 + luck * 3;
+  const rare = 27 + luck * 5;
+  const uncommon = 30;
+  const common = Math.max(0, 100 - superrare - rare - uncommon);
+  const legendary = LEGENDARY_CHANCE * (1 + r.boost * 0.6) * 100;
+  return { common, uncommon, rare, superrare, legendary };
+}
+
 // ================================================================
 //  MAP view
 // ================================================================
@@ -863,10 +897,9 @@ function renderMap() {
   $('#mapGrid').innerHTML = REGIONS.map(r => {
     const locked = r.unlock && !state.unlocked[r.id];
     const active = state.region === r.id;
-    const w = TIER_WEIGHTS[r.boost];
-    const total = TIER_ORDER.reduce((s, t) => s + w[t], 0);
+    const rt = regionRates(r);
     const rates = TIER_ORDER.filter(t => r._byTier[t] && r._byTier[t].length)
-      .map(t => `<span class="mc-rate rarity-${t}">${TIER_LABEL[t]} ${(w[t] / total * 100).toFixed(t === 'legendary' || t === 'superrare' ? 1 : 0)}%</span>`).join('');
+      .map(t => `<span class="mc-rate rarity-${t}">${TIER_EMOJI[t]} ${TIER_LABEL[t]} ${rt[t] < 1 ? rt[t].toFixed(2) : rt[t].toFixed(t === 'superrare' ? 1 : 0)}%</span>`).join('');
     const beaten = state.badges[r.id];
     return `<div class="map-card${active ? ' active-region' : ''}${locked ? ' locked' : ''}" style="background:${r.bg}">
       <div class="mc-deco">${r.deco.map((d, i) => `<span style="position:absolute;left:${10 + i * 22}%;top:${12 + (i % 3) * 24}%">${d}</span>`).join('')}</div>
