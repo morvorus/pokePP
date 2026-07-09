@@ -152,6 +152,19 @@ const HELD_ITEMS = {
 };
 const HELD_ORDER = Object.keys(HELD_ITEMS);
 
+// ยิม/เทรนเนอร์ — สู้ทีมหลายตัว ปลดล็อกทีละด่าน (แบบเดินสายยิม PokeMeow)
+const GYMS = [
+  { id: 'g1', name: 'ยิมหญ้า',    emoji: '🌿', type: 'grass',    lvl: 18, count: 2, reward: 300 },
+  { id: 'g2', name: 'ยิมน้ำ',     emoji: '💧', type: 'water',    lvl: 26, count: 2, reward: 500 },
+  { id: 'g3', name: 'ยิมไฟ',      emoji: '🔥', type: 'fire',     lvl: 34, count: 3, reward: 800 },
+  { id: 'g4', name: 'ยิมไฟฟ้า',   emoji: '⚡', type: 'electric', lvl: 42, count: 3, reward: 1200 },
+  { id: 'g5', name: 'ยิมพิษ',     emoji: '☠️', type: 'poison',   lvl: 50, count: 3, reward: 1700 },
+  { id: 'g6', name: 'ยิมหิน',     emoji: '🪨', type: 'rock',     lvl: 58, count: 3, reward: 2300 },
+  { id: 'g7', name: 'ยิมจิต',     emoji: '🔮', type: 'psychic',  lvl: 66, count: 3, reward: 3200 },
+  { id: 'g8', name: 'ยิมมังกร',   emoji: '🐉', type: 'dragon',   lvl: 74, count: 3, reward: 4500 },
+  { id: 'champ', name: 'แชมป์เปี้ยน', emoji: '👑', type: null,   lvl: 84, count: 4, reward: 8000 },
+];
+
 const EGG_PRICE = 450, STONE_PRICE = 600, EGG_HATCH_CATCHES = 15;
 
 // ตารางธาตุแพ้ทาง (attacker -> {defender: multiplier}) เฉพาะที่ไม่ใช่ 1x
@@ -344,6 +357,7 @@ function newSave() {
     fishTokens: 0,       // เหรียญตกปลา
     fishReadyAt: 0,      // คูลดาวน์ตกปลา (timestamp)
     heldInv: {},         // คลัง Held Item ที่ยังไม่ได้สวม {key:count}
+    gymsBeaten: {},      // {gymId:true} ยิมที่ชนะแล้ว
     selBall: 'poke',
     region: 'plains',
     unlocked: { plains: true },
@@ -1475,6 +1489,7 @@ function renderMenu() {
   $('#profileBox').innerHTML = renderProfile();
   $('#profileBox').querySelectorAll('.party-mini[data-uid]').forEach(el =>
     el.onclick = () => openIndividualModal(el.dataset.uid));
+  renderGyms();
   renderCharms();
   renderDexRewards();
   const done = ACHIEVEMENTS.filter(a => state.achievements[a.id]).length;
@@ -1544,6 +1559,25 @@ function renderMenu() {
   $('#btnReset').onclick = () => { if (confirm('รีเซ็ตเกมทั้งหมด? ข้อมูลจะหายถาวร')) resetGame(); };
 }
 
+function renderGyms() {
+  const box = $('#gymBox'); if (!box) return;
+  box.innerHTML = GYMS.map((g, i) => {
+    const beaten = state.gymsBeaten[g.id];
+    const unlocked = i === 0 || state.gymsBeaten[GYMS[i - 1].id];
+    return `<div class="ach${beaten ? ' done' : ''}">
+      <div class="ach-ico">${g.emoji}</div>
+      <div class="ach-body">
+        <div class="ach-name">${g.name} ${beaten ? '✅' : ''}</div>
+        <div class="ach-desc">${g.type ? 'ธาตุ ' + g.type + ' · ' : ''}${g.count} ตัว · ~Lv.${g.lvl} · รางวัล ${g.reward}🪙</div>
+      </div>
+      ${unlocked
+        ? `<button class="claim-btn" data-gym="${g.id}">${beaten ? 'สู้อีก' : 'ท้าสู้'}</button>`
+        : '<div class="ach-state">🔒</div>'}
+    </div>`;
+  }).join('');
+  box.querySelectorAll('.claim-btn[data-gym]').forEach(btn =>
+    btn.onclick = () => startTrainerBattle(btn.dataset.gym));
+}
 function renderCharms() {
   const box = $('#charmBox'); if (!box) return;
   box.innerHTML = CHARM_ORDER.map(k => {
@@ -1774,7 +1808,9 @@ function startBattle(isBoss, bossData) {
   }
   const team = members.map(ind => { const s = statsWithHeld(ind); return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false }; });
   battleState = {
+    mode: isBoss ? 'boss' : 'wild',
     isBoss, bossData, foeMon, foeLevel, foeStats, foeHp, foeMaxHp,
+    foeQueue: [{ mon: foeMon }], foeIdx: 0,
     team, activeIdx: 0, over: false, lost: false,
     msg: isBoss ? `👑 บอส ${foeMon.name} ท้าดวล!` : `เจอ ${foeMon.name} ป่า — เลือกท่าโจมตี!`,
   };
@@ -1805,6 +1841,7 @@ function renderBattle() {
   $('#battleBox').innerHTML = `
     <div class="battle-arena">
       <div class="bt-side foe">
+        ${b.mode === 'trainer' ? `<div style="font-size:11px;color:#ffb3bb;font-weight:700">${b.gym.emoji} ${b.gym.name} · เหลือศัตรู ${b.foeQueue.length - b.foeIdx}/${b.foeQueue.length}</div>` : ''}
         <div class="bt-head"><span>${b.isBoss ? '👑 ' : ''}${b.foeMon.name} Lv.${b.foeLevel} ${b.foeMon.types.map(t => `<span class="badge t-${t}" style="font-size:9px;padding:1px 6px">${t}</span>`).join('')}</span>${spriteImg(b.foeMon.id, false)}</div>
         <div class="bt-hpbar"><div class="${hpCls(b.foeHp, b.foeMaxHp)}" style="width:${foePct}%"></div></div>
         <div class="hp-txt" style="text-align:left">HP ${Math.ceil(b.foeHp)}/${b.foeMaxHp}</div>
@@ -1859,12 +1896,13 @@ function battleAttack(moveIdx) {
   const mon = MON_BY_ID[active.ind.id];
   const mv = getMoves(active.ind.id)[moveIdx] || getMoves(active.ind.id)[0];
   const atk = calcDamage(mon, active.stats, active.ind.level, b.foeMon, b.foeStats, mv, active.ind.held);
-  b.foeHp = Math.max(b.isBoss ? 0 : 1, b.foeHp - atk.dmg);
+  const koMode = b.mode !== 'wild';
+  b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - atk.dmg);
   b.msg = `${mon.name} ใช้ ${mv.name}! -${atk.dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
-  if (!b.isBoss && currentSpawn) currentSpawn.hp = b.foeHp;
+  if (b.mode === 'wild' && currentSpawn) currentSpawn.hp = b.foeHp;
 
   if (b.foeHp <= 0) { onFoeDown(); save(); renderBattle(); return; }
-  if (!b.isBoss && b.foeHp <= 1) {
+  if (b.mode === 'wild' && b.foeHp <= 1) {
     b.over = true;
     b.msg = `${b.foeMon.name} อ่อนแรงสุดขีด! รีบปาบอลเลย — จับง่ายสุด ✅`;
     gainXpTo(active.ind, Math.round(b.foeLevel)); gainTrainerXp(4);
@@ -1895,8 +1933,30 @@ function battleSwitch(idx) {
   save(); renderBattle();
 }
 function onFoeDown() {
-  const b = battleState; b.over = true;
+  const b = battleState;
   const active = b.team[b.activeIdx];
+  if (b.mode === 'trainer') {
+    const downed = b.foeMon.name;
+    gainXpTo(active.ind, Math.round(b.foeLevel * 1.5)); gainTrainerXp(15);
+    b.foeIdx++;
+    if (b.foeIdx < b.foeQueue.length) {
+      loadFoe(b, b.foeQueue[b.foeIdx]);
+      b.msg = `${downed} ล้ม! ${b.gym.emoji} ${b.gym.name} ส่ง ${b.foeMon.name} Lv.${b.foeLevel} ลงต่อ! (เหลือ ${b.foeQueue.length - b.foeIdx})`;
+      return;   // ยังไม่จบ สู้ตัวต่อไป
+    }
+    // ชนะยิม
+    b.over = true;
+    const g = b.gym, first = !state.gymsBeaten[g.id];
+    state.gymsBeaten[g.id] = true;
+    state.coins += g.reward;
+    if (first) { state.balls.ultra = (state.balls.ultra || 0) + 3; state.fishTokens = (state.fishTokens || 0) + 5; }
+    gainTrainerXp(120);
+    b.msg = `🏆 ชนะ ${g.emoji} ${g.name}! +${g.reward}🪙${first ? ' +Ultra×3 (ชนะครั้งแรก!)' : ''}`;
+    logMsg(`🏆 พิชิต <b>${g.name}</b>! +${g.reward}🪙`, 'big');
+    playSfx('rare'); checkAchievements(); save(); renderTopbar();
+    return;
+  }
+  b.over = true;
   if (b.isBoss) {
     state.badges[b.bossData.region.id] = true;
     const reward = 200 + b.foeLevel * 10;
@@ -1914,11 +1974,12 @@ function onFoeDown() {
   }
 }
 function endBattle() {
-  const wasBoss = battleState && battleState.isBoss;
+  const wasMode = battleState ? battleState.mode : null;
   battleState = null;
   $('#battleModal').classList.add('hidden');
-  if (!wasBoss) { renderSpawn(); renderBerryBar(); }
+  if (wasMode === 'wild') { renderSpawn(); renderBerryBar(); }
   if (currentView === 'map') renderMap();
+  if (currentView === 'menu') renderMenu();
   renderTopbar();
 }
 function startBossBattle(regionId) {
@@ -1933,6 +1994,40 @@ function startBossBattle(regionId) {
   if (!bossMon) { toast('เขตนี้ยังไม่มีบอส', 'bad'); return; }
   const level = r.lvl[1] + 6;
   startBattle(true, { mon: bossMon, level, region: r });
+}
+// โหลดศัตรูตัวถัดไปเข้า current-foe fields (ใช้ในโหมดเทรนเนอร์)
+function makeFoeDef(mon, level) {
+  const base = statsForWild(mon, level);
+  return { mon, level, stats: { atk: base.atk, def: base.def, spatk: base.spatk, spdef: base.spdef, spd: base.spd }, maxHp: base.hp };
+}
+function loadFoe(b, def) {
+  b.foeMon = def.mon; b.foeLevel = def.level; b.foeStats = def.stats;
+  b.foeMaxHp = def.maxHp; b.foeHp = def.maxHp;
+}
+function startTrainerBattle(gymId) {
+  const g = GYMS.find(x => x.id === gymId); if (!g) return;
+  const idx = GYMS.indexOf(g);
+  const prevBeaten = idx === 0 || state.gymsBeaten[GYMS[idx - 1].id];
+  if (!prevBeaten) { toast('🔒 ต้องชนะยิมก่อนหน้าก่อน', 'bad'); return; }
+  const members = partyMembers();
+  if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
+  // สร้างทีมศัตรูจากธาตุยิม (แชมป์ = คละตัวหายาก)
+  const pool = g.type ? MONSTERS.filter(m => m.types.includes(g.type)) : MONSTERS.filter(m => m._tier === 'superrare' || m._tier === 'legendary');
+  const queue = [];
+  for (let i = 0; i < g.count; i++) {
+    const mon = pick(pool.length ? pool : MONSTERS);
+    const lv = g.lvl + rand(-2, 2) + (i === g.count - 1 ? 3 : 0);   // ตัวสุดท้ายแรงกว่า
+    queue.push(makeFoeDef(mon, lv));
+  }
+  const team = members.map(ind => { const s = statsWithHeld(ind); return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false }; });
+  battleState = {
+    mode: 'trainer', isBoss: false, gym: g, foeQueue: queue, foeIdx: 0,
+    foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp,
+    team, activeIdx: 0, over: false, lost: false,
+    msg: `${g.emoji} ${g.name} — ศัตรู ${g.count} ตัว! เลือกท่าโจมตี`,
+  };
+  renderBattle();
+  $('#battleModal').classList.remove('hidden');
 }
 
 // ================================================================
