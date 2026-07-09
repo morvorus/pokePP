@@ -9,10 +9,25 @@ const SAVE_KEY = 'pokepp_save_v2';
 // ใช้ jsDelivr CDN (เสถียร/เร็วกว่า raw.githubusercontent มาก โดยเฉพาะในไทย)
 const SP_BASE = 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon';
 const SP = {
+  anim5: id => `${SP_BASE}/versions/generation-v/black-white/animated/${id}.gif`,       // Gen1-5 เล็ก+ขยับ+เร็ว
+  anim5s: id => `${SP_BASE}/versions/generation-v/black-white/animated/shiny/${id}.gif`,
   gif:   id => `${SP_BASE}/other/showdown/${id}.gif`,
   shiny: id => `${SP_BASE}/other/showdown/shiny/${id}.gif`,
   art:   id => `${SP_BASE}/other/official-artwork/${id}.png`,
   png:   id => `${SP_BASE}/${id}.png`,
+};
+// ลำดับรูปที่จะลอง (เอาตัวเล็ก/ขยับก่อน แล้วค่อยตัวใหญ่/นิ่ง)
+function spriteChain(id, shiny) {
+  return id <= 649
+    ? (shiny ? [SP.anim5s(id), SP.gif(id), SP.shiny(id), SP.art(id), SP.png(id)]
+             : [SP.anim5(id), SP.gif(id), SP.art(id), SP.png(id)])
+    : (shiny ? [SP.shiny(id), SP.gif(id), SP.art(id), SP.png(id)]
+             : [SP.gif(id), SP.art(id), SP.png(id)]);
+}
+// ตัว fallback: เมื่อรูปโหลดไม่ได้ ไล่ไปรูปถัดไปในลิสต์
+window.__sf = function (img) {
+  const fb = (img.dataset.fb || '').split('|').filter(Boolean);
+  if (fb.length) { img.dataset.fb = fb.slice(1).join('|'); img.src = fb[0]; }
 };
 const SPAWN_MIN = 9000, SPAWN_MAX = 16000;
 const FLEE_MS = 45000;
@@ -245,9 +260,9 @@ let _uidc = 0;
 const genUid = () => Date.now().toString(36) + (_uidc++).toString(36) + Math.floor(Math.random() * 1e4).toString(36);
 
 function spriteImg(id, shiny, cls) {
-  const primary = shiny ? SP.shiny(id) : SP.gif(id);
-  return `<img class="${cls || ''}" src="${primary}"
-    onerror="this.onerror=null;this.src='${SP.art(id)}';this.onerror=function(){this.onerror=null;this.src='${SP.png(id)}';}" alt="">`;
+  const chain = spriteChain(id, shiny);
+  const first = chain[0], fb = chain.slice(1).join('|');
+  return `<img class="${cls || ''}" loading="lazy" src="${first}" data-fb="${fb}" onerror="__sf(this)" alt="">`;
 }
 function weightedTier(boost) {
   const w = TIER_WEIGHTS[boost] || TIER_WEIGHTS[0];
@@ -383,7 +398,7 @@ function logMsg(msg, kind) {
   el.className = 'log-item ' + (kind || '');
   el.innerHTML = msg;
   box.prepend(el);
-  while (box.children.length > 8) box.lastChild.remove();
+  while (box.children.length > 5) box.lastChild.remove();
 }
 function showRareAlert(mon, tier, shiny) {
   const el = $('#rareAlert');
@@ -460,8 +475,10 @@ function renderTopbar() {
   if (b) {
     const m = MON_BY_ID[b.id];
     const img = $('#buddyImg');
-    img.src = (b.shiny ? SP.shiny : SP.gif)(b.id);
-    img.onerror = function () { this.onerror = null; this.src = SP.png(b.id); };
+    const ch = spriteChain(b.id, b.shiny);
+    img.dataset.fb = ch.slice(1).join('|');
+    img.onerror = function () { __sf(this); };
+    img.src = ch[0];
     $('#buddyName').textContent = (b.shiny ? '✨' : '') + m.name;
     $('#buddyLv').textContent = 'Lv.' + b.level;
     const need = xpForLevel(b.level);
@@ -621,14 +638,13 @@ function renderRegionBanner() {
 function renderSpawn() {
   const card = $('#spawnCard');
   card.classList.remove('rare-glow', 'legend-glow', 'shiny-glow');
-  const throwBtn = $('#throwBtn'), battleBtn = $('#battleBtn');
+  const battleBtn = $('#battleBtn');
   if (!currentSpawn) {
     card.classList.add('empty');
     $('#spawnTop').innerHTML = '';
     $('#spawnTags').innerHTML = '';
     $('#wildHp').innerHTML = '';
     $('#spawnTimer').innerHTML = '<div class="empty-msg">🔎 กำลังค้นหาโปเกมอนในเขตนี้...</div>';
-    throwBtn.disabled = true;
     if (battleBtn) battleBtn.disabled = true;
     renderBerryBar();
     return;
@@ -649,7 +665,6 @@ function renderSpawn() {
     `<span class="badge rarity-${shiny ? 'shiny' : tier}">${shiny ? '✨ shiny' : TIER_EMOJI[tier] + ' ' + TIER_LABEL[tier]}</span>`;
   renderWildHp();
   renderBerryBar();
-  updateThrowBtn();
   if (battleBtn) {
     const b = getBuddy();
     battleBtn.disabled = !b;
@@ -693,7 +708,7 @@ function renderBallBar() {
       const k = el.dataset.ball;
       if ((state.balls[k] || 0) <= 0) { toast('❌ บอลชนิดนี้หมด', 'bad'); return; }
       if (currentSpawn && !throwing) { throwBall(k); }   // แตะบอล = โยนทันที
-      else { state.selBall = k; save(); renderBallBar(); updateThrowBtn(); }
+      else { state.selBall = k; save(); renderBallBar(); }
     };
   });
 }
@@ -723,15 +738,6 @@ function throwBerry(k) {
   logMsg(`${b.emoji} โยน ${b.name} ใส่ ${currentSpawn.mon.name}`, '');
   save(); renderBerryBar();
 }
-function updateThrowBtn() {
-  const btn = $('#throwBtn');
-  const have = state.balls[state.selBall] || 0;
-  if (!currentSpawn) { btn.disabled = true; btn.textContent = 'ยังไม่มีโปเกมอน'; return; }
-  if (have <= 0) { btn.disabled = true; btn.textContent = 'บอลหมด!'; return; }
-  btn.disabled = false;
-  btn.textContent = `ปา ${BALLS[state.selBall].emoji} ${BALLS[state.selBall].name}!`;
-}
-
 // ================================================================
 //  CATCH (ปาบอล)
 // ================================================================
@@ -779,7 +785,6 @@ function throwBall(k) {
   const sprite = $('#spawnSprite');
   ball.textContent = BALLS[k].emoji;
   ball.className = 'throw-ball'; void ball.offsetWidth; ball.classList.add('animate');
-  $('#throwBtn').disabled = true;
   setTimeout(() => {                       // ดูดโปเกมอนเข้าบอล แล้วเริ่มสั่น
     if (sprite) sprite.style.opacity = '0';
     ball.classList.remove('animate'); ball.classList.add('shake');
@@ -823,8 +828,6 @@ function onCatchFail(ballKey) {
   if (Math.random() < fledChance) {
     toast(`💨 ${currentSpawn.mon.name} หนีไปแล้ว!`, 'bad');
     clearSpawn(); scheduleSpawn();
-  } else {
-    updateThrowBtn();
   }
 }
 
@@ -1128,7 +1131,7 @@ function renderShop() {
   $('#shopGrid').querySelectorAll('.buy-btn[data-i]').forEach(btn => btn.onclick = () => items[+btn.dataset.i].act());
 }
 function spend(n) { if (state.coins < n) { toast('❌ เงินไม่พอ', 'bad'); return false; } state.coins -= n; return true; }
-function postBuy() { save(); renderTopbar(); renderShop(); renderBallBar(); updateThrowBtn(); }
+function postBuy() { save(); renderTopbar(); renderShop(); renderBallBar(); }
 function addBalls(k, n, price) { if (spend(price)) { state.balls[k] = (state.balls[k] || 0) + n; toast(`${BALLS[k].emoji} +${n} ${BALLS[k].name}`, 'good'); postBuy(); } }
 function addBerries(k, n, price) { if (spend(price)) { state.berries[k] = (state.berries[k] || 0) + n; toast(`${BERRIES[k].emoji} +${n} ${BERRIES[k].name}`, 'good'); postBuy(); renderBerryBar(); } }
 function buyEgg() { if (spend(EGG_PRICE)) { state.eggs.push({ progressStart: state.totalCaught }); toast(`🥚 ได้ไข่! จับอีก ${EGG_HATCH_CATCHES} ตัวเพื่อฟัก`, 'good'); postBuy(); } }
@@ -1700,7 +1703,6 @@ function init() {
   renderBallBar();
   renderSpawn();
 
-  $('#throwBtn').addEventListener('click', () => throwBall());
   $('#battleBtn').addEventListener('click', () => startBattle(false));
   $('#toMapBtn').addEventListener('click', () => switchView('map'));
   document.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => switchView(b.dataset.view));

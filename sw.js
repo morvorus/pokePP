@@ -1,5 +1,5 @@
-/* PokePP service worker — offline app shell (same-origin only) */
-const CACHE = 'pokepp-v2';
+/* PokePP service worker — network-first สำหรับโค้ด (freshness), cache-first สำหรับข้อมูล/ไอคอน */
+const CACHE = 'pokepp-v3';
 const SHELL = [
   './', './index.html', './style.css', './game.js',
   './monsters-data.js', './manifest.json', './icon.svg',
@@ -17,11 +17,28 @@ self.addEventListener('activate', e => {
   );
 });
 
+function putCache(req, res) {
+  const copy = res.clone();
+  caches.open(CACHE).then(c => c.put(req, copy));
+  return res;
+}
+
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   const url = new URL(e.request.url);
-  // ปล่อยรูปสไปรต์ข้ามโดเมน (jsDelivr) ให้เบราว์เซอร์จัดการเอง — ห้ามดัก
+  // รูปสไปรต์ข้ามโดเมน (jsDelivr) — ปล่อยให้เบราว์เซอร์จัดการ ห้ามดัก
   if (url.origin !== self.location.origin) return;
-  // app shell เดียวกัน: cache-first สำรองด้วย network
-  e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request)));
+
+  const isCode = url.pathname === '/' || /\.(html|js|css)$/.test(url.pathname);
+  if (isCode) {
+    // network-first: เอาโค้ดล่าสุดเสมอเมื่อออนไลน์ สำรองด้วยแคชเมื่อออฟไลน์
+    e.respondWith(
+      fetch(e.request).then(res => putCache(e.request, res)).catch(() => caches.match(e.request))
+    );
+  } else {
+    // cache-first: ข้อมูล/ไอคอน (เปลี่ยนน้อย โหลดเร็ว)
+    e.respondWith(
+      caches.match(e.request).then(hit => hit || fetch(e.request).then(res => putCache(e.request, res)))
+    );
+  }
 });

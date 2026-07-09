@@ -232,12 +232,22 @@ main { flex: 1; padding: 12px; }
 .throw-btn:not(:disabled):active { transform: scale(.97); }
 .micro-hint { font-size: 12px; color: var(--muted); text-align: center; margin: 8px 0; }
 
-/* ===== Log ===== */
-.log { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
-.log-item { font-size: 13px; padding: 8px 12px; border-radius: 10px; background: var(--card); border-left: 3px solid var(--muted); }
+/* ===== Log (มุมซ้ายบน แบบลอย ไม่ต้องเลื่อน) ===== */
+.log {
+  position: fixed; top: 60px; left: 6px; z-index: 38;
+  width: min(56%, 300px); display: flex; flex-direction: column; gap: 4px;
+  pointer-events: none;
+}
+.log-item {
+  font-size: 11px; line-height: 1.25; padding: 5px 9px; border-radius: 8px;
+  background: rgba(18,20,44,.82); backdrop-filter: blur(4px);
+  border-left: 3px solid var(--muted); box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .log-item.good { border-color: var(--good); }
 .log-item.bad { border-color: var(--bad); }
 .log-item.big { border-color: var(--accent); }
+@media (max-width: 460px) { .log { width: 62%; top: 58px; } .log-item { font-size: 10px; } }
 
 /* ===== Map ===== */
 .map-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 10px; }
