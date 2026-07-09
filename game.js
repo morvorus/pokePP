@@ -29,6 +29,13 @@ window.__sf = function (img) {
   const fb = (img.dataset.fb || '').split('|').filter(Boolean);
   if (fb.length) { img.dataset.fb = fb.slice(1).join('|'); img.src = fb[0]; }
 };
+// ภาพไอเทม (บอล/เบอร์รี่) จาก PokeAPI — ถ้าโหลดไม่ได้ให้ลบ img ทิ้งเผยอีโมจิด้านหลังแทน
+const ITEM_BASE = 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/';
+function itemIcon(emoji, img, extraCls) {
+  if (!img) return `<span class="item-ico ${extraCls || ''}">${emoji}</span>`;
+  // emoji อยู่ข้างหลังเป็น fallback: ระหว่างโหลด/ถ้าโหลดไม่ได้ จะเห็นอีโมจิแทน
+  return `<span class="item-ico ${extraCls || ''}">${emoji}<img src="${ITEM_BASE}${img}.png" onerror="this.remove()" alt=""></span>`;
+}
 const SPAWN_MIN = 9000, SPAWN_MAX = 16000;
 const FLEE_MS = 45000;
 const SHINY_CHANCE = 1 / 380;
@@ -70,16 +77,16 @@ const TIER_WEIGHTS = {
 
 // ชนิดบอล — บางลูกมีโบนัสตามเงื่อนไข (cond)
 const BALLS = {
-  poke:   { name: 'Poké Ball',  emoji: '🔴', mult: 1.0, add: 0.00, price: 20, hint: 'พื้นฐาน' },
-  great:  { name: 'Great Ball', emoji: '🔵', mult: 1.7, add: 0.03, price: 65, hint: '×1.7' },
-  ultra:  { name: 'Ultra Ball', emoji: '🟡', mult: 2.6, add: 0.09, price: 160, hint: '×2.6' },
-  net:    { name: 'Net Ball',   emoji: '🕸️', mult: 1.0, add: 0.00, price: 110, hint: '×3.3 ธาตุน้ำ/แมลง',
+  poke:   { name: 'Poké Ball',  emoji: '🔴', img: 'poke-ball',  mult: 1.0, add: 0.00, price: 20, hint: 'พื้นฐาน' },
+  great:  { name: 'Great Ball', emoji: '🔵', img: 'great-ball', mult: 1.7, add: 0.03, price: 65, hint: '×1.7' },
+  ultra:  { name: 'Ultra Ball', emoji: '🟡', img: 'ultra-ball', mult: 2.6, add: 0.09, price: 160, hint: '×2.6' },
+  net:    { name: 'Net Ball',   emoji: '🕸️', img: 'net-ball',   mult: 1.0, add: 0.00, price: 110, hint: '×3.3 ธาตุน้ำ/แมลง',
            cond: ctx => ctx.mon.types.some(t => t === 'water' || t === 'bug') ? { mult: 3.3 } : {} },
-  dusk:   { name: 'Dusk Ball',  emoji: '🌑', mult: 1.0, add: 0.00, price: 110, hint: '×3.3 กลางคืน/ถ้ำ',
+  dusk:   { name: 'Dusk Ball',  emoji: '🌑', img: 'dusk-ball',  mult: 1.0, add: 0.00, price: 110, hint: '×3.3 กลางคืน/ถ้ำ',
            cond: ctx => (ctx.time === 'night' || ctx.region.id === 'cave') ? { mult: 3.3 } : {} },
-  quick:  { name: 'Quick Ball', emoji: '⚡', mult: 1.0, add: 0.00, price: 130, hint: '×4 ลูกแรก',
+  quick:  { name: 'Quick Ball', emoji: '⚡', img: 'quick-ball', mult: 1.0, add: 0.00, price: 130, hint: '×4 ลูกแรก',
            cond: ctx => ctx.throws === 0 ? { mult: 4.0 } : {} },
-  master: { name: 'Master Ball', emoji: '🟣', mult: 999, add: 1,    price: 9000, hint: '100%' },
+  master: { name: 'Master Ball', emoji: '🟣', img: 'master-ball', mult: 999, add: 1, price: 9000, hint: '100%' },
 };
 const BALL_ORDER = ['poke', 'great', 'ultra', 'net', 'dusk', 'quick', 'master'];
 
@@ -97,8 +104,8 @@ const WEATHER_MS = 7 * 60000;   // อากาศเปลี่ยนทุก
 
 // เบอร์รี่ (โยนก่อนปาบอลเพื่อเพิ่มโอกาสจับ)
 const BERRIES = {
-  razz:   { name: 'Razz Berry', emoji: '🍓', add: 0.13, price: 45 },
-  golden: { name: 'Golden Razz', emoji: '🥭', add: 0.32, price: 170 },
+  razz:   { name: 'Razz Berry', emoji: '🍓', img: 'razz-berry', add: 0.13, price: 45 },
+  golden: { name: 'Golden Razz', emoji: '🥭', img: 'nanab-berry', add: 0.32, price: 170 },
 };
 const BERRY_ORDER = ['razz', 'golden'];
 
@@ -722,7 +729,7 @@ function renderBallBar() {
     const tag = b.mult >= 999 ? '100%' : b.cond ? '★' : '×' + b.mult;
     return `<div class="ball-opt${sel}${dis}" data-ball="${k}" title="${b.hint}">
       <span class="bmult">${tag}</span>
-      <div class="be">${b.emoji}</div>
+      <div class="be">${itemIcon(b.emoji, b.img)}</div>
       <div class="bn">${b.name.replace(' Ball', '')}</div>
       <div class="bc">×${have}</div></div>`;
   }).join('');
@@ -745,7 +752,7 @@ function renderBerryBar() {
   bar.innerHTML = BERRY_ORDER.map(k => {
     const b = BERRIES[k], have = state.berries[k] || 0;
     return `<div class="berry-opt${have <= 0 ? ' disabled' : ''}" data-berry="${k}">
-      <div class="be">${b.emoji}</div><div class="bn">${b.name.replace(' Berry', '')}</div>
+      <div class="be">${itemIcon(b.emoji, b.img)}</div><div class="bn">${b.name.replace(' Berry', '')}</div>
       <div class="bc">×${have} +${Math.round(b.add * 100)}%</div></div>`;
   }).join('');
   bar.querySelectorAll('.berry-opt').forEach(el => el.onclick = () => throwBerry(el.dataset.berry));
@@ -806,7 +813,7 @@ function throwBall(k) {
   // แอนิเมชันปาบอล 3 จังหวะ: ขว้าง → ดูดเข้าบอล → สั่น 3 ครั้ง → รู้ผล
   const ball = $('#throwBall');
   const sprite = $('#spawnSprite');
-  ball.textContent = BALLS[k].emoji;
+  ball.innerHTML = `<img class="tb-img" src="${ITEM_BASE}${BALLS[k].img}.png" onerror="this.replaceWith(document.createTextNode('${BALLS[k].emoji}'))" alt="">`;
   ball.className = 'throw-ball'; void ball.offsetWidth; ball.classList.add('animate');
   setTimeout(() => {                       // ดูดโปเกมอนเข้าบอล แล้วเริ่มสั่น
     if (sprite) sprite.style.opacity = '0';
@@ -1142,23 +1149,23 @@ function releaseIndividual(uid) {
 // ================================================================
 function renderShop() {
   const items = [
-    { emoji: '🔴', name: 'Poké Ball ×5', desc: 'โอกาสจับพื้นฐาน', price: BALLS.poke.price * 5, act: () => addBalls('poke', 5, BALLS.poke.price * 5) },
-    { emoji: '🔵', name: 'Great Ball ×3', desc: 'โอกาสจับ ×1.7', price: BALLS.great.price * 3, act: () => addBalls('great', 3, BALLS.great.price * 3) },
-    { emoji: '🟡', name: 'Ultra Ball ×2', desc: 'โอกาสจับ ×2.6', price: BALLS.ultra.price * 2, act: () => addBalls('ultra', 2, BALLS.ultra.price * 2) },
-    { emoji: '🕸️', name: 'Net Ball ×3', desc: '×3.3 กับธาตุน้ำ/แมลง', price: BALLS.net.price * 3, act: () => addBalls('net', 3, BALLS.net.price * 3) },
-    { emoji: '🌑', name: 'Dusk Ball ×3', desc: '×3.3 ตอนกลางคืน/ในถ้ำ', price: BALLS.dusk.price * 3, act: () => addBalls('dusk', 3, BALLS.dusk.price * 3) },
-    { emoji: '⚡', name: 'Quick Ball ×3', desc: '×4 ถ้าปาเป็นลูกแรก', price: BALLS.quick.price * 3, act: () => addBalls('quick', 3, BALLS.quick.price * 3) },
-    { emoji: '🟣', name: 'Master Ball ×1', desc: 'จับติด 100% การันตี', price: BALLS.master.price, act: () => addBalls('master', 1, BALLS.master.price) },
-    { emoji: '🍓', name: 'Razz Berry ×3', desc: 'โยนก่อนปา เพิ่มโอกาสจับ +13%', price: BERRIES.razz.price * 3, act: () => addBerries('razz', 3, BERRIES.razz.price * 3) },
-    { emoji: '🥭', name: 'Golden Razz ×1', desc: 'เพิ่มโอกาสจับ +32%', price: BERRIES.golden.price, act: () => addBerries('golden', 1, BERRIES.golden.price) },
+    { emoji: '🔴', img: 'poke-ball', name: 'Poké Ball ×5', desc: 'โอกาสจับพื้นฐาน', price: BALLS.poke.price * 5, act: () => addBalls('poke', 5, BALLS.poke.price * 5) },
+    { emoji: '🔵', img: 'great-ball', name: 'Great Ball ×3', desc: 'โอกาสจับ ×1.7', price: BALLS.great.price * 3, act: () => addBalls('great', 3, BALLS.great.price * 3) },
+    { emoji: '🟡', img: 'ultra-ball', name: 'Ultra Ball ×2', desc: 'โอกาสจับ ×2.6', price: BALLS.ultra.price * 2, act: () => addBalls('ultra', 2, BALLS.ultra.price * 2) },
+    { emoji: '🕸️', img: 'net-ball', name: 'Net Ball ×3', desc: '×3.3 กับธาตุน้ำ/แมลง', price: BALLS.net.price * 3, act: () => addBalls('net', 3, BALLS.net.price * 3) },
+    { emoji: '🌑', img: 'dusk-ball', name: 'Dusk Ball ×3', desc: '×3.3 ตอนกลางคืน/ในถ้ำ', price: BALLS.dusk.price * 3, act: () => addBalls('dusk', 3, BALLS.dusk.price * 3) },
+    { emoji: '⚡', img: 'quick-ball', name: 'Quick Ball ×3', desc: '×4 ถ้าปาเป็นลูกแรก', price: BALLS.quick.price * 3, act: () => addBalls('quick', 3, BALLS.quick.price * 3) },
+    { emoji: '🟣', img: 'master-ball', name: 'Master Ball ×1', desc: 'จับติด 100% การันตี', price: BALLS.master.price, act: () => addBalls('master', 1, BALLS.master.price) },
+    { emoji: '🍓', img: 'razz-berry', name: 'Razz Berry ×3', desc: 'โยนก่อนปา เพิ่มโอกาสจับ +13%', price: BERRIES.razz.price * 3, act: () => addBerries('razz', 3, BERRIES.razz.price * 3) },
+    { emoji: '🥭', img: 'nanab-berry', name: 'Golden Razz ×1', desc: 'เพิ่มโอกาสจับ +32%', price: BERRIES.golden.price, act: () => addBerries('golden', 1, BERRIES.golden.price) },
     { emoji: '🥚', name: 'ไข่ปริศนา', desc: `ฟักเมื่อจับครบ ${EGG_HATCH_CATCHES} ตัว`, price: EGG_PRICE, act: buyEgg },
     { emoji: '💎', name: 'หินวิวัฒนาการ', desc: 'วิวัฒนาการตัวที่ต้องใช้ไอเทม', price: STONE_PRICE, act: () => { if (spend(STONE_PRICE)) { state.stones = (state.stones || 0) + 1; toast('💎 +1 หินวิวัฒนาการ', 'good'); postBuy(); } } },
   ];
   $('#shopGrid').innerHTML =
     `<div class="dex-stats">มีหินวิวัฒนาการ: 💎 ${state.stones || 0} · บอล: ` +
-    BALL_ORDER.map(k => `${BALLS[k].emoji}${state.balls[k] || 0}`).join(' ') + `</div>` +
+    BALL_ORDER.map(k => `${itemIcon(BALLS[k].emoji, BALLS[k].img)}${state.balls[k] || 0}`).join(' ') + `</div>` +
     items.map((it, i) => `<div class="shop-item">
-      <div class="emoji">${it.emoji}</div>
+      <div class="emoji">${itemIcon(it.emoji, it.img, 'big')}</div>
       <div class="si-body"><div class="si-name">${it.name}</div><div class="si-desc">${it.desc}</div></div>
       <button class="buy-btn" data-i="${i}" ${state.coins < it.price ? 'disabled' : ''}>${it.price}🪙</button></div>`).join('');
   $('#shopGrid').querySelectorAll('.buy-btn[data-i]').forEach(btn => btn.onclick = () => items[+btn.dataset.i].act());

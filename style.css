@@ -194,6 +194,19 @@ main { flex: 1; padding: 12px; }
 .ball-opt .bc { font-size: 12px; font-weight: 800; }
 .ball-opt .bmult { position:absolute; top:2px; right:6px; font-size:9px; color: var(--accent); }
 
+/* item icons (ball/berry images with emoji fallback behind) */
+.item-ico {
+  position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; line-height: 1; vertical-align: middle; font-size: 18px;
+}
+.item-ico img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; image-rendering: pixelated;
+}
+.item-ico.big { width: 38px; height: 38px; font-size: 30px; }
+.ball-opt .be, .berry-opt .be { display: flex; align-items: center; justify-content: center; height: 28px; }
+.throw-ball .tb-img { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }
+
 /* berries */
 .berry-bar { display: flex; gap: 8px; margin-top: 8px; }
 .berry-bar:empty { display: none; }
