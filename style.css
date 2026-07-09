@@ -197,15 +197,15 @@ main { flex: 1; padding: 12px; }
 .ball-opt .bc { font-size: 12px; font-weight: 800; }
 .ball-opt .bmult { position:absolute; top:2px; right:6px; font-size:9px; color: var(--accent); }
 
-/* item icons (ball/berry) — แสดงภาพอย่างเดียว ถ้าโหลดไม่ได้สลับเป็น emoji (span คลาสเดียวกัน) */
+/* item icons (ball/berry) — เรนเดอร์แบบเนียน (ภาพไอเทมเป็นภาพวาด ไม่ใช่ pixel art) */
 .item-ico {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 28px; height: 28px; line-height: 1; vertical-align: middle; font-size: 18px;
-  object-fit: contain; image-rendering: pixelated;
+  width: 30px; height: 30px; line-height: 1; vertical-align: middle; font-size: 18px;
+  object-fit: contain; image-rendering: auto;
 }
-.item-ico.big { width: 40px; height: 40px; font-size: 30px; }
-.ball-opt .be, .berry-opt .be { display: flex; align-items: center; justify-content: center; height: 30px; }
-.throw-ball .tb-img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; }
+.item-ico.big { width: 42px; height: 42px; font-size: 30px; }
+.ball-opt .be, .berry-opt .be { display: flex; align-items: center; justify-content: center; height: 32px; }
+.throw-ball .tb-img { width: 42px; height: 42px; object-fit: contain; image-rendering: auto; }
 
 /* berries */
 .berry-bar { display: flex; gap: 8px; margin-top: 8px; }
