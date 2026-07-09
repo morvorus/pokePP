@@ -14,13 +14,15 @@ const SP = {
   gif:   id => `${SP_BASE}/other/showdown/${id}.gif`,
   shiny: id => `${SP_BASE}/other/showdown/shiny/${id}.gif`,
   art:   id => `${SP_BASE}/other/official-artwork/${id}.png`,
+  artS:  id => `${SP_BASE}/other/official-artwork/shiny/${id}.png`,   // ภาพนิ่งสี shiny
   png:   id => `${SP_BASE}/${id}.png`,
+  pngS:  id => `${SP_BASE}/shiny/${id}.png`,                          // png สี shiny
 };
 // ลำดับรูปที่จะลอง — เอา "showdown" (สไปรต์ขยับแบบ PokeMeow) เป็นหลัก
 // ถ้าไม่มี ค่อยลอง gen5 ขยับ (ตัวเก่า) แล้วค่อยภาพนิ่ง (artwork)
 function spriteChain(id, shiny) {
   const anim = shiny
-    ? [SP.shiny(id), (id <= 649 ? SP.anim5s(id) : null), SP.art(id), SP.png(id)]
+    ? [SP.shiny(id), (id <= 649 ? SP.anim5s(id) : null), SP.artS(id), SP.pngS(id)]   // fallback = สี shiny
     : [SP.gif(id), (id <= 649 ? SP.anim5(id) : null), SP.art(id), SP.png(id)];
   return anim.filter(Boolean);
 }
