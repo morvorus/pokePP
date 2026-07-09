@@ -53,6 +53,8 @@ function preloadItems() {
     ...BALL_ORDER.map(k => BALLS[k].img),
     ...BERRY_ORDER.map(k => BERRIES[k].img),
     ...CHARM_ORDER.map(k => CHARMS[k].img),
+    ...HELD_ORDER.map(k => HELD_ITEMS[k].img),
+    'rare-candy',
   ].filter(Boolean);
   names.forEach(n => { const i = new Image(); i.src = ITEM_BASE + n + '.png'; });
 }
@@ -137,6 +139,18 @@ const CHARMS = {
   xp:    { name: 'XP Charm',    emoji: '📿', img: 'lucky-egg',      mult: 2,   price: 800,  desc: 'XP ที่ได้ ×2' },
 };
 const CHARM_ORDER = ['shiny', 'catch', 'xp'];
+
+// Held Items — สวมให้โปเกมอนในทีมเพื่อบูสต์ตอนต่อสู้ (แบบ PokeMeow "Battle items")
+const HELD_ITEMS = {
+  'life-orb':     { name: 'Life Orb',     emoji: '🔮', img: 'life-orb',     price: 2000, desc: 'ดาเมจที่ทำ +30%' },
+  'choice-band':  { name: 'Choice Band',  emoji: '💪', img: 'choice-band',  price: 1800, desc: 'ATK +50%' },
+  'choice-specs': { name: 'Choice Specs', emoji: '👓', img: 'choice-specs', price: 1800, desc: 'Sp.ATK +50%' },
+  'assault-vest': { name: 'Assault Vest', emoji: '🦺', img: 'assault-vest', price: 1500, desc: 'Sp.DEF +50%' },
+  'expert-belt':  { name: 'Expert Belt',  emoji: '🥋', img: 'expert-belt',  price: 1500, desc: 'ดาเมจธาตุได้เปรียบ +20%' },
+  'leftovers':    { name: 'Leftovers',    emoji: '🍖', img: 'leftovers',    price: 1600, desc: 'ฟื้น HP 1/16 ทุกเทิร์น' },
+  'focus-sash':   { name: 'Focus Sash',   emoji: '🎗️', img: 'focus-sash',   price: 1200, desc: 'รอดท่าสังหารครั้งแรก (ต้อง HP เต็ม)' },
+};
+const HELD_ORDER = Object.keys(HELD_ITEMS);
 
 const EGG_PRICE = 450, STONE_PRICE = 600, EGG_HATCH_CATCHES = 15;
 
@@ -329,6 +343,7 @@ function newSave() {
     candies: 0,          // Rare Candy (เลเวลอัพทันที)
     fishTokens: 0,       // เหรียญตกปลา
     fishReadyAt: 0,      // คูลดาวน์ตกปลา (timestamp)
+    heldInv: {},         // คลัง Held Item ที่ยังไม่ได้สวม {key:count}
     selBall: 'poke',
     region: 'plains',
     unlocked: { plains: true },
@@ -1173,6 +1188,25 @@ function baseStatRows(s) {
   return ['hp', 'atk', 'def', 'spatk', 'spdef', 'spd']
     .map(k => `<div class="stat-row"><span>${STAT_LABEL[k]}</span><span>${s[k]}</span></div>`).join('');
 }
+function heldSectionHtml(ind) {
+  const owned = HELD_ORDER.filter(k => (state.heldInv[k] || 0) > 0);
+  let html = '<div class="ms-title">🎽 ไอเทมสวม (Held Item)</div>';
+  if (ind.held) {
+    const h = HELD_ITEMS[ind.held];
+    html += `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px">
+      ${itemIcon(h.emoji, h.img)} <b>${h.name}</b> <span style="font-size:11px;color:var(--muted)">${h.desc}</span>
+      <button class="claim-btn" id="hUnequip" style="padding:4px 10px">ถอด</button></div>`;
+  }
+  if (owned.length) {
+    html += `<div style="font-size:11px;color:var(--muted);margin-bottom:4px">แตะเพื่อสวม:</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">` +
+      owned.map(k => `<button class="pill" data-held="${k}" style="cursor:pointer;border:none;display:inline-flex;align-items:center;gap:4px">
+        ${itemIcon(HELD_ITEMS[k].emoji, HELD_ITEMS[k].img)} ${HELD_ITEMS[k].name} ×${state.heldInv[k]}</button>`).join('') + `</div>`;
+  } else if (!ind.held) {
+    html += `<div style="font-size:12px;color:var(--muted)">ยังไม่มีไอเทมสวม — ซื้อได้ที่ร้านค้า 🏪</div>`;
+  }
+  return html;
+}
 function evoText(m) {
   if (!m.evolvesTo) return '';
   const to = MON_BY_ID[m.evolvesTo];
@@ -1209,6 +1243,7 @@ function openIndividualModal(uid) {
       <div class="ms-title">⚔️ ท่าโจมตี</div>
       ${getMoves(ind.id).map(mv => `<span class="pill t-${mv.type}" style="color:#fff">${mv.name} <b>${mv.pow}</b></span>`).join('')}
     </div>
+    <div class="moveset" id="heldSection">${heldSectionHtml(ind)}</div>
     ${evoText(m)}
     <div class="modal-actions">
       <button class="btn-primary" id="mBuddy" ${isBuddy ? 'disabled' : ''}>${isBuddy ? '⭐ หัวหน้าทีม' : 'ตั้งเป็นหัวหน้า'}</button>
@@ -1244,6 +1279,9 @@ function openIndividualModal(uid) {
     ind.nick = name || null; save(); openIndividualModal(uid); renderCurrentView();
     toast(name ? `✏️ ตั้งชื่อ "${name}" แล้ว` : 'ลบชื่อเล่นแล้ว', 'good');
   };
+  const un = $('#hUnequip'); if (un) un.onclick = () => { unequipHeld(uid); openIndividualModal(uid); };
+  $('#modalBox').querySelectorAll('[data-held]').forEach(b =>
+    b.onclick = () => { equipHeld(uid, b.dataset.held); openIndividualModal(uid); });
 }
 function releaseIndividual(uid) {
   const idx = state.caught.findIndex(c => c.uid === uid);
@@ -1282,6 +1320,7 @@ function renderShop() {
     { emoji: CHARMS.shiny.emoji, img: CHARMS.shiny.img, name: 'Shiny Charm', desc: CHARMS.shiny.desc + ' · 30 นาที (กดใช้ในเมนู)', price: CHARMS.shiny.price, act: () => buyCharm('shiny') },
     { emoji: CHARMS.catch.emoji, img: CHARMS.catch.img, name: 'Catch Charm', desc: CHARMS.catch.desc + ' · 30 นาที', price: CHARMS.catch.price, act: () => buyCharm('catch') },
     { emoji: CHARMS.xp.emoji, img: CHARMS.xp.img, name: 'XP Charm', desc: CHARMS.xp.desc + ' · 30 นาที', price: CHARMS.xp.price, act: () => buyCharm('xp') },
+    ...HELD_ORDER.map(k => ({ emoji: HELD_ITEMS[k].emoji, img: HELD_ITEMS[k].img, name: HELD_ITEMS[k].name, desc: '🎽 สวมสู้: ' + HELD_ITEMS[k].desc, price: HELD_ITEMS[k].price, act: () => buyHeld(k) })),
     // แลกด้วยเหรียญตกปลา 🎟️
     { emoji: '🟡', img: 'ultra-ball', name: 'Ultra Ball ×3', desc: 'แลกด้วยเหรียญตกปลา', tokenPrice: 5, act: () => { if (spendTokens(5)) { state.balls.ultra = (state.balls.ultra || 0) + 3; toast('🟡 +3 Ultra Ball', 'good'); postBuy(); } } },
     { emoji: CHARMS.shiny.emoji, img: CHARMS.shiny.img, name: 'Shiny Charm', desc: 'แลกด้วยเหรียญตกปลา', tokenPrice: 25, act: () => { if (spendTokens(25)) { state.charms.shiny = (state.charms.shiny || 0) + 1; toast('🔮 +1 Shiny Charm', 'good'); postBuy(); } } },
@@ -1306,6 +1345,19 @@ function postBuy() { save(); renderTopbar(); renderShop(); renderBallBar(); }
 function addBalls(k, n, price) { if (spend(price)) { state.balls[k] = (state.balls[k] || 0) + n; toast(`${BALLS[k].emoji} +${n} ${BALLS[k].name}`, 'good'); postBuy(); } }
 function addBerries(k, n, price) { if (spend(price)) { state.berries[k] = (state.berries[k] || 0) + n; toast(`${BERRIES[k].emoji} +${n} ${BERRIES[k].name}`, 'good'); postBuy(); renderBerryBar(); } }
 function buyCharm(k) { if (spend(CHARMS[k].price)) { state.charms[k] = (state.charms[k] || 0) + 1; toast(`${CHARMS[k].emoji} ซื้อ ${CHARMS[k].name} — กดใช้ในเมนู ⚙️`, 'good'); postBuy(); } }
+function buyHeld(k) { if (spend(HELD_ITEMS[k].price)) { state.heldInv[k] = (state.heldInv[k] || 0) + 1; toast(`${HELD_ITEMS[k].emoji} ซื้อ ${HELD_ITEMS[k].name} — สวมได้ในหน้าโปเกมอน`, 'good'); postBuy(); } }
+function equipHeld(uid, k) {
+  const ind = indByUid(uid); if (!ind) return;
+  if ((state.heldInv[k] || 0) <= 0) { toast('❌ ไม่มีไอเทมนี้', 'bad'); return; }
+  if (ind.held) { state.heldInv[ind.held] = (state.heldInv[ind.held] || 0) + 1; }  // คืนของเดิม
+  state.heldInv[k]--; ind.held = k;
+  save(); toast(`🎽 สวม ${HELD_ITEMS[k].name} ให้ ${MON_BY_ID[ind.id].name}`, 'good');
+}
+function unequipHeld(uid) {
+  const ind = indByUid(uid); if (!ind || !ind.held) return;
+  state.heldInv[ind.held] = (state.heldInv[ind.held] || 0) + 1; ind.held = null;
+  save(); toast('ถอดไอเทมแล้ว', '');
+}
 function buyEgg() { if (spend(EGG_PRICE)) { state.eggs.push({ progressStart: state.totalCaught }); toast(`🥚 ได้ไข่! จับอีก ${EGG_HATCH_CATCHES} ตัวเพื่อฟัก`, 'good'); postBuy(); } }
 
 // ================================================================
@@ -1676,7 +1728,7 @@ function gainXpTo(ind, amount) {
 function gainTrainerXp(n) { state.trainerXp = (state.trainerXp || 0) + n; }
 function trainerLevel() { return Math.floor(Math.pow((state.trainerXp || 0) / 60, 0.5)) + 1; }
 
-function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move) {
+function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move, held) {
   const physical = atkStats.atk >= atkStats.spatk;
   const A = physical ? atkStats.atk : atkStats.spatk;
   const D = physical ? defStats.def : defStats.spdef;
@@ -1686,7 +1738,17 @@ function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move) {
   const stab = atkMon.types.includes(moveType) ? 1.5 : 1;
   let dmg = (((2 * atkLevel / 5 + 2) * power * A / Math.max(1, D)) / 50 + 2);
   dmg = dmg * stab * eff * (0.85 + Math.random() * 0.15);
+  if (held === 'life-orb') dmg *= 1.3;                      // Life Orb
+  if (held === 'expert-belt' && eff > 1) dmg *= 1.2;        // Expert Belt (ธาตุได้เปรียบ)
   return { dmg: Math.max(1, Math.floor(dmg)), eff };
+}
+// ใส่ผล Held Item ที่ปรับสเตตัส (ตอนสร้างทีมสู้)
+function statsWithHeld(ind) {
+  const s = calcStats(ind);
+  if (ind.held === 'choice-band') s.atk = Math.floor(s.atk * 1.5);
+  if (ind.held === 'choice-specs') s.spatk = Math.floor(s.spatk * 1.5);
+  if (ind.held === 'assault-vest') s.spdef = Math.floor(s.spdef * 1.5);
+  return s;
 }
 function foeChooseMove(foeMon, defTypes) {
   const moves = getMoves(foeMon.id);
@@ -1710,7 +1772,7 @@ function startBattle(isBoss, bossData) {
     foeStats = statsForWild(foeMon, foeLevel);
     foeMaxHp = currentSpawn.maxHp; foeHp = currentSpawn.hp;
   }
-  const team = members.map(ind => { const s = calcStats(ind); return { ind, stats: s, hp: s.hp, maxHp: s.hp }; });
+  const team = members.map(ind => { const s = statsWithHeld(ind); return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false }; });
   battleState = {
     isBoss, bossData, foeMon, foeLevel, foeStats, foeHp, foeMaxHp,
     team, activeIdx: 0, over: false, lost: false,
@@ -1772,8 +1834,13 @@ function foeTurn(b) {
   const aMon = MON_BY_ID[active.ind.id];
   const mv = foeChooseMove(b.foeMon, aMon.types);
   const dmg = calcDamage(b.foeMon, b.foeStats, b.foeLevel, aMon, active.stats, mv).dmg;
+  const wasFull = active.hp === active.maxHp;
   active.hp = Math.max(0, active.hp - dmg);
   b.msg += ` · ${b.foeMon.name} ใช้ ${mv.name}! -${dmg}`;
+  if (active.hp <= 0 && active.ind.held === 'focus-sash' && !active.sashUsed && wasFull) {
+    active.hp = 1; active.sashUsed = true;
+    b.msg += ` · 🎗️ ${aMon.name} ยึด Focus Sash รอดมาได้!`;
+  }
   if (active.hp <= 0) {
     b.msg += ` · 😵 ${aMon.name} หมดแรง!`;
     const next = b.team.findIndex(t => t.hp > 0);
@@ -1791,7 +1858,7 @@ function battleAttack(moveIdx) {
   const active = b.team[b.activeIdx];
   const mon = MON_BY_ID[active.ind.id];
   const mv = getMoves(active.ind.id)[moveIdx] || getMoves(active.ind.id)[0];
-  const atk = calcDamage(mon, active.stats, active.ind.level, b.foeMon, b.foeStats, mv);
+  const atk = calcDamage(mon, active.stats, active.ind.level, b.foeMon, b.foeStats, mv, active.ind.held);
   b.foeHp = Math.max(b.isBoss ? 0 : 1, b.foeHp - atk.dmg);
   b.msg = `${mon.name} ใช้ ${mv.name}! -${atk.dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
   if (!b.isBoss && currentSpawn) currentSpawn.hp = b.foeHp;
@@ -1805,8 +1872,17 @@ function battleAttack(moveIdx) {
     save(); renderBattle(); return;
   }
   foeTurn(b);
+  applyLeftovers(b);
   if (!b.isBoss && currentSpawn) renderSpawn();
   save(); renderBattle();
+}
+function applyLeftovers(b) {
+  const a = b.team[b.activeIdx];
+  if (a && a.hp > 0 && a.hp < a.maxHp && a.ind.held === 'leftovers') {
+    const heal = Math.max(1, Math.floor(a.maxHp / 16));
+    a.hp = Math.min(a.maxHp, a.hp + heal);
+    b.msg += ` · 🍖 ฟื้น ${heal}`;
+  }
 }
 function battleSwitch(idx) {
   const b = battleState; if (!b || b.over || idx === b.activeIdx) return;
@@ -1815,6 +1891,7 @@ function battleSwitch(idx) {
   b.activeIdx = idx;
   b.msg = `สลับมา ${MON_BY_ID[t.ind.id].name}!`;
   foeTurn(b);                       // สลับตัวเสียเทิร์น ศัตรูโจมตีก่อน
+  applyLeftovers(b);
   save(); renderBattle();
 }
 function onFoeDown() {
