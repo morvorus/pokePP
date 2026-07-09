@@ -1,0 +1,14 @@
+{
+  "name": "PokePP — เกมจับมอนสเตอร์",
+  "short_name": "PokePP",
+  "description": "เกมจับมอนสเตอร์สไตล์ PokeMeow เล่นคนเดียว — จับ สะสม ต่อสู้ ครบทุก Gen",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1226",
+  "theme_color": "#171a35",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

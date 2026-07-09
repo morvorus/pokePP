@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>PokePP — เกมจับมอนสเตอร์</title>
+<meta name="theme-color" content="#171a35">
+<meta name="description" content="เกมจับมอนสเตอร์สไตล์ PokeMeow เล่นคนเดียว ครบทุก Gen">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== Top status bar ===== -->
+  <header id="topbar">
+    <div class="stat-chip" title="เหรียญ">
+      <span class="ico">🪙</span><span id="coins">0</span>
+    </div>
+    <div class="stat-chip buddy-chip" id="buddyChip" title="Buddy">
+      <img id="buddyImg" alt="" />
+      <div class="buddy-meta">
+        <div class="buddy-name"><span id="buddyName">ยังไม่มี Buddy</span> <span class="lv" id="buddyLv"></span></div>
+        <div class="xpbar"><div class="xpfill" id="buddyXp"></div></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Rare-encounter alert (มุมขวาบน) -->
+  <div id="rareAlert" class="rare-alert hidden"></div>
+
+  <!-- ===== Main views ===== -->
+  <main>
+    <!-- HOME -->
+    <section class="view active" id="view-home">
+      <div id="regionBanner" class="region-banner">
+        <div class="rb-info"><span id="rbEmoji">🌾</span> <b id="rbName">—</b>
+          <span class="rb-lvl" id="rbLvl"></span></div>
+        <button id="toMapBtn" class="mini-btn">🗺️ เปลี่ยนเขต</button>
+      </div>
+
+      <div id="spawnCard" class="spawn-card empty">
+        <div class="scrim"></div>
+        <div class="deco" id="spawnDeco"></div>
+        <div class="spawn-inner">
+          <div class="spawn-top" id="spawnTop"></div>
+          <div id="spawnSpriteWrap" class="sprite-wrap">
+            <div id="throwBall" class="throw-ball hidden">🔴</div>
+            <img id="spawnSprite" alt="wild monster" />
+          </div>
+          <div id="spawnTags" class="tags"></div>
+          <div id="wildHp" class="wild-hp"></div>
+          <div id="spawnTimer" class="timer"></div>
+        </div>
+      </div>
+
+      <div id="ballBar" class="ball-bar"></div>
+      <div id="berryBar" class="berry-bar"></div>
+      <div class="action-row">
+        <button id="battleBtn" class="act-btn" disabled>⚔️ สู้เพื่อทำ HP ลด</button>
+      </div>
+      <button id="throwBtn" class="throw-btn" disabled>ปาบอล!</button>
+      <p class="micro-hint">เลือกบอล → ปาใส่ · สู้ก่อนเพื่อลด HP ให้จับง่ายขึ้น · โยนเบอร์รี่เพิ่มโอกาส</p>
+
+      <div id="log" class="log"></div>
+    </section>
+
+    <!-- MAP -->
+    <section class="view" id="view-map">
+      <h2 class="view-title">🗺️ แผนที่ — เลือกเขตออกล่า</h2>
+      <div id="mapGrid" class="map-grid"></div>
+    </section>
+
+    <!-- COLLECTION -->
+    <section class="view" id="view-dex">
+      <div class="dex-controls">
+        <input id="dexSearch" type="text" placeholder="🔍 ค้นหาชื่อ..." />
+        <select id="dexFilter"></select>
+        <select id="dexSort"></select>
+      </div>
+      <div id="dexStats" class="dex-stats"></div>
+      <div id="dexGrid" class="dex-grid"></div>
+    </section>
+
+    <!-- SHOP -->
+    <section class="view" id="view-shop">
+      <h2 class="view-title">🏪 ร้านค้า</h2>
+      <div id="shopGrid" class="shop-grid"></div>
+    </section>
+
+    <!-- QUESTS -->
+    <section class="view" id="view-quest">
+      <h2 class="view-title">📜 เควสประจำวัน</h2>
+      <div id="questReset" class="quest-reset"></div>
+      <div id="questList" class="quest-list"></div>
+      <h2 class="view-title">🥚 ไข่</h2>
+      <div id="eggList" class="egg-list"></div>
+    </section>
+
+    <!-- MENU (profile + settings + achievements) -->
+    <section class="view" id="view-menu">
+      <h2 class="view-title">👤 โปรไฟล์</h2>
+      <div id="profileBox"></div>
+      <h2 class="view-title">🎖️ รางวัลจบเดกซ์</h2>
+      <div id="dexRewardBox" class="ach-list"></div>
+      <h2 class="view-title">🏆 ความสำเร็จ</h2>
+      <div id="achList" class="ach-list"></div>
+      <h2 class="view-title">⚙️ ตั้งค่า</h2>
+      <div id="settingsBox" class="settings-box"></div>
+    </section>
+  </main>
+
+  <!-- ===== Bottom nav ===== -->
+  <nav id="nav">
+    <button class="nav-btn active" data-view="home"><span>🎯</span>ล่า</button>
+    <button class="nav-btn" data-view="map"><span>🗺️</span>แผนที่</button>
+    <button class="nav-btn" data-view="dex"><span>📖</span>คลัง</button>
+    <button class="nav-btn" data-view="shop"><span>🏪</span>ร้าน</button>
+    <button class="nav-btn" data-view="quest"><span>📜</span>เควส</button>
+    <button class="nav-btn" data-view="menu"><span>⚙️</span>เมนู</button>
+  </nav>
+
+  <!-- Toast container -->
+  <div id="toasts"></div>
+
+  <!-- Detail modal -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-box" id="modalBox"></div>
+  </div>
+
+  <!-- Battle modal -->
+  <div id="battleModal" class="modal hidden">
+    <div class="battle-box" id="battleBox"></div>
+  </div>
+
+</div>
+
+<script src="monsters-data.js"></script>
+<script src="game.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+</script>
+</body>
+</html>
