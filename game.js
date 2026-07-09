@@ -24,6 +24,27 @@ const TIER_XP   = { common: 14, uncommon: 26, rare: 55, superrare: 110, legendar
 const TIER_LABEL = { common: 'Common', uncommon: 'Uncommon', rare: 'Rare', superrare: 'Super Rare', legendary: 'Legendary' };
 const TIER_ORDER = ['common', 'uncommon', 'rare', 'superrare', 'legendary'];
 
+// เลเวลตามระดับความหายาก (แบบ PokeMeow) — ตัวหายาก = เลเวลสูง = ออกยากขึ้น
+// เกิดได้ทุกเลเวล ไม่ผูกกับเขต แต่ในแต่ละช่วงเอนไปทางเลเวลต่ำ (เลเวลสูงยิ่งหายาก)
+const TIER_LEVEL = {
+  common:    [1, 20],
+  uncommon:  [12, 38],
+  rare:      [28, 58],
+  superrare: [50, 80],
+  legendary: [70, 100],
+};
+
+// อีโมจิธาตุ ใช้ตกแต่งแต่ละตัว
+const TYPE_EMOJI = {
+  normal: '⭐', fire: '🔥', water: '💧', electric: '⚡', grass: '🌿', ice: '❄️',
+  fighting: '🥊', poison: '☠️', ground: '⛰️', flying: '🕊️', psychic: '🔮', bug: '🐛',
+  rock: '🪨', ghost: '👻', dragon: '🐉', dark: '🌑', steel: '⚙️', fairy: '🧚',
+};
+const TIER_EMOJI = { common: '⚪', uncommon: '🟢', rare: '🔵', superrare: '🟣', legendary: '🟡' };
+function typeBadges(types) {
+  return types.map(t => `<span class="badge t-${t}">${TYPE_EMOJI[t] || ''} ${t}</span>`).join('');
+}
+
 // น้ำหนักการสุ่มระดับ ตาม "rarityBoost" ของเขต
 const TIER_WEIGHTS = {
   0: { common: 56, uncommon: 27, rare: 12, superrare: 4, legendary: 1 },
@@ -502,11 +523,10 @@ function scheduleSpawn(delay) {
   clearTimeout(spawnTimer);
   spawnTimer = setTimeout(doSpawn, delay != null ? delay : spawnInterval());
 }
-function levelFor(r, tier) {
-  const [lo, hi] = r.lvl;
-  const bump = { common: 0, uncommon: .12, rare: .3, superrare: .55, legendary: .8 }[tier];
-  const mid = lo + (hi - lo) * bump;
-  return clamp(Math.round(mid + rand(-2, 4)), lo, hi + 4);
+function levelFor(tier) {
+  const [lo, hi] = TIER_LEVEL[tier] || TIER_LEVEL.common;
+  // เอนไปทางเลเวลต่ำ: เลเวลสูงในช่วงยิ่งเจอยาก (pow > 1)
+  return Math.round(lo + (hi - lo) * Math.pow(Math.random(), 1.6));
 }
 // ---------- world: time / weather / event ----------
 function timeOfDay() { const h = new Date().getHours(); return (h >= 6 && h < 18) ? 'day' : 'night'; }
@@ -555,7 +575,7 @@ function doSpawn() {
     mon = sub.length ? pick(sub) : pick(pool);
   } else mon = pick(pool);
   const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier();
-  const level = levelFor(r, mon._tier);
+  const level = levelFor(mon._tier);
   const maxHp = wildMaxHp(mon, level);
 
   currentSpawn = { mon, tier: mon._tier, shiny, level, throws: 0, deadline: Date.now() + FLEE_MS,
@@ -591,7 +611,7 @@ function renderRegionBanner() {
   const w = WEATHERS[getWeather(r.id)];
   const timeIco = timeOfDay() === 'night' ? '🌙' : '☀️';
   const ev = isEventActive() ? ' · <b style="color:var(--accent)">✨อีเวนต์ x2</b>' : '';
-  $('#rbLvl').innerHTML = `Lv.${r.lvl[0]}-${r.lvl[1]} · ${timeIco} · ${w.emoji}${w.name}${ev}`;
+  $('#rbLvl').innerHTML = `${timeIco} · ${w.emoji}${w.name}${ev}`;
   const card = $('#spawnCard');
   card.style.background = r.bg;
   card.classList.toggle('night', timeOfDay() === 'night');
@@ -622,10 +642,11 @@ function renderSpawn() {
   $('#spawnSprite').outerHTML =
     spriteImg(mon.id, shiny, '').replace('<img', '<img id="spawnSprite"');
   $('#spawnTop').innerHTML =
-    `<span class="lv-badge">Lv.${level}</span>` + (shiny ? '<span class="lv-badge">✨</span>' : '');
+    `<span class="lv-badge">${mon.types.map(t => TYPE_EMOJI[t] || '').join('')} Lv.${level}</span>` +
+    (shiny ? '<span class="lv-badge">✨</span>' : '');
   $('#spawnTags').innerHTML =
-    mon.types.map(t => `<span class="badge t-${t}">${t}</span>`).join('') +
-    `<span class="badge rarity-${shiny ? 'shiny' : tier}">${shiny ? 'shiny' : TIER_LABEL[tier]}</span>`;
+    typeBadges(mon.types) +
+    `<span class="badge rarity-${shiny ? 'shiny' : tier}">${shiny ? '✨ shiny' : TIER_EMOJI[tier] + ' ' + TIER_LABEL[tier]}</span>`;
   renderWildHp();
   renderBerryBar();
   updateThrowBtn();
@@ -671,7 +692,8 @@ function renderBallBar() {
     el.onclick = () => {
       const k = el.dataset.ball;
       if ((state.balls[k] || 0) <= 0) { toast('❌ บอลชนิดนี้หมด', 'bad'); return; }
-      state.selBall = k; save(); renderBallBar(); updateThrowBtn();
+      if (currentSpawn && !throwing) { throwBall(k); }   // แตะบอล = โยนทันที
+      else { state.selBall = k; save(); renderBallBar(); updateThrowBtn(); }
     };
   });
 }
@@ -735,10 +757,12 @@ function catchChance(mon, level, ball, mods) {
   return clamp(p, 0.02, 0.96);
 }
 let throwing = false;
-function throwBall() {
+function throwBall(k) {
   if (!currentSpawn || throwing) return;
-  const k = state.selBall, have = state.balls[k] || 0;
+  k = (typeof k === 'string') ? k : state.selBall;
+  const have = state.balls[k] || 0;
   if (have <= 0) { toast('❌ บอลหมด', 'bad'); return; }
+  state.selBall = k;
   throwing = true;
   const prevThrows = currentSpawn.throws;   // จำนวนก่อนขว้างครั้งนี้ (ใช้เช็ค Quick Ball)
   state.balls[k]--;
@@ -846,7 +870,7 @@ function renderMap() {
       ${beaten ? '<div class="mc-badge">🏅</div>' : ''}
       <div class="mc-body">
         <div class="mc-name" data-go="${r.id}">${r.emoji} ${r.name}</div>
-        <div class="mc-lvl">Lv.${r.lvl[0]}–${r.lvl[1]} · ${r.desc}</div>
+        <div class="mc-lvl">${r.desc}</div>
         <div class="mc-rates">${rates}</div>
         ${!locked ? `<button class="boss-btn" data-boss="${r.id}">${beaten ? '⚔️ ท้าบอสอีกครั้ง' : '⚔️ ท้าบอสประจำเขต'}</button>` : ''}
       </div>
@@ -926,8 +950,8 @@ function renderDex() {
       ${isBuddy ? '<div class="buddytag">⭐</div>' : ''}
       ${hasShiny ? '<div class="shinytag">✨</div>' : ''}
       ${spriteImg(m.id, hasShiny)}
-      <div class="dname">${m.name}</div>
-      <div class="dnum">#${String(m.id).padStart(3, '0')}</div></div>`;
+      <div class="dname">${TYPE_EMOJI[m.types[0]] || ''} ${m.name}</div>
+      <div class="dnum">${TIER_EMOJI[m._tier]} #${String(m.id).padStart(3, '0')}</div></div>`;
   }).join('');
   grid.querySelectorAll('.dex-cell[data-id]').forEach(cell => {
     cell.onclick = () => { cnt(+cell.dataset.id); };
@@ -942,7 +966,7 @@ function openSpeciesModal(id) {
   $('#modalBox').innerHTML = `
     <h3>${m.name} <span style="font-size:13px;color:var(--muted)">#${String(id).padStart(3, '0')}</span></h3>
     <div class="tags" style="justify-content:center;margin-bottom:6px">
-      ${m.types.map(t => `<span class="badge t-${t}">${t}</span>`).join('')}
+      ${typeBadges(m.types)}
       <span class="badge rarity-${m._tier}">${TIER_LABEL[m._tier]}</span></div>
     <p style="font-size:12px;color:var(--muted);margin:4px 0 12px">มีในคลัง ${mine.length} ตัว · แตะเพื่อดูรายตัว</p>
     <div style="text-align:left">${mine.map(ind => indRow(ind)).join('')}</div>
@@ -991,7 +1015,7 @@ function openDexEntry(id) {
     ${spriteImg(id, false, 'big')}
     <h3>${m.name} <span style="font-size:14px;color:var(--muted)">#${String(id).padStart(3, '0')}</span></h3>
     <div class="tags" style="justify-content:center;margin-bottom:10px">
-      ${m.types.map(t => `<span class="badge t-${t}">${t}</span>`).join('')}
+      ${typeBadges(m.types)}
       <span class="badge rarity-${m._tier}">${TIER_LABEL[m._tier]}</span></div>
     <p style="font-size:13px;color:var(--muted)">ยังไม่มีในคลัง — ค่าพื้นฐาน (Base Stats)</p>
     ${baseStatRows(s)}
@@ -1032,7 +1056,7 @@ function openIndividualModal(uid) {
       <span class="pill">IV ${ivPercent(ind)}%</span>
     </div>
     <div class="tags" style="justify-content:center;margin-bottom:12px">
-      ${m.types.map(t => `<span class="badge t-${t}">${t}</span>`).join('')}</div>
+      ${typeBadges(m.types)}</div>
     <div style="text-align:left">${ivRows}</div>
     <div class="moveset">
       <div class="ms-title">⚔️ ท่าโจมตี</div>
@@ -1676,7 +1700,7 @@ function init() {
   renderBallBar();
   renderSpawn();
 
-  $('#throwBtn').addEventListener('click', throwBall);
+  $('#throwBtn').addEventListener('click', () => throwBall());
   $('#battleBtn').addEventListener('click', () => startBattle(false));
   $('#toMapBtn').addEventListener('click', () => switchView('map'));
   document.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => switchView(b.dataset.view));
