@@ -6,11 +6,13 @@
 
 // ---------- config ----------
 const SAVE_KEY = 'pokepp_save_v2';
+// ใช้ jsDelivr CDN (เสถียร/เร็วกว่า raw.githubusercontent มาก โดยเฉพาะในไทย)
+const SP_BASE = 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon';
 const SP = {
-  gif:   id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`,
-  shiny: id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${id}.gif`,
-  art:   id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`,
-  png:   id => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`,
+  gif:   id => `${SP_BASE}/other/showdown/${id}.gif`,
+  shiny: id => `${SP_BASE}/other/showdown/shiny/${id}.gif`,
+  art:   id => `${SP_BASE}/other/official-artwork/${id}.png`,
+  png:   id => `${SP_BASE}/${id}.png`,
 };
 const SPAWN_MIN = 9000, SPAWN_MAX = 16000;
 const FLEE_MS = 45000;
