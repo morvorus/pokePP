@@ -228,6 +228,7 @@ main { flex: 1; padding: 12px; }
 }
 .act-btn:disabled { opacity: .5; cursor: not-allowed; }
 .act-btn:not(:disabled):active { transform: scale(.97); }
+.fish-btn { background: linear-gradient(180deg,#2b8fc9,#12557f); flex: 0 0 40%; }
 
 /* wild HP bar */
 .wild-hp { margin: 4px auto 0; max-width: 220px; }

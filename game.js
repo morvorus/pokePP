@@ -280,6 +280,11 @@ function tierOf(m) {
 MONSTERS.forEach(m => { m._tier = tierOf(m); });
 const ALL_TYPES = [...new Set(MONSTERS.flatMap(m => m.types))].sort();
 
+// pool สำหรับตกปลา (ธาตุน้ำ/น้ำแข็ง)
+const FISH_POOL = MONSTERS.filter(m => m.types.includes('water') || m.types.includes('ice'));
+const FISH_POOL_BY_TIER = {};
+TIER_ORDER.forEach(t => { FISH_POOL_BY_TIER[t] = FISH_POOL.filter(m => m._tier === t); });
+
 // pool ต่อเขต แยกตามระดับ
 REGIONS.forEach(r => {
   r._pool = MONSTERS.filter(m => m.types.some(t => r.types.includes(t)));
@@ -321,6 +326,9 @@ function newSave() {
     charms: { shiny: 0, catch: 0, xp: 0 },       // charm ที่มีในคลัง
     activeBoosts: { shiny: 0, catch: 0, xp: 0 }, // เวลาหมดอายุของบูสต์ (timestamp)
     stones: 0,
+    candies: 0,          // Rare Candy (เลเวลอัพทันที)
+    fishTokens: 0,       // เหรียญตกปลา
+    fishReadyAt: 0,      // คูลดาวน์ตกปลา (timestamp)
     selBall: 'poke',
     region: 'plains',
     unlocked: { plains: true },
@@ -672,20 +680,62 @@ function doSpawn() {
   }
   // ชั้น shiny: overlay สุ่มแยกอิสระ (ซ้อนตัวที่สุ่มได้)
   const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier();
+  beginSpawn(mon, shiny, false);
+}
+// สร้าง spawn จริง (ใช้ร่วมกันทั้งเดินป่าปกติและตกปลา)
+function beginSpawn(mon, shiny, fromFishing) {
   const level = levelFor(mon._tier);
   const maxHp = wildMaxHp(mon, level);
-
   currentSpawn = { mon, tier: mon._tier, shiny, level, throws: 0, deadline: Date.now() + FLEE_MS,
-    maxHp, hp: maxHp, berry: null };
+    maxHp, hp: maxHp, berry: null, fishing: !!fromFishing };
   state.seen[mon.id] = true;
   renderSpawn();
-
   if (shiny || mon._tier === 'rare' || mon._tier === 'superrare' || mon._tier === 'legendary') {
     showRareAlert(mon, mon._tier, shiny);
-    logMsg(`${shiny ? '✨' : '⭐'} พบ <b>${mon.name}</b> (${shiny ? 'Shiny' : TIER_LABEL[mon._tier]}) Lv.${level}!`, 'big');
+    logMsg(`${shiny ? '✨' : '⭐'} ${fromFishing ? '🎣 ' : ''}พบ <b>${mon.name}</b> (${shiny ? 'Shiny' : TIER_LABEL[mon._tier]}) Lv.${level}!`, 'big');
+  } else if (fromFishing) {
+    logMsg(`🎣 เกี่ยว <b>${mon.name}</b> Lv.${level} ขึ้นมาได้!`, '');
   }
   clearTimeout(despawnTimer);
   despawnTimer = setTimeout(fleeSpawn, FLEE_MS);
+}
+// ===== ระบบตกปลา (แบบ PokeMeow) =====
+const FISH_CD = 8000;   // คูลดาวน์ 8 วินาที
+function fish() {
+  const now = Date.now();
+  if (now < (state.fishReadyAt || 0)) {
+    toast(`🎣 รอเบ็ดพร้อมอีก ${Math.ceil((state.fishReadyAt - now) / 1000)} วิ`, 'bad'); return;
+  }
+  state.fishReadyAt = now + FISH_CD;
+  const roll = Math.random();
+  if (roll < 0.60) {
+    // เกี่ยวโปเกมอนน้ำ/น้ำแข็งขึ้นมา
+    clearTimeout(spawnTimer);
+    const luck = isEventActive() ? 1 : 0;
+    let tier = rollRarity(luck);
+    let ti = TIER_ORDER.indexOf(tier);
+    while (ti >= 0 && !FISH_POOL_BY_TIER[TIER_ORDER[ti]].length) ti--;
+    const pool = ti >= 0 ? FISH_POOL_BY_TIER[TIER_ORDER[ti]] : FISH_POOL;
+    const mon = pick(pool.length ? pool : MONSTERS);
+    const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier();
+    beginSpawn(mon, shiny, true);
+    toast('🎣 มีบางอย่างกินเบ็ด!', 'good');
+  } else if (roll < 0.90) {
+    // ได้เหรียญตกปลา + เหรียญ
+    const tok = rand(1, 3), coins = rand(10, 40);
+    state.fishTokens = (state.fishTokens || 0) + tok; state.coins += coins;
+    toast(`🎣 ได้ 🪙${coins} + 🎟️${tok} เหรียญตกปลา`, 'good');
+    logMsg(`🎣 ตกปลาได้ 🪙${coins} + 🎟️${tok} เหรียญตกปลา`, '');
+  } else {
+    toast('🎣 ไม่มีอะไรกินเบ็ด...', '');
+  }
+  save(); renderTopbar(); updateFishBtn();
+}
+function updateFishBtn() {
+  const btn = $('#fishBtn'); if (!btn) return;
+  const left = Math.ceil(((state.fishReadyAt || 0) - Date.now()) / 1000);
+  if (left > 0) { btn.disabled = true; btn.textContent = `🎣 รอ ${left} วิ`; }
+  else { btn.disabled = false; btn.textContent = '🎣 ตกปลา'; }
 }
 function fleeSpawn() {
   if (!currentSpawn) return;
@@ -1098,8 +1148,8 @@ function indRow(ind) {
   return `<div class="ind-row" data-uid="${ind.uid}">
     ${spriteImg(ind.id, ind.shiny)}
     <div class="ir-main">
-      <div class="ir-name">${ind.shiny ? '✨' : ''}${m.name} ${genderIcon(ind.gender)} ${isBuddy ? '⭐' : ''}</div>
-      <div class="ir-sub">Lv.${ind.level} · ${ind.nature}</div>
+      <div class="ir-name">${ind.shiny ? '✨' : ''}${ind.nick ? ind.nick : m.name} ${genderIcon(ind.gender)} ${isBuddy ? '⭐' : ''}</div>
+      <div class="ir-sub">Lv.${ind.level} · ${ind.nature}${ind.nick ? ' · ' + m.name : ''}</div>
     </div>
     <div class="ir-iv">IV ${ivPercent(ind)}%</div></div>`;
 }
@@ -1144,7 +1194,8 @@ function openIndividualModal(uid) {
       <span class="val">${st[k]} <span style="color:var(--muted);font-size:10px">(${ind.iv[k]})</span></span></div>`).join('');
   $('#modalBox').innerHTML = `
     ${spriteImg(ind.id, ind.shiny, 'big')}
-    <h3>${ind.shiny ? '✨' : ''}${m.name} ${genderIcon(ind.gender)}</h3>
+    <h3>${ind.shiny ? '✨' : ''}${ind.nick ? ind.nick : m.name} ${genderIcon(ind.gender)}</h3>
+    ${ind.nick ? `<div style="font-size:12px;color:var(--muted);margin-top:-4px">(${m.name})</div>` : ''}
     <div style="margin-bottom:8px">
       <span class="pill">Lv.${ind.level}</span>
       <span class="pill">${ind.nature} nature</span>
@@ -1165,6 +1216,8 @@ function openIndividualModal(uid) {
         ? (isBuddy ? '' : `<button class="btn-ghost" id="mParty">➖ ออกจากทีม</button>`)
         : `<button class="btn-primary" id="mParty">➕ เข้าทีม (${state.party.length}/6)</button>`}
       ${(m.evolveItem && state.stones > 0) ? `<button class="btn-primary" id="mStone">💎 ใช้หินวิวัฒนาการ</button>` : ''}
+      ${(state.candies > 0 && ind.level < 100) ? `<button class="btn-primary" id="mCandy">🍬 Rare Candy (มี ${state.candies})</button>` : ''}
+      <button class="btn-ghost" id="mNick">✏️ ตั้งชื่อเล่น</button>
       <button class="btn-ghost" id="mLock">${ind.locked ? '🔒 ล็อกอยู่' : '🔓 ล็อก'}</button>
       <button class="btn-danger" id="mRelease" ${ind.locked ? 'disabled' : ''}>ปล่อย</button>
       <button class="btn-ghost" id="mClose">ปิด</button>
@@ -1178,6 +1231,18 @@ function openIndividualModal(uid) {
   const sn = $('#mStone'); if (sn) sn.onclick = () => {
     if ((state.stones || 0) <= 0) { toast('❌ ไม่มีหินวิวัฒนาการ', 'bad'); return; }
     state.stones--; doEvolve(ind, m.evolvesTo); save(); openIndividualModal(uid); renderCurrentView();
+  };
+  const cd = $('#mCandy'); if (cd) cd.onclick = () => {
+    if ((state.candies || 0) <= 0 || ind.level >= 100) return;
+    state.candies--; ind.level++; ind.xp = 0;
+    toast(`🍬 ${MON_BY_ID[ind.id].name} ขึ้นเป็น Lv.${ind.level}`, 'good');
+    tryEvolveByLevel(ind); save(); renderTopbar(); openIndividualModal(uid); renderCurrentView();
+  };
+  const nk = $('#mNick'); if (nk) nk.onclick = () => {
+    const cur = ind.nick || '';
+    const name = (prompt('ตั้งชื่อเล่น (เว้นว่างเพื่อลบ):', cur) || '').trim().slice(0, 16);
+    ind.nick = name || null; save(); openIndividualModal(uid); renderCurrentView();
+    toast(name ? `✏️ ตั้งชื่อ "${name}" แล้ว` : 'ลบชื่อเล่นแล้ว', 'good');
   };
 }
 function releaseIndividual(uid) {
@@ -1211,21 +1276,31 @@ function renderShop() {
     { emoji: '🟣', img: 'master-ball', name: 'Master Ball ×1', desc: 'จับติด 100% การันตี', price: BALLS.master.price, act: () => addBalls('master', 1, BALLS.master.price) },
     { emoji: '🍓', img: 'razz-berry', name: 'Razz Berry ×3', desc: 'โยนก่อนปา เพิ่มโอกาสจับ +13%', price: BERRIES.razz.price * 3, act: () => addBerries('razz', 3, BERRIES.razz.price * 3) },
     { emoji: '🥭', img: 'nanab-berry', name: 'Golden Razz ×1', desc: 'เพิ่มโอกาสจับ +32%', price: BERRIES.golden.price, act: () => addBerries('golden', 1, BERRIES.golden.price) },
+    { emoji: '🍬', img: 'rare-candy', name: 'Rare Candy ×3', desc: 'เลเวลอัพทันที (ใช้กับตัวใดก็ได้ในคลัง)', price: 450, act: () => { if (spend(450)) { state.candies = (state.candies || 0) + 3; toast('🍬 +3 Rare Candy', 'good'); postBuy(); } } },
     { emoji: '🥚', name: 'ไข่ปริศนา', desc: `ฟักเมื่อจับครบ ${EGG_HATCH_CATCHES} ตัว`, price: EGG_PRICE, act: buyEgg },
     { emoji: '💎', name: 'หินวิวัฒนาการ', desc: 'วิวัฒนาการตัวที่ต้องใช้ไอเทม', price: STONE_PRICE, act: () => { if (spend(STONE_PRICE)) { state.stones = (state.stones || 0) + 1; toast('💎 +1 หินวิวัฒนาการ', 'good'); postBuy(); } } },
     { emoji: CHARMS.shiny.emoji, img: CHARMS.shiny.img, name: 'Shiny Charm', desc: CHARMS.shiny.desc + ' · 30 นาที (กดใช้ในเมนู)', price: CHARMS.shiny.price, act: () => buyCharm('shiny') },
     { emoji: CHARMS.catch.emoji, img: CHARMS.catch.img, name: 'Catch Charm', desc: CHARMS.catch.desc + ' · 30 นาที', price: CHARMS.catch.price, act: () => buyCharm('catch') },
     { emoji: CHARMS.xp.emoji, img: CHARMS.xp.img, name: 'XP Charm', desc: CHARMS.xp.desc + ' · 30 นาที', price: CHARMS.xp.price, act: () => buyCharm('xp') },
+    // แลกด้วยเหรียญตกปลา 🎟️
+    { emoji: '🟡', img: 'ultra-ball', name: 'Ultra Ball ×3', desc: 'แลกด้วยเหรียญตกปลา', tokenPrice: 5, act: () => { if (spendTokens(5)) { state.balls.ultra = (state.balls.ultra || 0) + 3; toast('🟡 +3 Ultra Ball', 'good'); postBuy(); } } },
+    { emoji: CHARMS.shiny.emoji, img: CHARMS.shiny.img, name: 'Shiny Charm', desc: 'แลกด้วยเหรียญตกปลา', tokenPrice: 25, act: () => { if (spendTokens(25)) { state.charms.shiny = (state.charms.shiny || 0) + 1; toast('🔮 +1 Shiny Charm', 'good'); postBuy(); } } },
   ];
   $('#shopGrid').innerHTML =
-    `<div class="dex-stats">มีหินวิวัฒนาการ: 💎 ${state.stones || 0} · บอล: ` +
+    `<div class="dex-stats">💎 ${state.stones || 0} · 🍬 ${state.candies || 0} · 🎟️ ${state.fishTokens || 0} เหรียญตกปลา · บอล: ` +
     BALL_ORDER.map(k => `${itemIcon(BALLS[k].emoji, BALLS[k].img)}${state.balls[k] || 0}`).join(' ') + `</div>` +
-    items.map((it, i) => `<div class="shop-item">
-      <div class="emoji">${itemIcon(it.emoji, it.img, 'big')}</div>
-      <div class="si-body"><div class="si-name">${it.name}</div><div class="si-desc">${it.desc}</div></div>
-      <button class="buy-btn" data-i="${i}" ${state.coins < it.price ? 'disabled' : ''}>${it.price}🪙</button></div>`).join('');
+    items.map((it, i) => {
+      const isTok = it.tokenPrice != null;
+      const cant = isTok ? (state.fishTokens || 0) < it.tokenPrice : state.coins < it.price;
+      const label = isTok ? `${it.tokenPrice}🎟️` : `${it.price}🪙`;
+      return `<div class="shop-item">
+        <div class="emoji">${itemIcon(it.emoji, it.img, 'big')}</div>
+        <div class="si-body"><div class="si-name">${it.name}</div><div class="si-desc">${it.desc}</div></div>
+        <button class="buy-btn" data-i="${i}" ${cant ? 'disabled' : ''}>${label}</button></div>`;
+    }).join('');
   $('#shopGrid').querySelectorAll('.buy-btn[data-i]').forEach(btn => btn.onclick = () => items[+btn.dataset.i].act());
 }
+function spendTokens(n) { if ((state.fishTokens || 0) < n) { toast('❌ เหรียญตกปลาไม่พอ', 'bad'); return false; } state.fishTokens -= n; return true; }
 function spend(n) { if (state.coins < n) { toast('❌ เงินไม่พอ', 'bad'); return false; } state.coins -= n; return true; }
 function postBuy() { save(); renderTopbar(); renderShop(); renderBallBar(); }
 function addBalls(k, n, price) { if (spend(price)) { state.balls[k] = (state.balls[k] || 0) + n; toast(`${BALLS[k].emoji} +${n} ${BALLS[k].name}`, 'good'); postBuy(); } }
@@ -1820,6 +1895,9 @@ function init() {
   renderSpawn();
 
   $('#battleBtn').addEventListener('click', () => startBattle(false));
+  $('#fishBtn').addEventListener('click', fish);
+  updateFishBtn();
+  setInterval(updateFishBtn, 1000);
   $('#toMapBtn').addEventListener('click', () => switchView('map'));
   document.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => switchView(b.dataset.view));
   $('#dexSearch').addEventListener('input', renderDex);
