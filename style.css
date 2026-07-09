@@ -94,6 +94,9 @@ main { flex: 1; padding: 12px; }
 .rb-info { font-size: 15px; display: flex; align-items: center; gap: 6px; }
 .rb-info #rbEmoji { font-size: 20px; }
 .rb-lvl { font-size: 12px; color: var(--muted); }
+.boost-strip { display: flex; gap: 6px; flex-wrap: wrap; width: 100%; margin-top: 2px; }
+.boost-strip:empty { display: none; }
+.boost-chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: linear-gradient(90deg,#3d7dca,#47d16c); color: #fff; }
 .mini-btn {
   padding: 8px 12px; border: none; border-radius: 10px; cursor: pointer;
   background: var(--accent2); color: #fff; font-weight: 700; font-size: 13px;
