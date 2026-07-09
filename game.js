@@ -31,16 +31,30 @@ window.__sf = function (img) {
   const fb = (img.dataset.fb || '').split('|').filter(Boolean);
   if (fb.length) { img.dataset.fb = fb.slice(1).join('|'); img.src = fb[0]; }
 };
-// ภาพไอเทม (บอล/เบอร์รี่) จาก PokeAPI — แสดงภาพอย่างเดียว ถ้าโหลดไม่ได้ค่อยสลับเป็นอีโมจิ (ไม่ซ้อน)
+// ภาพไอเทม (บอล/เบอร์รี่/charm) จาก PokeAPI — แสดงภาพอย่างเดียว ไม่มี emoji
+// ถ้าโหลดพลาด (เน็ตกระตุก/CDN cold) ให้ retry จนขึ้น ไม่สลับเป็นอีโมจิ
 const ITEM_BASE = 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/';
-window.__itemFail = function (img, emoji) {
-  const s = document.createElement('span');
-  s.className = img.className; s.textContent = emoji;
-  img.replaceWith(s);
+window.__imgRetry = function (img) {
+  const t = (+img.dataset.try || 0) + 1;
+  img.dataset.try = t;
+  if (t > 15) return;                          // กันลูปไม่รู้จบ (พยายามนานมากแล้ว)
+  const delay = Math.min(250 * t, 2500);
+  const base = img.dataset.src;
+  setTimeout(() => { img.src = base + '?r=' + t; }, delay);   // บังคับ fetch ใหม่
 };
 function itemIcon(emoji, img, extraCls) {
   if (!img) return `<span class="item-ico ${extraCls || ''}">${emoji}</span>`;
-  return `<img class="item-ico ${extraCls || ''}" src="${ITEM_BASE}${img}.png" onerror="__itemFail(this,'${emoji}')" alt="">`;
+  const url = ITEM_BASE + img + '.png';
+  return `<img class="item-ico ${extraCls || ''}" src="${url}" data-src="${url}" data-try="0" onerror="__imgRetry(this)" alt="">`;
+}
+// โหลดภาพไอเทมทั้งหมดล่วงหน้าตอนเปิดเกม (warm cache ให้ jsDelivr) เพื่อให้ขึ้นทันทีเสมอ
+function preloadItems() {
+  const names = [
+    ...BALL_ORDER.map(k => BALLS[k].img),
+    ...BERRY_ORDER.map(k => BERRIES[k].img),
+    ...CHARM_ORDER.map(k => CHARMS[k].img),
+  ].filter(Boolean);
+  names.forEach(n => { const i = new Image(); i.src = ITEM_BASE + n + '.png'; });
 }
 const SPAWN_MIN = 9000, SPAWN_MAX = 16000;
 const FLEE_MS = 45000;
@@ -852,7 +866,7 @@ function throwBall(k) {
   // แอนิเมชันปาบอล 3 จังหวะ: ขว้าง → ดูดเข้าบอล → สั่น 3 ครั้ง → รู้ผล
   const ball = $('#throwBall');
   const sprite = $('#spawnSprite');
-  ball.innerHTML = `<img class="tb-img" src="${ITEM_BASE}${BALLS[k].img}.png" onerror="this.replaceWith(document.createTextNode('${BALLS[k].emoji}'))" alt="">`;
+  ball.innerHTML = `<img class="tb-img" src="${ITEM_BASE}${BALLS[k].img}.png" data-src="${ITEM_BASE}${BALLS[k].img}.png" data-try="0" onerror="__imgRetry(this)" alt="">`;
   ball.className = 'throw-ball'; void ball.offsetWidth; ball.classList.add('animate');
   setTimeout(() => {                       // ดูดโปเกมอนเข้าบอล แล้วเริ่มสั่น
     if (sprite) sprite.style.opacity = '0';
@@ -1815,6 +1829,7 @@ function init() {
   $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
   $('#battleModal').addEventListener('click', e => { if (e.target.id === 'battleModal' && battleState && battleState.over) endBattle(); });
 
+  preloadItems();
   checkAchievements();
   scheduleSpawn(2200);
   logMsg('👋 ยินดีต้อนรับ! เลือกเขตในแผนที่ แล้วปาบอลจับโปเกมอนได้เลย', 'big');
