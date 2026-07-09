@@ -118,9 +118,9 @@ const BERRY_ORDER = ['razz', 'golden'];
 // Charm — ไอเทมบูสต์ (ซื้อเก็บ แล้วกดใช้ บูสต์ 30 นาที) แบบ PokeMeow
 const CHARM_MS = 30 * 60000;
 const CHARMS = {
-  shiny: { name: 'Shiny Charm', emoji: '🔮', mult: 3,   price: 5000, desc: 'โอกาส Shiny ×3' },
-  catch: { name: 'Catch Charm', emoji: '🧲', mult: 1.5, price: 1200, desc: 'โอกาสจับ ×1.5' },
-  xp:    { name: 'XP Charm',    emoji: '📿', mult: 2,   price: 800,  desc: 'XP ที่ได้ ×2' },
+  shiny: { name: 'Shiny Charm', emoji: '🔮', img: 'shiny-charm',    mult: 3,   price: 5000, desc: 'โอกาส Shiny ×3' },
+  catch: { name: 'Catch Charm', emoji: '🧲', img: 'catching-charm', mult: 1.5, price: 1200, desc: 'โอกาสจับ ×1.5' },
+  xp:    { name: 'XP Charm',    emoji: '📿', img: 'lucky-egg',      mult: 2,   price: 800,  desc: 'XP ที่ได้ ×2' },
 };
 const CHARM_ORDER = ['shiny', 'catch', 'xp'];
 
@@ -1199,9 +1199,9 @@ function renderShop() {
     { emoji: '🥭', img: 'nanab-berry', name: 'Golden Razz ×1', desc: 'เพิ่มโอกาสจับ +32%', price: BERRIES.golden.price, act: () => addBerries('golden', 1, BERRIES.golden.price) },
     { emoji: '🥚', name: 'ไข่ปริศนา', desc: `ฟักเมื่อจับครบ ${EGG_HATCH_CATCHES} ตัว`, price: EGG_PRICE, act: buyEgg },
     { emoji: '💎', name: 'หินวิวัฒนาการ', desc: 'วิวัฒนาการตัวที่ต้องใช้ไอเทม', price: STONE_PRICE, act: () => { if (spend(STONE_PRICE)) { state.stones = (state.stones || 0) + 1; toast('💎 +1 หินวิวัฒนาการ', 'good'); postBuy(); } } },
-    { emoji: CHARMS.shiny.emoji, name: 'Shiny Charm', desc: CHARMS.shiny.desc + ' · 30 นาที (กดใช้ในเมนู)', price: CHARMS.shiny.price, act: () => buyCharm('shiny') },
-    { emoji: CHARMS.catch.emoji, name: 'Catch Charm', desc: CHARMS.catch.desc + ' · 30 นาที', price: CHARMS.catch.price, act: () => buyCharm('catch') },
-    { emoji: CHARMS.xp.emoji, name: 'XP Charm', desc: CHARMS.xp.desc + ' · 30 นาที', price: CHARMS.xp.price, act: () => buyCharm('xp') },
+    { emoji: CHARMS.shiny.emoji, img: CHARMS.shiny.img, name: 'Shiny Charm', desc: CHARMS.shiny.desc + ' · 30 นาที (กดใช้ในเมนู)', price: CHARMS.shiny.price, act: () => buyCharm('shiny') },
+    { emoji: CHARMS.catch.emoji, img: CHARMS.catch.img, name: 'Catch Charm', desc: CHARMS.catch.desc + ' · 30 นาที', price: CHARMS.catch.price, act: () => buyCharm('catch') },
+    { emoji: CHARMS.xp.emoji, img: CHARMS.xp.img, name: 'XP Charm', desc: CHARMS.xp.desc + ' · 30 นาที', price: CHARMS.xp.price, act: () => buyCharm('xp') },
   ];
   $('#shopGrid').innerHTML =
     `<div class="dex-stats">มีหินวิวัฒนาการ: 💎 ${state.stones || 0} · บอล: ` +
@@ -1410,7 +1410,7 @@ function renderCharms() {
     const active = boostActive(k);
     const left = active ? Math.ceil((state.activeBoosts[k] - Date.now()) / 60000) : 0;
     return `<div class="ach${active ? ' done' : ''}">
-      <div class="ach-ico">${c.emoji}</div>
+      <div class="ach-ico">${itemIcon(c.emoji, c.img, 'big')}</div>
       <div class="ach-body">
         <div class="ach-name">${c.name} ${active ? `<span style="color:var(--good)">· ทำงาน ${left} นาที</span>` : ''}</div>
         <div class="ach-desc">${c.desc} · มี ${have} ชิ้น</div>
