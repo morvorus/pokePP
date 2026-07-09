@@ -2026,12 +2026,12 @@ function startBattle(isBoss, bossData) {
     foeStats = statsForWild(foeMon, foeLevel);
     foeMaxHp = currentSpawn.maxHp; foeHp = currentSpawn.hp;
   }
-  const team = members.map(ind => { const s = statsWithHeld(ind); return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false }; });
+  const team = members.map(ind => { const s = statsWithHeld(ind); return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, status: null, sleepT: 0 }; });
   battleState = {
     mode: isBoss ? 'boss' : 'wild',
     isBoss, bossData, foeMon, foeLevel, foeStats, foeHp, foeMaxHp,
     foeQueue: [{ mon: foeMon }], foeIdx: 0,
-    team, activeIdx: 0, over: false, lost: false,
+    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0 },
     msg: isBoss ? `👑 บอส ${foeMon.name} ท้าดวล!` : `เจอ ${foeMon.name} ป่า — เลือกท่าโจมตี!`,
   };
   renderBattle();
@@ -2062,12 +2062,12 @@ function renderBattle() {
     <div class="battle-arena">
       <div class="bt-side foe">
         ${b.mode === 'trainer' ? `<div style="font-size:11px;color:#ffb3bb;font-weight:700">${b.gym.emoji} ${b.gym.name} · เหลือศัตรู ${b.foeQueue.length - b.foeIdx}/${b.foeQueue.length}</div>` : ''}
-        <div class="bt-head"><span>${b.isBoss ? '👑 ' : ''}${b.foeMon.name} Lv.${b.foeLevel} ${b.foeMon.types.map(t => `<span class="badge t-${t}" style="font-size:9px;padding:1px 6px">${t}</span>`).join('')}</span>${spriteImg(b.foeMon.id, false)}</div>
+        <div class="bt-head"><span>${b.isBoss ? '👑 ' : ''}${b.foeMon.name} Lv.${b.foeLevel} ${statusBadge(b.foe.status)} ${b.foeMon.types.map(t => `<span class="badge t-${t}" style="font-size:9px;padding:1px 6px">${t}</span>`).join('')}</span>${spriteImg(b.foeMon.id, false)}</div>
         <div class="bt-hpbar"><div class="${hpCls(b.foeHp, b.foeMaxHp)}" style="width:${foePct}%"></div></div>
         <div class="hp-txt" style="text-align:left">HP ${Math.ceil(b.foeHp)}/${b.foeMaxHp}</div>
       </div>
       <div class="bt-side me">
-        <div class="bt-head">${spriteImg(active.ind.id, active.ind.shiny)}<span>${mon.name} Lv.${active.ind.level} ${genderIcon(active.ind.gender)}</span></div>
+        <div class="bt-head">${spriteImg(active.ind.id, active.ind.shiny)}<span>${mon.name} Lv.${active.ind.level} ${genderIcon(active.ind.gender)} ${statusBadge(active.status)}</span></div>
         <div class="bt-hpbar"><div class="${hpCls(active.hp, active.maxHp)}" style="width:${myPct}%"></div></div>
         <div class="hp-txt" style="text-align:right">HP ${Math.ceil(active.hp)}/${active.maxHp}</div>
       </div>
@@ -2086,28 +2086,86 @@ function renderBattle() {
     $('#battleBox').querySelectorAll('.team-chip[data-sw]').forEach(el => el.onclick = () => battleSwitch(+el.dataset.sw));
   }
 }
+// ===== สถานะผิดปกติ (Status) =====
+const STATUS = {
+  burn:   { emoji: '🔥', name: 'ไหม้', dot: 1 / 16 },
+  poison: { emoji: '☠️', name: 'พิษ', dot: 1 / 8 },
+  para:   { emoji: '⚡', name: 'อัมพาต' },
+  sleep:  { emoji: '💤', name: 'หลับ' },
+  freeze: { emoji: '❄️', name: 'แช่แข็ง' },
+};
+const TYPE_STATUS = {   // ธาตุของท่า -> สถานะที่อาจติด + โอกาส
+  fire: { s: 'burn', c: 0.3 }, electric: { s: 'para', c: 0.3 }, ice: { s: 'freeze', c: 0.2 },
+  poison: { s: 'poison', c: 0.35 }, grass: { s: 'poison', c: 0.2 }, bug: { s: 'poison', c: 0.2 },
+  ghost: { s: 'sleep', c: 0.25 }, psychic: { s: 'sleep', c: 0.2 }, fairy: { s: 'para', c: 0.2 },
+};
+const STATUS_IMMUNE = { burn: ['fire'], freeze: ['ice'], para: ['electric', 'ground'], poison: ['poison', 'steel'] };
+function statusBadge(st) { return st ? `<span title="${STATUS[st].name}" style="font-size:12px">${STATUS[st].emoji}</span>` : ''; }
+function canAct(ent) {   // ตรวจว่าขยับได้ไหม (mutate: ตื่น/ละลาย)
+  const st = ent.status; if (!st) return { can: true };
+  if (st === 'freeze') { if (Math.random() < 0.2) { ent.status = null; return { can: true, note: 'ละลายน้ำแข็ง' }; } return { can: false, note: 'ถูกแช่แข็ง' }; }
+  if (st === 'sleep') { ent.sleepT = (ent.sleepT || 1) - 1; if (ent.sleepT <= 0) { ent.status = null; return { can: true, note: 'ตื่นแล้ว' }; } return { can: false, note: 'หลับอยู่ 💤' }; }
+  if (st === 'para' && Math.random() < 0.25) return { can: false, note: 'อัมพาต ขยับไม่ได้' };
+  return { can: true };
+}
+function tryInflict(move, target, targetTypes, name) {
+  if (target.status) return '';
+  const ts = TYPE_STATUS[move.type]; if (!ts) return '';
+  if ((STATUS_IMMUNE[ts.s] || []).some(t => targetTypes.includes(t))) return '';
+  if (Math.random() < ts.c) {
+    target.status = ts.s;
+    if (ts.s === 'sleep') target.sleepT = rand(1, 3);
+    return ` · ${STATUS[ts.s].emoji} ${name} ติด${STATUS[ts.s].name}!`;
+  }
+  return '';
+}
 function foeTurn(b) {
+  if (b.over) return;
   const active = b.team[b.activeIdx];
   const aMon = MON_BY_ID[active.ind.id];
+  const gate = canAct(b.foe);
+  if (gate.note) b.msg += ` · ${b.foeMon.name} ${gate.note}`;
+  if (!gate.can) return;
   const mv = foeChooseMove(b.foeMon, aMon.types);
-  const dmg = calcDamage(b.foeMon, b.foeStats, b.foeLevel, aMon, active.stats, mv).dmg;
+  let dmg = calcDamage(b.foeMon, b.foeStats, b.foeLevel, aMon, active.stats, mv).dmg;
+  if (b.foe.status === 'burn') dmg = Math.floor(dmg * 0.6);
   const wasFull = active.hp === active.maxHp;
   active.hp = Math.max(0, active.hp - dmg);
   b.msg += ` · ${b.foeMon.name} ใช้ ${mv.name}! -${dmg}`;
+  b.msg += tryInflict(mv, active, aMon.types, aMon.name);
   if (active.hp <= 0 && active.ind.held === 'focus-sash' && !active.sashUsed && wasFull) {
     active.hp = 1; active.sashUsed = true;
     b.msg += ` · 🎗️ ${aMon.name} ยึด Focus Sash รอดมาได้!`;
   }
-  if (active.hp <= 0) {
-    b.msg += ` · 😵 ${aMon.name} หมดแรง!`;
-    const next = b.team.findIndex(t => t.hp > 0);
-    if (next < 0) {
-      b.over = true; b.lost = true;
-      b.msg += b.isBoss ? ' · แพ้บอส! ลองใหม่' : ` · แต่โปเกมอนป่ายังเหลือ HP ${Math.ceil(b.foeHp)}`;
-    } else {
-      b.activeIdx = next;
-      b.msg += ` ส่ง ${MON_BY_ID[b.team[next].ind.id].name} ลงสนาม!`;
-    }
+  if (active.hp <= 0) faintActive(b, aMon);
+}
+function faintActive(b, aMon) {
+  b.msg += ` · 😵 ${aMon.name} หมดแรง!`;
+  const next = b.team.findIndex(t => t.hp > 0);
+  if (next < 0) {
+    b.over = true; b.lost = true;
+    b.msg += b.mode === 'wild' ? ` · แต่โปเกมอนป่ายังเหลือ HP ${Math.ceil(b.foeHp)}` : ' · แพ้! ลองใหม่';
+  } else { b.activeIdx = next; b.msg += ` ส่ง ${MON_BY_ID[b.team[next].ind.id].name} ลงสนาม!`; }
+}
+function endRound(b) {
+  if (b.over) return;
+  const a = b.team[b.activeIdx];
+  if (a && a.hp > 0 && a.hp < a.maxHp && a.ind.held === 'leftovers') {   // Leftovers
+    const heal = Math.max(1, Math.floor(a.maxHp / 16));
+    a.hp = Math.min(a.maxHp, a.hp + heal); b.msg += ` · 🍖 ฟื้น ${heal}`;
+  }
+  if (a && a.hp > 0 && (a.status === 'burn' || a.status === 'poison')) {   // DoT ผู้เล่น
+    const d = Math.max(1, Math.floor(a.maxHp * STATUS[a.status].dot));
+    a.hp = Math.max(0, a.hp - d);
+    b.msg += ` · ${STATUS[a.status].emoji} ${MON_BY_ID[a.ind.id].name} -${d}`;
+    if (a.hp <= 0) faintActive(b, MON_BY_ID[a.ind.id]);
+  }
+  if (!b.over && b.foeHp > 0 && (b.foe.status === 'burn' || b.foe.status === 'poison')) {   // DoT ศัตรู
+    const d = Math.max(1, Math.floor(b.foeMaxHp * STATUS[b.foe.status].dot));
+    b.foeHp = Math.max(b.mode === 'wild' ? 1 : 0, b.foeHp - d);
+    b.msg += ` · ${STATUS[b.foe.status].emoji} ${b.foeMon.name} -${d}`;
+    if (b.mode === 'wild' && currentSpawn) currentSpawn.hp = b.foeHp;
+    if (b.foeHp <= 0) onFoeDown();
   }
 }
 function battleAttack(moveIdx) {
@@ -2115,10 +2173,21 @@ function battleAttack(moveIdx) {
   const active = b.team[b.activeIdx];
   const mon = MON_BY_ID[active.ind.id];
   const mv = getMoves(active.ind.id)[moveIdx] || getMoves(active.ind.id)[0];
-  const atk = calcDamage(mon, active.stats, active.ind.level, b.foeMon, b.foeStats, mv, active.ind.held);
+  b.msg = '';
+  const gate = canAct(active);
+  if (gate.note) b.msg += `${mon.name} ${gate.note} · `;
+  if (!gate.can) {                        // ผู้เล่นขยับไม่ได้ → ข้ามไปเทิร์นศัตรู
+    foeTurn(b); endRound(b);
+    if (b.mode === 'wild' && currentSpawn) renderSpawn();
+    save(); renderBattle(); return;
+  }
+  let atk = calcDamage(mon, active.stats, active.ind.level, b.foeMon, b.foeStats, mv, active.ind.held);
+  let dmg = atk.dmg;
+  if (active.status === 'burn') dmg = Math.floor(dmg * 0.6);   // ไหม้ลดพลังโจมตี
   const koMode = b.mode !== 'wild';
-  b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - atk.dmg);
-  b.msg = `${mon.name} ใช้ ${mv.name}! -${atk.dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
+  b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - dmg);
+  b.msg += `${mon.name} ใช้ ${mv.name}! -${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
+  b.msg += tryInflict(mv, b.foe, b.foeMon.types, b.foeMon.name);
   if (b.mode === 'wild' && currentSpawn) currentSpawn.hp = b.foeHp;
 
   if (b.foeHp <= 0) { onFoeDown(); save(); renderBattle(); return; }
@@ -2130,17 +2199,9 @@ function battleAttack(moveIdx) {
     save(); renderBattle(); return;
   }
   foeTurn(b);
-  applyLeftovers(b);
-  if (!b.isBoss && currentSpawn) renderSpawn();
+  endRound(b);
+  if (b.mode === 'wild' && currentSpawn) renderSpawn();
   save(); renderBattle();
-}
-function applyLeftovers(b) {
-  const a = b.team[b.activeIdx];
-  if (a && a.hp > 0 && a.hp < a.maxHp && a.ind.held === 'leftovers') {
-    const heal = Math.max(1, Math.floor(a.maxHp / 16));
-    a.hp = Math.min(a.maxHp, a.hp + heal);
-    b.msg += ` · 🍖 ฟื้น ${heal}`;
-  }
 }
 function battleSwitch(idx) {
   const b = battleState; if (!b || b.over || idx === b.activeIdx) return;
@@ -2149,7 +2210,7 @@ function battleSwitch(idx) {
   b.activeIdx = idx;
   b.msg = `สลับมา ${MON_BY_ID[t.ind.id].name}!`;
   foeTurn(b);                       // สลับตัวเสียเทิร์น ศัตรูโจมตีก่อน
-  applyLeftovers(b);
+  endRound(b);
   save(); renderBattle();
 }
 function onFoeDown() {
@@ -2223,6 +2284,7 @@ function makeFoeDef(mon, level) {
 function loadFoe(b, def) {
   b.foeMon = def.mon; b.foeLevel = def.level; b.foeStats = def.stats;
   b.foeMaxHp = def.maxHp; b.foeHp = def.maxHp;
+  b.foe = { status: null, sleepT: 0 };   // ศัตรูตัวใหม่ = สถานะเคลียร์
 }
 function startTrainerBattle(gymId) {
   const g = GYMS.find(x => x.id === gymId); if (!g) return;
@@ -2239,11 +2301,11 @@ function startTrainerBattle(gymId) {
     const lv = g.lvl + rand(-2, 2) + (i === g.count - 1 ? 3 : 0);   // ตัวสุดท้ายแรงกว่า
     queue.push(makeFoeDef(mon, lv));
   }
-  const team = members.map(ind => { const s = statsWithHeld(ind); return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false }; });
+  const team = members.map(ind => { const s = statsWithHeld(ind); return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, status: null, sleepT: 0 }; });
   battleState = {
     mode: 'trainer', isBoss: false, gym: g, foeQueue: queue, foeIdx: 0,
     foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp,
-    team, activeIdx: 0, over: false, lost: false,
+    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0 },
     msg: `${g.emoji} ${g.name} — ศัตรู ${g.count} ตัว! เลือกท่าโจมตี`,
   };
   renderBattle();
