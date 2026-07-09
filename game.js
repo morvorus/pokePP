@@ -165,6 +165,17 @@ const GYMS = [
   { id: 'champ', name: 'แชมป์เปี้ยน', emoji: '👑', type: null,   lvl: 84, count: 4, reward: 8000 },
 ];
 
+// BP Shop — ของหายาก/ราคาแพงที่แลกได้เฉพาะด้วย Battle Points (ได้จากชนะยิม/บอสเท่านั้น)
+const BP_SHOP = [
+  { id: 'bp_ultra5', name: 'Ultra Ball ×5', emoji: '🟡', img: 'ultra-ball', cost: 40, act: () => { state.balls.ultra = (state.balls.ultra || 0) + 5; return '🟡 +5 Ultra Ball'; } },
+  { id: 'bp_master', name: 'Master Ball', emoji: '🟣', img: 'master-ball', cost: 180, limit: 3, act: () => { state.balls.master = (state.balls.master || 0) + 1; return '🟣 +1 Master Ball'; } },
+  { id: 'bp_shinycharm', name: 'Shiny Charm', emoji: '🔮', img: 'shiny-charm', cost: 120, act: () => { state.charms.shiny = (state.charms.shiny || 0) + 1; return '🔮 +1 Shiny Charm'; } },
+  { id: 'bp_goldegg', name: 'ไข่ทอง', emoji: '🥚', cost: 150, act: () => { state.eggs.push({ kind: 'gold', progressStart: state.totalCaught }); return '🥚 +1 ไข่ทอง'; } },
+  { id: 'bp_candy5', name: 'Rare Candy ×5', emoji: '🍬', img: 'rare-candy', cost: 60, act: () => { state.candies = (state.candies || 0) + 5; return '🍬 +5 Rare Candy'; } },
+  { id: 'bp_lifeorb', name: 'Life Orb', emoji: '🔮', img: 'life-orb', cost: 100, limit: 2, act: () => { state.heldInv['life-orb'] = (state.heldInv['life-orb'] || 0) + 1; return '🔮 +1 Life Orb'; } },
+  { id: 'bp_amulet', name: 'Amulet Coin', emoji: '🪙', img: 'amulet-coin', cost: 80, act: () => { if ((state.amulets || 0) >= AMULET_MAX) return null; state.amulets = (state.amulets || 0) + 1; return '🪙 +1 Amulet Coin'; } },
+];
+
 // ค่าคงที่กลไกเสริม
 const AMULET_MAX = 10, AMULET_PRICE = 1200;     // Amulet Coin: +5%/ชิ้น สูงสุด +50%
 const STREAK_MILESTONE = 10;                     // ทุก 10 สตรีค = กล่องสุ่ม 1 กล่อง
@@ -393,6 +404,8 @@ function newSave() {
     catchbot: { pkLvl: 0, durLvl: 0, profLvl: 0, active: false, startedAt: 0 },
     heldInv: {},         // คลัง Held Item ที่ยังไม่ได้สวม {key:count}
     gymsBeaten: {},      // {gymId:true} ยิมที่ชนะแล้ว
+    battlePoints: 0,     // BP จากชนะยิม/บอส ใช้แลกของใน BP Shop
+    bpBought: {},        // {itemId: count} จำนวนที่แลกไปแล้ว (ใช้กันของ limited)
     selBall: 'poke',
     region: 'plains',
     unlocked: { plains: true },
@@ -1178,15 +1191,9 @@ function sortDexList(list) {
   else if (by === 'tier') list.sort((a, b) => TIER_ORDER.indexOf(b._tier) - TIER_ORDER.indexOf(a._tier) || a.id - b.id);
   // 'dex' = ตามลำดับเดิม (id)
 }
-function renderDex() {
+function dexFilteredSpecies() {
   const search = $('#dexSearch').value.trim().toLowerCase();
   const filter = $('#dexFilter').value;
-  const grid = $('#dexGrid');
-  const speciesOwned = speciesOwnedCount();
-  const shinyCount = state.caught.filter(c => c.shiny).length;
-  $('#dexStats').innerHTML =
-    `จับได้ ${speciesOwned}/${MONSTERS.length} ชนิด · รวม ${state.totalCaught} ตัว · ✨ ${shinyCount} ตัว`;
-
   const list = MONSTERS.filter(m => {
     if (search && !m.name.toLowerCase().includes(search)) return false;
     if (filter === 'owned' && !speciesCount(m.id)) return false;
@@ -1196,7 +1203,18 @@ function renderDex() {
     return true;
   });
   sortDexList(list);
+  return list;
+}
+function renderDex() {
+  const grid = $('#dexGrid');
+  const speciesOwned = speciesOwnedCount();
+  const shinyCount = state.caught.filter(c => c.shiny).length;
+  $('#dexStats').innerHTML =
+    `จับได้ ${speciesOwned}/${MONSTERS.length} ชนิด · รวม ${state.totalCaught} ตัว · ✨ ${shinyCount} ตัว`;
 
+  if (bulkMode) { renderBulkList(); return; }
+
+  const list = dexFilteredSpecies();
   grid.innerHTML = list.map(m => {
     const cnt = speciesCount(m.id);
     const seen = state.seen[m.id];
@@ -1220,6 +1238,97 @@ function renderDex() {
     cell.onclick = () => { cnt(+cell.dataset.id); };
   });
   function cnt(id) { speciesCount(id) ? openSpeciesModal(id) : openDexEntry(id); }
+}
+
+// ---------- bulk management mode ----------
+let bulkMode = false;
+let bulkSelected = new Set();
+function toggleBulkMode() {
+  bulkMode = !bulkMode;
+  bulkSelected.clear();
+  $('#dexGrid').classList.toggle('hidden', bulkMode);
+  $('#dexList').classList.toggle('hidden', !bulkMode);
+  $('#bulkBar').classList.toggle('hidden', !bulkMode);
+  $('#bulkModeBtn').textContent = bulkMode ? '📖 กลับหน้าปกติ' : '📋 จัดการหลายตัว';
+  renderDex();
+}
+function bulkIndividuals() {
+  const speciesIds = new Set(dexFilteredSpecies().map(m => m.id));
+  return state.caught.filter(c => speciesIds.has(c.id))
+    .sort((a, b) => (b.tier === a.tier ? ivPercent(b) - ivPercent(a) : TIER_ORDER.indexOf(b.tier) - TIER_ORDER.indexOf(a.tier)));
+}
+function renderBulkList() {
+  const list = bulkIndividuals();
+  const listEl = $('#dexList');
+  listEl.innerHTML = list.map(ind => {
+    const m = MON_BY_ID[ind.id];
+    const sel = bulkSelected.has(ind.uid);
+    const tags = (ind.locked ? '🔒' : '') + (inParty(ind.uid) ? '⭐' : '') + (ind.shiny ? '✨' : '');
+    return `<div class="ind-row bulk-mode${sel ? ' selected' : ''}" data-uid="${ind.uid}">
+      <div class="ir-check">${sel ? '✓' : ''}</div>
+      ${spriteImg(ind.id, ind.shiny)}
+      <div class="ir-main">
+        <div class="ir-name">${ind.nick || m.name} ${genderIcon(ind.gender)} <span class="ir-tags">${tags}</span></div>
+        <div class="ir-sub">Lv.${ind.level} · ${TIER_LABEL[ind.tier]}</div>
+      </div>
+      <div class="ir-iv">IV ${ivPercent(ind)}%</div></div>`;
+  }).join('') || `<p style="color:var(--muted);text-align:center;padding:20px">ไม่มีโปเกมอนตรงตัวกรอง</p>`;
+  listEl.querySelectorAll('.ind-row[data-uid]').forEach(row => {
+    row.onclick = () => { toggleBulkSelect(row.dataset.uid); };
+  });
+  updateBulkBar();
+}
+function toggleBulkSelect(uid) {
+  bulkSelected.has(uid) ? bulkSelected.delete(uid) : bulkSelected.add(uid);
+  renderBulkList();
+}
+function updateBulkBar() {
+  $('#bulkCount').textContent = `เลือก ${bulkSelected.size} ตัว`;
+}
+function bulkSelectAll() {
+  const list = bulkIndividuals();
+  if (bulkSelected.size === list.length) bulkSelected.clear();
+  else list.forEach(ind => bulkSelected.add(ind.uid));
+  renderBulkList();
+}
+function bulkDoRelease() {
+  const uids = [...bulkSelected].filter(uid => { const ind = indByUid(uid); return ind && !ind.locked; });
+  if (!uids.length) { toast('ไม่มีตัวที่เลือก (หรือถูกล็อกทั้งหมด)', 'bad'); return; }
+  if (!confirm(`ปล่อย ${uids.length} ตัว? (ตัวล็อกจะถูกข้าม)`)) return;
+  let refund = 0;
+  uids.forEach(uid => { const ind = indByUid(uid); if (ind) refund += Math.round(TIER_COIN[ind.tier] * 0.4); });
+  const set = new Set(uids);
+  state.caught = state.caught.filter(c => !set.has(c.uid));
+  state.party = state.party.filter(u => !set.has(u));
+  state.buddyUid = state.party[0] || null;
+  state.coins += refund;
+  bulkSelected.clear();
+  save(); renderTopbar();
+  toast(`👋 ปล่อย ${uids.length} ตัว · +${refund}🪙`, 'good');
+  renderDex();
+}
+function bulkDoParty() {
+  const uids = [...bulkSelected];
+  if (!uids.length) return;
+  let added = 0, skipped = 0;
+  uids.forEach(uid => {
+    if (state.party.length >= 6) { skipped++; return; }
+    if (inParty(uid)) return;
+    state.party.push(uid); added++;
+  });
+  if (added && !state.buddyUid) state.buddyUid = state.party[0];
+  save(); renderTopbar();
+  toast(`➕ เพิ่มเข้าทีม ${added} ตัว${skipped ? ` (ทีมเต็ม เหลือ ${skipped} ตัวไม่ได้เพิ่ม)` : ''}`, 'good');
+  renderDex();
+}
+function bulkDoLock() {
+  const uids = [...bulkSelected];
+  if (!uids.length) return;
+  const allLocked = uids.every(uid => { const ind = indByUid(uid); return ind && ind.locked; });
+  uids.forEach(uid => { const ind = indByUid(uid); if (ind) ind.locked = !allLocked; });
+  save();
+  toast(allLocked ? '🔓 ปลดล็อกแล้ว' : '🔒 ล็อกแล้ว', 'good');
+  renderDex();
 }
 
 // ---------- species modal: list individuals ----------
@@ -1618,6 +1727,7 @@ function renderMenu() {
   renderCloudUI();
   renderIdle();
   renderGyms();
+  renderBpShop();
   renderCharms();
   renderDexRewards();
   const done = ACHIEVEMENTS.filter(a => state.achievements[a.id]).length;
@@ -1740,6 +1850,34 @@ function renderGyms() {
   }).join('');
   box.querySelectorAll('.claim-btn[data-gym]').forEach(btn =>
     btn.onclick = () => startTrainerBattle(btn.dataset.gym));
+}
+function renderBpShop() {
+  const box = $('#bpShopBox'); if (!box) return;
+  box.innerHTML = `<div class="dex-stats">🎖️ Battle Points: ${state.battlePoints || 0} (ได้จากชนะยิม/บอสเท่านั้น)</div>` +
+    BP_SHOP.map(it => {
+      const bought = (state.bpBought[it.id] || 0);
+      const maxed = it.limit && bought >= it.limit;
+      const cant = maxed || (state.battlePoints || 0) < it.cost;
+      return `<div class="shop-item">
+        <div class="emoji">${itemIcon(it.emoji, it.img, 'big')}</div>
+        <div class="si-body"><div class="si-name">${it.name}</div>
+          <div class="si-desc">${it.limit ? `จำกัด ${bought}/${it.limit}` : 'ไม่จำกัด'}</div></div>
+        <button class="buy-btn" data-bp="${it.id}" ${cant ? 'disabled' : ''}>${maxed ? 'เต็ม' : it.cost + '🎖️'}</button></div>`;
+    }).join('');
+  box.querySelectorAll('.buy-btn[data-bp]').forEach(btn => btn.onclick = () => redeemBP(btn.dataset.bp));
+}
+function redeemBP(id) {
+  const it = BP_SHOP.find(x => x.id === id); if (!it) return;
+  const bought = state.bpBought[id] || 0;
+  if (it.limit && bought >= it.limit) { toast('❌ แลกครบจำนวนจำกัดแล้ว', 'bad'); return; }
+  if ((state.battlePoints || 0) < it.cost) { toast('❌ BP ไม่พอ', 'bad'); return; }
+  const desc = it.act();
+  if (!desc) { toast('❌ แลกไม่ได้ตอนนี้', 'bad'); return; }
+  state.battlePoints -= it.cost;
+  state.bpBought[id] = bought + 1;
+  save(); renderTopbar(); renderBpShop(); renderBallBar();
+  toast(`🎖️ แลกได้: <b>${desc}</b>`, 'good');
+  playSfx('rare');
 }
 function renderCharms() {
   const box = $('#charmBox'); if (!box) return;
@@ -2230,10 +2368,12 @@ function onFoeDown() {
     const g = b.gym, first = !state.gymsBeaten[g.id];
     state.gymsBeaten[g.id] = true;
     state.coins += g.reward;
+    const bp = (GYMS.indexOf(g) + 1) * (first ? 15 : 5);
+    state.battlePoints = (state.battlePoints || 0) + bp;
     if (first) { state.balls.ultra = (state.balls.ultra || 0) + 3; state.fishTokens = (state.fishTokens || 0) + 5; }
     gainTrainerXp(120);
-    b.msg = `🏆 ชนะ ${g.emoji} ${g.name}! +${g.reward}🪙${first ? ' +Ultra×3 (ชนะครั้งแรก!)' : ''}`;
-    logMsg(`🏆 พิชิต <b>${g.name}</b>! +${g.reward}🪙`, 'big');
+    b.msg = `🏆 ชนะ ${g.emoji} ${g.name}! +${g.reward}🪙 +${bp}🎖️BP${first ? ' +Ultra×3 (ชนะครั้งแรก!)' : ''}`;
+    logMsg(`🏆 พิชิต <b>${g.name}</b>! +${g.reward}🪙 +${bp}BP`, 'big');
     playSfx('rare'); checkAchievements(); save(); renderTopbar();
     return;
   }
@@ -2241,11 +2381,13 @@ function onFoeDown() {
   if (b.isBoss) {
     state.badges[b.bossData.region.id] = true;
     const reward = 200 + b.foeLevel * 10;
+    const bp = 40;
     state.coins += reward;
+    state.battlePoints = (state.battlePoints || 0) + bp;
     state.balls.ultra = (state.balls.ultra || 0) + 2;
     gainXpTo(active.ind, Math.round(b.foeLevel * 2.5)); gainTrainerXp(80);
-    b.msg = `🏆 ชนะบอส ${b.foeMon.name}! ได้ 🏅 เหรียญตรา + ${reward}🪙 + Ultra Ball ×2`;
-    logMsg(`🏆 ชนะบอสเขต <b>${b.bossData.region.name}</b>! +${reward}🪙`, 'big');
+    b.msg = `🏆 ชนะบอส ${b.foeMon.name}! ได้ 🏅 เหรียญตรา + ${reward}🪙 + ${bp}🎖️BP + Ultra Ball ×2`;
+    logMsg(`🏆 ชนะบอสเขต <b>${b.bossData.region.name}</b>! +${reward}🪙 +${bp}BP`, 'big');
     playSfx('rare'); checkAchievements(); save(); renderTopbar();
   } else {
     const xp = Math.round(b.foeLevel * 2);
@@ -2446,6 +2588,11 @@ function init() {
   $('#dexSearch').addEventListener('input', renderDex);
   $('#dexFilter').addEventListener('change', renderDex);
   $('#dexSort').addEventListener('change', renderDex);
+  $('#bulkModeBtn').addEventListener('click', toggleBulkMode);
+  $('#bulkSelAll').addEventListener('click', bulkSelectAll);
+  $('#bulkRelease').addEventListener('click', bulkDoRelease);
+  $('#bulkParty').addEventListener('click', bulkDoParty);
+  $('#bulkLock').addEventListener('click', bulkDoLock);
   $('#buddyChip').addEventListener('click', () => switchView('dex'));
   $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
   $('#battleModal').addEventListener('click', e => { if (e.target.id === 'battleModal' && battleState && battleState.over) endBattle(); });

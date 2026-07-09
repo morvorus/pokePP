@@ -323,6 +323,30 @@ main { flex: 1; padding: 12px; }
 .ind-row .ir-sub { font-size: 11px; color: var(--muted); }
 .ind-row .ir-iv { font-size: 12px; font-weight: 800; color: var(--accent); }
 
+/* ===== Bulk management ===== */
+.bulk-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  background: var(--card2); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px;
+  border: 1px solid var(--accent);
+}
+.bulk-bar.hidden { display: none; }
+.bulk-bar #bulkCount { font-size: 13px; font-weight: 700; }
+.bulk-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.bulk-actions .mini-btn { font-size: 12px; padding: 6px 10px; }
+.bulk-actions .mini-btn.danger { background: rgba(255,93,108,.25); color: var(--bad); }
+.dex-list { display: flex; flex-direction: column; gap: 6px; }
+.dex-list.hidden, .dex-grid.hidden { display: none; }
+.ind-row.bulk-mode { position: relative; padding-left: 40px; }
+.ind-row.bulk-mode .ir-check {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; border-radius: 5px; border: 2px solid var(--muted);
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+}
+.ind-row.bulk-mode.selected { outline: 2px solid var(--accent); background: var(--card2); }
+.ind-row.bulk-mode.selected .ir-check { background: var(--accent); border-color: var(--accent); color: #3a2c00; }
+.ind-row .ir-tags { display: flex; gap: 3px; }
+.ind-row .ir-tags span { font-size: 10px; }
+
 /* ===== Shop ===== */
 .shop-grid, .egg-list { display: flex; flex-direction: column; gap: 10px; }
 .shop-item { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 14px; padding: 12px 14px; }

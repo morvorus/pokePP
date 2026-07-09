@@ -83,9 +83,20 @@
         <input id="dexSearch" type="text" placeholder="🔍 ค้นหาชื่อ..." />
         <select id="dexFilter"></select>
         <select id="dexSort"></select>
+        <button id="bulkModeBtn" class="mini-btn">📋 จัดการหลายตัว</button>
       </div>
       <div id="dexStats" class="dex-stats"></div>
+      <div id="bulkBar" class="bulk-bar hidden">
+        <span id="bulkCount">เลือก 0 ตัว</span>
+        <div class="bulk-actions">
+          <button id="bulkSelAll" class="mini-btn">เลือกทั้งหมด</button>
+          <button id="bulkRelease" class="mini-btn danger">ปล่อย</button>
+          <button id="bulkParty" class="mini-btn">เข้าทีม</button>
+          <button id="bulkLock" class="mini-btn">ล็อก/ปลดล็อก</button>
+        </div>
+      </div>
       <div id="dexGrid" class="dex-grid"></div>
+      <div id="dexList" class="dex-list hidden"></div>
     </section>
 
     <!-- SHOP -->
@@ -113,6 +124,8 @@
       <div id="idleBox"></div>
       <h2 class="view-title">⚔️ ยิม / เดินสายสู้</h2>
       <div id="gymBox" class="ach-list"></div>
+      <h2 class="view-title">🎖️ BP Shop</h2>
+      <div id="bpShopBox" class="shop-grid"></div>
       <h2 class="view-title">🔮 ไอเทมบูสต์ (Charms)</h2>
       <div id="charmBox" class="ach-list"></div>
       <h2 class="view-title">🎖️ รางวัลจบเดกซ์</h2>
