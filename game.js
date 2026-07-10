@@ -668,6 +668,7 @@ function newSave() {
     battlePoints: 0,     // BP จากชนะยิม/บอส ใช้แลกของใน BP Shop
     bpBought: {},        // {itemId: count} จำนวนที่แลกไปแล้ว (ใช้กันของ limited)
     tower: { floor: 1, bestFloor: 0 },   // หอคอยไต่ระดับ — แพ้แล้วรีเซ็ตกลับชั้น 1, สถิติสูงสุดเก็บถาวร
+    shopQty: {},          // {ballKey: qty} จำนวนบอลที่เลือกซื้อล่าสุดในร้าน (ต่อชนิด)
     selBall: 'poke',
     region: 'plains',
     unlocked: { plains: true },
@@ -793,11 +794,14 @@ function musicTick() {
 function startMusic() { if (musicTimer || !state.settings.music) return; musicStep = 0; musicTick(); }
 function stopMusic() { clearTimeout(musicTimer); musicTimer = null; }
 
+const TOAST_MAX = 3;   // กันข้อความท่วมจอตอนกดรัวๆ — เก็บแค่ล่าสุด 3 อัน เก่ากว่านั้นตัดทิ้งทันที
 function toast(msg, kind) {
+  const box = $('#toasts');
+  while (box.children.length >= TOAST_MAX) box.firstChild.remove();
   const el = document.createElement('div');
   el.className = 'toast ' + (kind || '');
   el.innerHTML = msg;
-  $('#toasts').appendChild(el);
+  box.appendChild(el);
   setTimeout(() => el.remove(), 3000);
 }
 function logMsg(msg, kind) {
@@ -2181,10 +2185,24 @@ function releaseIndividual(uid) {
 // ================================================================
 //  SHOP
 // ================================================================
+const BALL_QTY_OPTIONS = [1, 5, 10, 25];
 function renderShop() {
+  const ballsHtml = BALL_ORDER.map(k => {
+    const b = BALLS[k];
+    const qty = (state.shopQty && state.shopQty[k]) || 1;
+    const total = b.price * qty;
+    const cant = state.coins < total;
+    return `<div class="shop-item">
+      <div class="emoji">${itemIcon(b.emoji, b.img, 'big')}</div>
+      <div class="si-body"><div class="si-name">${b.name}</div><div class="si-desc">${b.hint}</div></div>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:stretch">
+        <select class="set-select" data-ballqty="${k}" style="font-size:11px;padding:2px 4px">
+          ${BALL_QTY_OPTIONS.map(n => `<option value="${n}"${n === qty ? ' selected' : ''}>×${n}</option>`).join('')}
+        </select>
+        <button class="buy-btn" data-buyball="${k}" ${cant ? 'disabled' : ''}>${total}${itemIcon('🪙', 'nugget', 'price-ico')}</button>
+      </div></div>`;
+  }).join('');
   const items = [
-    // บอลทุกชนิด — ซื้อทีละ 1 ลูกเท่านั้น (กดซ้ำได้เรื่อยๆ)
-    ...BALL_ORDER.map(k => ({ emoji: BALLS[k].emoji, img: BALLS[k].img, name: BALLS[k].name, desc: BALLS[k].hint, price: BALLS[k].price, act: () => addBalls(k, 1, BALLS[k].price) })),
     { emoji: '🍬', img: 'rare-candy', name: 'Rare Candy ×3', desc: 'เลเวลอัพทันที (ใช้กับตัวใดก็ได้ในคลัง)', price: 450, act: () => { if (spend(450)) { state.candies = (state.candies || 0) + 3; toast('🍬 +3 Rare Candy', 'good'); postBuy(); } } },
     { emoji: '🎫', img: 'member-card', name: 'ตั๋ว Safari', desc: `เข้า Safari Zone ${SAFARI_SPAWNS} ตัวหายากสุดๆ (กดปุ่ม Safari หน้าล่า)`, price: 800, act: () => { if (spend(800)) { state.safariTickets = (state.safariTickets || 0) + 1; toast('🎫 +1 ตั๋ว Safari', 'good'); postBuy(); } } },
     { emoji: '🪙', img: 'amulet-coin', name: `Amulet Coin (${state.amulets || 0}/${AMULET_MAX})`, desc: 'เงินที่ได้จากการจับ +5% ต่อชิ้น สูงสุด +50%', price: AMULET_PRICE, act: () => { if ((state.amulets || 0) >= AMULET_MAX) { toast('มี Amulet Coin เต็มแล้ว', ''); return; } if (spend(AMULET_PRICE)) { state.amulets = (state.amulets || 0) + 1; toast(`🪙 Amulet Coin +1 (เงิน +${state.amulets * 5}%)`, 'good'); postBuy(); } } },
@@ -2205,6 +2223,7 @@ function renderShop() {
   $('#shopGrid').innerHTML =
     `<div class="dex-stats">💎 ${state.stones || 0} · 🍬 ${state.candies || 0} · 🎟️ ${state.fishTokens || 0} เหรียญตกปลา · บอล: ` +
     BALL_ORDER.map(k => `${itemIcon(BALLS[k].emoji, BALLS[k].img)}${state.balls[k] || 0}`).join(' ') + `</div>` +
+    ballsHtml +
     items.map((it, i) => {
       const isTok = it.tokenPrice != null;
       const owned = (it.img === 'mega-ring' && state.hasMegaRing) || (it.img === 'macho-brace' && state.hasDynamaxBand);
@@ -2216,6 +2235,16 @@ function renderShop() {
         <button class="buy-btn" data-i="${i}" ${cant ? 'disabled' : ''}>${label}</button></div>`;
     }).join('');
   $('#shopGrid').querySelectorAll('.buy-btn[data-i]').forEach(btn => btn.onclick = () => items[+btn.dataset.i].act());
+  $('#shopGrid').querySelectorAll('[data-ballqty]').forEach(sel => sel.onchange = () => {
+    state.shopQty = state.shopQty || {};
+    state.shopQty[sel.dataset.ballqty] = +sel.value;
+    save(); renderShop();
+  });
+  $('#shopGrid').querySelectorAll('[data-buyball]').forEach(btn => btn.onclick = () => {
+    const k = btn.dataset.buyball;
+    const qty = (state.shopQty && state.shopQty[k]) || 1;
+    addBalls(k, qty, BALLS[k].price * qty);
+  });
 }
 function spendTokens(n) { if ((state.fishTokens || 0) < n) { toast('❌ เหรียญตกปลาไม่พอ', 'bad'); return false; } state.fishTokens -= n; return true; }
 function spend(n) { if (state.coins < n) { toast('❌ เงินไม่พอ', 'bad'); return false; } state.coins -= n; return true; }
