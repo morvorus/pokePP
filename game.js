@@ -220,6 +220,9 @@ const HELD_ITEMS = {
   'expert-belt':  { name: 'Expert Belt',  emoji: '🥋', img: 'expert-belt',  price: 1500, desc: 'ดาเมจธาตุได้เปรียบ +20%' },
   'leftovers':    { name: 'Leftovers',    emoji: '🍖', img: 'leftovers',    price: 1600, desc: 'ฟื้น HP 1/16 ทุกเทิร์น' },
   'focus-sash':   { name: 'Focus Sash',   emoji: '🎗️', img: 'focus-sash',   price: 1200, desc: 'รอดท่าสังหารครั้งแรก (ต้อง HP เต็ม)' },
+  'scope-lens':   { name: 'Scope Lens',   emoji: '🔍', img: 'scope-lens',   price: 1700, desc: 'โอกาสคริติคอล ×4 (~25%)' },
+  'quick-claw':   { name: 'Quick Claw',   emoji: '🍀', img: 'quick-claw',   price: 1400, desc: '20% โอกาสได้โจมตีก่อนแม้ช้ากว่า' },
+  'sitrus-berry': { name: 'Sitrus Berry', emoji: '🫐', img: 'sitrus-berry', price: 900,  desc: 'ฟื้น HP 25% อัตโนมัติเมื่อ HP ต่ำกว่าครึ่ง (ใช้ได้ครั้งเดียว/แมตช์)' },
 };
 const HELD_ORDER = Object.keys(HELD_ITEMS);
 
@@ -2497,7 +2500,7 @@ function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move, held) {
   const power = move ? move.pow : 55;
   const eff = typeEffect(moveType, defMon.types);
   const stab = atkMon.types.includes(moveType) ? 1.5 : 1;
-  const crit = Math.random() < 1 / 16;   // คริติคอล 6.25% เหมือนเกมจริง
+  const crit = Math.random() < (held === 'scope-lens' ? 4 / 16 : 1 / 16);   // คริติคอล 6.25% (Scope Lens ×4 ~25%)
   let dmg = (((2 * atkLevel / 5 + 2) * power * A / Math.max(1, D)) / 50 + 2);
   dmg = dmg * stab * eff * (0.85 + Math.random() * 0.15) * (crit ? 1.5 : 1);
   if (held === 'life-orb') dmg *= 1.3;                      // Life Orb
@@ -2515,8 +2518,16 @@ function statsWithHeld(ind) {
 function buildBattleTeam(members) {
   return members.map(ind => {
     const s = statsWithHeld(ind);
-    return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, status: null, sleepT: 0, mega: null, dynamax: null };
+    return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, sitrusUsed: false, status: null, sleepT: 0, mega: null, dynamax: null };
   });
+}
+function checkSitrus(active, b) {   // Sitrus Berry: ฟื้น HP 25% อัตโนมัติครั้งเดียวเมื่อ HP ต่ำกว่าครึ่ง
+  if (active && active.hp > 0 && !active.sitrusUsed && active.ind.held === 'sitrus-berry' && active.hp <= active.maxHp * 0.5) {
+    const heal = Math.max(1, Math.floor(active.maxHp * 0.25));
+    active.hp = Math.min(active.maxHp, active.hp + heal);
+    active.sitrusUsed = true;
+    b.msg += ` · 🫐 ${MON_BY_ID[active.ind.id].name} กิน Sitrus Berry ฟื้น ${heal}!`;
+  }
 }
 function foeChooseMove(foeMon, defTypes) {
   const moves = getMoves(foeMon.id);
@@ -2735,7 +2746,8 @@ function foeTurn(b) {
     active.hp = 1; active.sashUsed = true;
     b.msg += ` · 🎗️ ${aMon.name} ยึด Focus Sash รอดมาได้!`;
   }
-  if (active.hp <= 0) faintActive(b, aMon);
+  if (active.hp <= 0) { faintActive(b, aMon); return; }
+  checkSitrus(active, b);
 }
 function faintActive(b, aMon) {
   b.msg += ` · 😵 ${aMon.name} หมดแรง!`;
@@ -2771,6 +2783,7 @@ function endRound(b) {
     b.msg += ` · ${STATUS[a.status].emoji} ${MON_BY_ID[a.ind.id].name} -${d}`;
     if (a.hp <= 0) faintActive(b, MON_BY_ID[a.ind.id]);
   }
+  if (a && a.hp > 0) checkSitrus(a, b);
   if (!b.over && b.foeHp > 0 && (b.foe.status === 'burn' || b.foe.status === 'poison')) {   // DoT ศัตรู
     const d = Math.max(1, Math.floor(b.foeMaxHp * STATUS[b.foe.status].dot));
     b.foeHp = Math.max(b.mode === 'wild' ? 1 : 0, b.foeHp - d);
@@ -2801,7 +2814,9 @@ function battleAttack(moveIdx) {
   // ลำดับการโจมตี: ท่า priority สูงกว่าไปก่อนเสมอ ถ้าเท่ากันตัวที่ SPD สูงกว่าไปก่อน
   const foeMvPreview = foeChooseMove(b.foeMon, view.types);
   const pPrio = mv.priority || 0, fPrio = foeMvPreview.priority || 0;
-  const foeFirst = fPrio !== pPrio ? fPrio > pPrio : (b.foeStats.spd > active.stats.spd);
+  let foeFirst = fPrio !== pPrio ? fPrio > pPrio : (b.foeStats.spd > active.stats.spd);
+  const quickClawSave = foeFirst && active.ind.held === 'quick-claw' && Math.random() < 0.2;   // Quick Claw: 20% แซงคิวได้แม้ช้ากว่า
+  if (quickClawSave) { foeFirst = false; b.msg += `🍀 Quick Claw! ${view.name} แซงคิวโจมตีก่อน! · `; }
 
   if (foeFirst) {
     foeTurn(b);
