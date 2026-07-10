@@ -2941,6 +2941,21 @@ function hofIndRow(ind, sub) {
     <div class="ir-sub">${sub}</div></div></div>`;
 }
 // คู่มือต่อสู้ — สรุปตารางธาตุแพ้ทาง + Ability ทั้งหมด ให้ผู้เล่นดูอ้างอิงได้ในเกม (ไม่ต้องเจอเองทีละตัว)
+function teamWeaknessHtml() {
+  const members = partyMembers();
+  if (!members.length) return `<div class="sr-sub">ยังไม่มีทีม — ตั้ง Buddy/เข้าทีมจากคลังก่อนเพื่อดูจุดอ่อนทีม</div>`;
+  const weaknessCount = {};
+  ALL_TYPES.forEach(t => weaknessCount[t] = 0);
+  members.forEach(ind => {
+    const m = MON_BY_ID[ind.id];
+    ALL_TYPES.forEach(atkType => { if (typeEffect(atkType, m.types) > 1) weaknessCount[atkType]++; });
+  });
+  const ranked = ALL_TYPES.filter(t => weaknessCount[t] > 0).sort((a, b) => weaknessCount[b] - weaknessCount[a]);
+  if (!ranked.length) return `<div class="sr-sub">ทีมนี้ไม่มีจุดอ่อนธาตุชัดเจน (สมดุลดี) 👍</div>`;
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap">` +
+    ranked.map(t => `<span class="badge t-${t}" style="font-size:11px;padding:3px 8px">${t} ×${weaknessCount[t]}</span>`).join('') +
+    `</div><div style="font-size:11px;color:var(--muted);margin-top:6px">จำนวน = ตัวในทีม (${members.length} ตัว) ที่โดนธาตุนั้นเอาเปรียบ (ดาเมจ ≥×2)</div>`;
+}
 function renderBattleGuide() {
   const box = $('#battleGuideBox'); if (!box) return;
   const typeRows = ALL_TYPES.map(t => {
@@ -2963,6 +2978,8 @@ function renderBattleGuide() {
       <span style="font-size:11px;color:var(--muted);text-align:right;max-width:55%">${ab.desc}</span></div>`;
   }).join('');
   box.innerHTML = `
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px">⚠️ จุดอ่อนทีมปัจจุบัน</div>
+    <div style="margin-bottom:16px">${teamWeaknessHtml()}</div>
     <div style="font-size:12px;font-weight:700;margin-bottom:6px">🔺 ตารางธาตุแพ้ทาง (มองจากฝ่ายโจมตี)</div>
     <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">${typeRows}</div>
     <div style="font-size:12px;font-weight:700;margin-bottom:6px">🧬 Ability ตามธาตุหลักของสายพันธุ์ (ครบ 18/18 ธาตุ)</div>
