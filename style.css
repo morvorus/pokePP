@@ -57,6 +57,7 @@ body {
   font-weight: 700; font-size: 15px; box-shadow: var(--shadow);
 }
 .stat-chip .ico { font-size: 16px; }
+.stat-chip .coin-ico { width: 18px; height: 18px; object-fit: contain; image-rendering: pixelated; }
 .buddy-chip { margin-left: auto; flex: 1; max-width: 240px; gap: 8px; padding: 6px 10px 6px 6px; cursor: pointer; }
 .buddy-chip img {
   width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated;
@@ -230,6 +231,7 @@ main { flex: 1; padding: 12px; }
   object-fit: contain; image-rendering: auto;
 }
 .item-ico.big { width: 42px; height: 42px; font-size: 30px; }
+.item-ico.price-ico { width: 14px; height: 14px; font-size: 12px; vertical-align: -2px; margin-left: 2px; }
 .ball-opt .be, .berry-opt .be { display: flex; align-items: center; justify-content: center; height: 32px; }
 .throw-ball .tb-img { width: 42px; height: 42px; object-fit: contain; image-rendering: auto; }
 
