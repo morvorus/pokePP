@@ -475,35 +475,67 @@ const STAT_LABEL = { hp: 'HP', atk: 'ATK', def: 'DEF', spatk: 'Sp.ATK', spdef: '
 const GENDERLESS = new Set([81, 82, 100, 101, 120, 121, 132, 137, 144, 145, 146, 150, 151]);
 
 // ---------- regions ----------
+// bgImg = ภาพพื้นหลังจริงจาก Wikimedia Commons (ตรวจสอบแล้วว่าโหลดได้จริง) ใช้ทับ bg (gradient เดิม เป็น fallback ถ้าภาพโหลดไม่ขึ้น)
 const REGIONS = [
   { id: 'plains', name: 'ทุ่งหญ้าเริ่มต้น', emoji: '🌾', types: ['normal', 'grass', 'bug', 'flying'],
     lvl: [2, 14], boost: 0, mascots: [25, 133, 10, 16],
     bg: 'linear-gradient(180deg,#8fd0f0 0%,#87ceeb 42%,#7ec850 42%,#4a9e3f 100%)',
+    bgImg: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/35/Meadow_%28145585419%29.jpeg/1280px-Meadow_%28145585419%29.jpeg',
     desc: 'เขตมือใหม่ ปลอดภัย โปเกมอนธรรมดา' },
   { id: 'forest', name: 'ป่าลึกครึ้ม', emoji: '🌲', types: ['bug', 'grass', 'poison', 'flying'],
     lvl: [6, 22], boost: 0, mascots: [1, 12, 48, 43],
-    bg: 'linear-gradient(180deg,#3b6b2e 0%,#1f3d15 100%)', desc: 'ต้นไม้หนาทึบ เต็มไปด้วยแมลง' },
+    bg: 'linear-gradient(180deg,#3b6b2e 0%,#1f3d15 100%)',
+    bgImg: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Dense_forest_canopy_quinault_rainforest_c_bubar_march_05_2015_%2822655664738%29.jpg/1280px-Dense_forest_canopy_quinault_rainforest_c_bubar_march_05_2015_%2822655664738%29.jpg',
+    desc: 'ต้นไม้หนาทึบ เต็มไปด้วยแมลง' },
   { id: 'sea', name: 'ชายฝั่งทะเล', emoji: '🌊', types: ['water', 'ice', 'flying'],
     lvl: [8, 26], boost: 0, mascots: [7, 120, 116, 129],
-    bg: 'linear-gradient(180deg,#7ec8f0 0%,#2b8fc9 45%,#12557f 100%)', desc: 'คลื่นซัดสาด โปเกมอนน้ำชุกชุม' },
+    bg: 'linear-gradient(180deg,#7ec8f0 0%,#2b8fc9 45%,#12557f 100%)',
+    bgImg: 'https://upload.wikimedia.org/wikipedia/commons/a/a0/Ocean_coastline_waves_water.jpg',
+    desc: 'คลื่นซัดสาด โปเกมอนน้ำชุกชุม' },
   { id: 'cave', name: 'ถ้ำมืดใต้ดิน', emoji: '🪨', types: ['rock', 'ground', 'steel', 'dark', 'poison'],
     lvl: [12, 32], boost: 1, mascots: [95, 41, 50, 74],
-    bg: 'linear-gradient(180deg,#3a3a4a 0%,#161620 100%)', desc: 'อับแสง ระวังโปเกมอนหิน/ดิน', unlock: 8 },
+    bg: 'linear-gradient(180deg,#3a3a4a 0%,#161620 100%)',
+    bgImg: 'https://upload.wikimedia.org/wikipedia/commons/f/f5/Coxs_cave_Cheddar_Gorge.jpg',
+    desc: 'อับแสง ระวังโปเกมอนหิน/ดิน', unlock: 8 },
   { id: 'volcano', name: 'ปล่องภูเขาไฟ', emoji: '🌋', types: ['fire', 'rock', 'ground'],
     lvl: [18, 40], boost: 1, mascots: [4, 58, 104, 37],
-    bg: 'linear-gradient(180deg,#7a2b1a 0%,#3a0f08 100%)', desc: 'ร้อนระอุ โปเกมอนไฟดุร้าย', unlock: 12 },
+    bg: 'linear-gradient(180deg,#7a2b1a 0%,#3a0f08 100%)',
+    bgImg: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bb/K%C4%ABlauea_-_Volcano_eruption_%28night%29.jpg/1280px-K%C4%ABlauea_-_Volcano_eruption_%28night%29.jpg',
+    desc: 'ร้อนระอุ โปเกมอนไฟดุร้าย', unlock: 12 },
   { id: 'power', name: 'โรงไฟฟ้าร้าง', emoji: '⚡', types: ['electric', 'steel', 'poison'],
     lvl: [15, 36], boost: 1, mascots: [25, 81, 100, 125],
-    bg: 'linear-gradient(180deg,#4a4620 0%,#26240e 100%)', desc: 'กระแสไฟฟ้ารั่ว เต็มไปด้วยพลัง', unlock: 15 },
+    bg: 'linear-gradient(180deg,#4a4620 0%,#26240e 100%)',
+    bgImg: 'https://upload.wikimedia.org/wikipedia/commons/thumb/2/25/Moran_Plant_Burlington_VT.jpg/1280px-Moran_Plant_Burlington_VT.jpg',
+    desc: 'กระแสไฟฟ้ารั่ว เต็มไปด้วยพลัง', unlock: 15 },
+  { id: 'desert', name: 'ทะเลทรายไร้ขอบเขต', emoji: '🏜️', types: ['ground', 'rock', 'fire', 'dark'],
+    lvl: [20, 42], boost: 1, mascots: [27, 328, 331, 322],
+    bg: 'linear-gradient(180deg,#e8c780 0%,#c99a4e 55%,#8a5f2a 100%)',
+    bgImg: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d8/A_sand_dune_in_the_Maranjab_Desert_of_Iran-_Photographer_Mostafa_Meraji_08.jpg/1280px-A_sand_dune_in_the_Maranjab_Desert_of_Iran-_Photographer_Mostafa_Meraji_08.jpg',
+    desc: 'ทรายร้อนสุดลูกหูลูกตา พายุทรายบ่อยครั้ง', unlock: 18 },
   { id: 'snow', name: 'ยอดเขาหิมะ', emoji: '❄️', types: ['ice', 'water', 'flying', 'rock'],
     lvl: [22, 44], boost: 2, mascots: [144, 131, 361, 215],
-    bg: 'linear-gradient(180deg,#dbeeff 0%,#9dc3e6 55%,#6f96c4 100%)', desc: 'หนาวเหน็บ ตัวหายากซ่อนอยู่', unlock: 25 },
+    bg: 'linear-gradient(180deg,#dbeeff 0%,#9dc3e6 55%,#6f96c4 100%)',
+    bgImg: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Mountains_in_snow%2C_Mountain_lake%2C_Chola_Valley%2C_Nepal%2C_Himalayas.jpg/1280px-Mountains_in_snow%2C_Mountain_lake%2C_Chola_Valley%2C_Nepal%2C_Himalayas.jpg',
+    desc: 'หนาวเหน็บ ตัวหายากซ่อนอยู่', unlock: 25 },
   { id: 'mystic', name: 'ดินแดนลึกลับ', emoji: '🔮', types: ['psychic', 'ghost', 'dragon', 'fairy', 'dark'],
     lvl: [30, 60], boost: 2, mascots: [94, 150, 148, 359],
-    bg: 'linear-gradient(180deg,#432a70 0%,#180830 100%)', desc: 'พลังลึกลับ โอกาสเจอเลเจนดารีสูง', unlock: 40 },
+    bg: 'linear-gradient(180deg,#432a70 0%,#180830 100%)',
+    bgImg: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/A_Colorful_Aurora_Paints_the_Night_Sky_%28153463%29.jpg/1280px-A_Colorful_Aurora_Paints_the_Night_Sky_%28153463%29.jpg',
+    desc: 'พลังลึกลับ โอกาสเจอเลเจนดารีสูง', unlock: 40 },
+  { id: 'sky', name: 'เกาะลอยฟ้า', emoji: '🌤️', types: ['flying', 'dragon', 'fairy', 'electric'],
+    lvl: [40, 75], boost: 2, mascots: [333, 334, 176, 227],
+    bg: 'linear-gradient(180deg,#aee0ff 0%,#7cc4f0 45%,#fff6d8 100%)',
+    bgImg: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Sea_of_clouds_2023.jpg/1280px-Sea_of_clouds_2023.jpg',
+    desc: 'เขตขั้นสุด เหนือทะเลเมฆ ลมแรง โปเกมอนบินหายากรออยู่', unlock: 55 },
 ];
 const REGION_BY_ID = {};
 REGIONS.forEach(r => { REGION_BY_ID[r.id] = r; });
+// รวมภาพพื้นหลังจริง (bgImg) กับ gradient เดิม (bg) เป็น CSS background เดียว
+// ถ้าภาพโหลดไม่ขึ้น browser จะข้ามเลเยอร์นั้นไปเฉยๆ เหลือ gradient ให้เห็นเสมอ ไม่มีทางว่างเปล่า
+function regionBgCss(r) {
+  if (!r.bgImg) return r.bg;
+  return `linear-gradient(180deg, rgba(10,12,26,.1), rgba(10,12,26,.28)), url('${r.bgImg}') center/cover no-repeat, ${r.bg}`;
+}
 
 // ================================================================
 //  data prep
@@ -1172,7 +1204,7 @@ function renderRegionBanner() {
   const safari = (state.safari && state.safari.left > 0) ? ` · <b style="color:#ffd76b">🎫 Safari เหลือ ${state.safari.left}</b>` : '';
   $('#rbLvl').innerHTML = `${timeIco} · ${w.emoji}${w.name}${ev}${safari}`;
   const card = $('#spawnCard');
-  card.style.background = r.bg;
+  card.style.background = regionBgCss(r);
   card.classList.toggle('night', timeOfDay() === 'night');
   renderBoostStrip();
 
@@ -1463,7 +1495,7 @@ function renderMap() {
     const rates = TIER_ORDER.filter(t => r._byTier[t] && r._byTier[t].length)
       .map(t => `<span class="mc-rate rarity-${t}">${TIER_EMOJI[t]} ${TIER_LABEL[t]} ${rt[t] < 1 ? rt[t].toFixed(2) : rt[t].toFixed(t === 'superrare' ? 1 : 0)}%</span>`).join('');
     const beaten = state.badges[r.id];
-    return `<div class="map-card${active ? ' active-region' : ''}${locked ? ' locked' : ''}" style="background:${r.bg}">
+    return `<div class="map-card${active ? ' active-region' : ''}${locked ? ' locked' : ''}" style="background:${regionBgCss(r)}">
       <div class="mc-deco">${mascotDecoHtml(r.mascots)}</div>
       ${beaten ? '<div class="mc-badge">🏅</div>' : ''}
       <div class="mc-body">
