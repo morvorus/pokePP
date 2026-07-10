@@ -426,10 +426,11 @@ function getMoves(id) {
   const seen = new Set();
   return moves.filter(mv => { if (seen.has(mv.name)) return false; seen.add(mv.name); return true; }).slice(0, 4);
 }
-function rollHit(move, atkHeld, defHeld) {   // เช็คว่าท่านี้แม่นเป้าไหม (คิดไอเทม Wide Lens/Bright Powder ด้วยถ้ามี)
+function rollHit(move, atkHeld, defHeld, defAbility) {   // เช็คว่าท่านี้แม่นเป้าไหม (คิดไอเทม Wide Lens/Bright Powder + Sand Veil ด้วยถ้ามี)
   let acc = move.acc == null ? 100 : move.acc;
   if (atkHeld === 'wide-lens') acc += 10;
   if (defHeld === 'bright-powder') acc -= 10;
+  if (defAbility && defAbility.name === 'Sand Veil' && getWeather(state.region) === 'sand') acc -= 15;
   return Math.random() * 100 < acc;
 }
 
@@ -2951,11 +2952,15 @@ const MOVE_STAT_FX = {
   'Shadow Ball':   { stat: 'spdef', delta: -1, target: 'foe',  chance: 0.2 },
   'Psychic':       { stat: 'spdef', delta: -1, target: 'foe',  chance: 0.1 },
 };
-function applyStatFx(mv, casterStages, targetStages, casterName, targetName) {
+function applyStatFx(mv, casterStages, targetStages, casterName, targetName, casterAbility, targetAbility) {
   const fx = MOVE_STAT_FX[mv.name]; if (!fx) return '';
-  if (Math.random() > fx.chance) return '';
-  const stages = fx.target === 'self' ? casterStages : targetStages;
-  const name = fx.target === 'self' ? casterName : targetName;
+  let chance = fx.chance;
+  if (casterAbility && casterAbility.name === 'Serene Grace') chance = Math.min(1, chance * 2);   // Serene Grace: โอกาสเอฟเฟกต์ท่าตัวเอง ×2
+  if (Math.random() > chance) return '';
+  const isSelf = fx.target === 'self';
+  if (!isSelf && fx.delta < 0 && targetAbility && targetAbility.name === 'Clear Body') return '';   // Clear Body บล็อกท่าที่ลดสเตตัสจากศัตรู
+  const stages = isSelf ? casterStages : targetStages;
+  const name = isSelf ? casterName : targetName;
   const before = stages[fx.stat] || 0;
   stages[fx.stat] = clamp(before + fx.delta, -6, 6);
   if (stages[fx.stat] === before) return '';   // ติดเพดานแล้ว ไม่มีอะไรเปลี่ยน
@@ -2980,6 +2985,12 @@ const TYPE_ABILITY = {
   dark:     { name: 'Intimidate',   desc: 'ตอนลงสนาม ลด ATK ศัตรู 1 ระดับ' },
   ghost:    { name: 'Insomnia',     desc: 'ต้านสถานะหลับสมบูรณ์' },
   psychic:  { name: 'Regenerator',  desc: 'ฟื้น HP 1/3 เมื่อสลับตัวออก' },
+  normal:   { name: 'Adaptability', desc: 'ท่าธาตุตรง (STAB) แรงขึ้นเป็น ×2 แทน ×1.5' },
+  ice:      { name: 'Ice Body',     desc: 'ฟื้น HP 1/16 ทุกเทิร์นตอนหิมะโปรย' },
+  ground:   { name: 'Sand Veil',    desc: 'ตอนพายุทราย ศัตรูที่โจมตีตัวนี้ความแม่นยำ -15%' },
+  steel:    { name: 'Clear Body',   desc: 'ต้านทุกท่า/ความสามารถที่ลดสเตตัสตัวเองจากศัตรู (รวม Intimidate)' },
+  fairy:    { name: 'Serene Grace', desc: 'โอกาสติดสถานะ/ปรับสเตตัสจากท่าตัวเอง ×2' },
+  fighting: { name: 'Guts',         desc: 'ATK ×1.5 เมื่อติดสถานะผิดปกติ' },
 };
 function abilityFor(id) { const m = MON_BY_ID[id]; return TYPE_ABILITY[m.types[0]] || null; }
 // Intimidate: เช็คตัวที่เพิ่งลงสนามฝั่งไหน แล้วลด ATK ฝั่งตรงข้าม 1 ระดับถ้ามีความสามารถนี้
@@ -2987,8 +2998,11 @@ function applyIntimidate(holderSide, b) {
   const holderId = holderSide === 'player' ? b.team[b.activeIdx].ind.id : b.foeMon.id;
   const ab = abilityFor(holderId);
   if (!ab || ab.name !== 'Intimidate') return '';
-  const targetStages = holderSide === 'player' ? b.foe.stages : b.team[b.activeIdx].stages;
+  const targetId = holderSide === 'player' ? b.foeMon.id : b.team[b.activeIdx].ind.id;
+  const targetAbility = abilityFor(targetId);
   const targetName = holderSide === 'player' ? (b.foeDisplayName || b.foeMon.name) : activeMonView(b.team[b.activeIdx]).name;
+  if (targetAbility && targetAbility.name === 'Clear Body') return ` · 😤 Intimidate! แต่ ${targetName} มี Clear Body ต้านไว้`;
+  const targetStages = holderSide === 'player' ? b.foe.stages : b.team[b.activeIdx].stages;
   const before = targetStages.atk;
   targetStages.atk = clamp(before - 1, -6, 6);
   if (targetStages.atk === before) return '';
@@ -3007,14 +3021,17 @@ function applyRegenerator(member) {
 function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move, held, opts) {
   opts = opts || {};
   const physical = atkStats.atk >= atkStats.spatk;
-  const A = physical ? atkStats.atk : atkStats.spatk;
+  let A = physical ? atkStats.atk : atkStats.spatk;
   const D = physical ? defStats.def : defStats.spdef;
   const moveType = move ? move.type : atkMon.types[0];
   let power = move ? move.pow : 55;
   let eff = typeEffect(moveType, defMon.types);
   if (opts.defAbility && opts.defAbility.immuneType === moveType) eff = 0;   // Levitate ฯลฯ
-  const stab = atkMon.types.includes(moveType) ? 1.5 : 1;
+  const isStab = atkMon.types.includes(moveType);
+  let stab = isStab ? 1.5 : 1;
+  if (isStab && opts.atkAbility && opts.atkAbility.name === 'Adaptability') stab = 2;
   if (opts.atkAbility && opts.atkAbility.boostType === moveType && opts.atkHpRatio != null && opts.atkHpRatio <= 1 / 3) power *= 1.5;   // Blaze/Torrent/Overgrow/Swarm
+  if (physical && opts.atkAbility && opts.atkAbility.name === 'Guts' && opts.atkHasStatus) A = Math.floor(A * 1.5);
   const weather = weatherBoosted(moveType);
   const crit = Math.random() < (held === 'scope-lens' ? 4 / 16 : 1 / 16);   // คริติคอล 6.25% (Scope Lens ×4 ~25%)
   let dmg = (((2 * atkLevel / 5 + 2) * power * A / Math.max(1, D)) / 50 + 2);
@@ -3271,12 +3288,13 @@ function revertDynamax(active, b) {
   active.dynamax = null;
   if (b) b.msg += ` · ${MON_BY_ID[active.ind.id].name} คืนร่างจากไดนาแม็กซ์`;
 }
-function tryInflict(move, target, targetTypes, name, targetAbility) {
+function tryInflict(move, target, targetTypes, name, targetAbility, casterAbility) {
   if (target.status) return '';
   const ts = TYPE_STATUS[move.type]; if (!ts) return '';
   if ((STATUS_IMMUNE[ts.s] || []).some(t => targetTypes.includes(t))) return '';
   if (targetAbility && targetAbility.name === 'Insomnia' && ts.s === 'sleep') return '';
-  if (Math.random() < ts.c) {
+  const chance = (casterAbility && casterAbility.name === 'Serene Grace') ? Math.min(1, ts.c * 2) : ts.c;
+  if (Math.random() < chance) {
     target.status = ts.s;
     if (ts.s === 'sleep') target.sleepT = rand(1, 3);
     return ` · ${STATUS[ts.s].emoji} ${name} ติด${STATUS[ts.s].name}!`;
@@ -3321,22 +3339,22 @@ function foeTurn(b) {
   if (!gate.can) return;
   const aiCtx = { atkStats: b.foeStats, atkLevel: b.foeLevel, defStats: active.stats, targetHp: active.hp, targetStatus: active.status };
   const mv = foeChooseMove(b.foeMon, view.types, aiCtx);
-  if (!rollHit(mv, b.foeHeld, active.ind.held)) {                     // ท่าศัตรูพลาดเป้า
+  if (!rollHit(mv, b.foeHeld, active.ind.held, abilityFor(active.ind.id))) {                     // ท่าศัตรูพลาดเป้า
     b.msg += ` · ${foeName} ใช้ ${mv.name}! แต่พลาดเป้า... 💨`;
     return;
   }
   const atkAbility = abilityFor(b.foeMon.id), defAbility = abilityFor(active.ind.id);
   const wasFull = active.hp === active.maxHp;
   const atkRes = calcDamage({ types: foeTypesForAtk }, statsWithStages(b.foeStats, b.foe.stages), b.foeLevel, { types: view.types }, statsWithStages(active.stats, active.stages), mv, b.foeHeld,
-    { atkAbility, defAbility, atkHpRatio: b.foeHp / b.foeMaxHp, defHpRatio: active.hp / active.maxHp });
+    { atkAbility, defAbility, atkHpRatio: b.foeHp / b.foeMaxHp, defHpRatio: active.hp / active.maxHp, atkHasStatus: !!b.foe.status });
   let dmg = atkRes.dmg;
   if (b.foe.status === 'burn') dmg = Math.floor(dmg * 0.6);
   let sturdyMsg = '';
   if (defAbility && defAbility.name === 'Sturdy' && wasFull && dmg >= active.hp) { dmg = active.hp - 1; sturdyMsg = ` · 🗿 ${view.name} ทนอยู่ด้วย Sturdy!`; }
   active.hp = Math.max(0, active.hp - dmg);
   b.msg += ` · ${foeName} ใช้ ${mv.name}! ${atkRes.crit ? '🎯คริติคอล! ' : ''}${atkRes.weather ? '🌦️ ' : ''}-${dmg}${sturdyMsg}`;
-  b.msg += tryInflict(mv, active, view.types, view.name, defAbility);
-  b.msg += applyStatFx(mv, b.foe.stages, active.stages, foeName, view.name);
+  b.msg += tryInflict(mv, active, view.types, view.name, defAbility, atkAbility);
+  b.msg += applyStatFx(mv, b.foe.stages, active.stages, foeName, view.name, atkAbility, defAbility);
   if (defAbility && defAbility.onHitStatus && !active.status && !b.foe.status && Math.random() < defAbility.onHitChance
       && !(STATUS_IMMUNE[defAbility.onHitStatus] || []).some(t => foeTypesForAtk.includes(t))) {
     b.foe.status = defAbility.onHitStatus; if (b.foe.status === 'sleep') b.foe.sleepT = rand(1, 3);
@@ -3414,6 +3432,10 @@ function endRound(b) {
     const heal = Math.max(1, Math.floor(a.maxHp / 16));
     a.hp = Math.min(a.maxHp, a.hp + heal); b.msg += ` · 🍖 ฟื้น ${heal}`;
   }
+  if (a && a.hp > 0 && a.hp < a.maxHp && w === WEATHERS.snow) {   // Ice Body ฟื้นตอนหิมะโปรย
+    const ab = abilityFor(a.ind.id);
+    if (ab && ab.name === 'Ice Body') { const heal = Math.max(1, Math.floor(a.maxHp / 16)); a.hp = Math.min(a.maxHp, a.hp + heal); b.msg += ` · ❄️ Ice Body! ฟื้น ${heal}`; }
+  }
   if (a && a.hp > 0 && (a.status === 'burn' || a.status === 'poison')) {   // DoT ผู้เล่น
     const d = Math.max(1, Math.floor(a.maxHp * STATUS[a.status].dot));
     a.hp = Math.max(0, a.hp - d);
@@ -3421,6 +3443,10 @@ function endRound(b) {
     if (a.hp <= 0) faintActive(b, MON_BY_ID[a.ind.id]);
   }
   if (a && a.hp > 0) checkSitrus(a, b);
+  if (!b.over && b.foeHp > 0 && b.foeHp < b.foeMaxHp && w === WEATHERS.snow) {   // Ice Body ฝั่งศัตรู
+    const ab = abilityFor(b.foeMon.id);
+    if (ab && ab.name === 'Ice Body') { const heal = Math.max(1, Math.floor(b.foeMaxHp / 16)); b.foeHp = Math.min(b.foeMaxHp, b.foeHp + heal); b.msg += ` · ❄️ Ice Body! ${b.foeDisplayName || b.foeMon.name} ฟื้น ${heal}`; if (b.mode === 'wild' && currentSpawn) currentSpawn.hp = b.foeHp; }
+  }
   if (!b.over && b.foeHp > 0 && (b.foe.status === 'burn' || b.foe.status === 'poison')) {   // DoT ศัตรู
     const d = Math.max(1, Math.floor(b.foeMaxHp * STATUS[b.foe.status].dot));
     b.foeHp = Math.max(b.mode === 'wild' ? 1 : 0, b.foeHp - d);
@@ -3475,7 +3501,7 @@ function battleAttack(moveIdx) {
   if (quickClawSave) { foeFirst = false; b.msg += `🍀 Quick Claw! ${view.name} แซงคิวโจมตีก่อน! · `; state._quickClawSaved = true; }
 
   function playerHalf() {   // คืนค่า true ถ้าเทิร์นจบทันที (KO/ป่าอ่อนแรงสุดขีด) ไม่ต้องรอศัตรูตอบโต้
-    if (!rollHit(mv, active.ind.held, b.foeHeld)) {
+    if (!rollHit(mv, active.ind.held, b.foeHeld, abilityFor(b.foeMon.id))) {
       b.msg += `${view.name} ใช้ ${mv.name}! แต่พลาดเป้า... 💨`;
       return false;
     }
@@ -3483,7 +3509,7 @@ function battleAttack(moveIdx) {
     const atkAbility = abilityFor(active.ind.id), defAbility = abilityFor(b.foeMon.id);
     const foeWasFull = b.foeHp === b.foeMaxHp;
     const atk = calcDamage({ types: view.types }, statsWithStages(active.stats, active.stages), active.ind.level, { types: foeTypesForDef }, statsWithStages(b.foeStats, b.foe.stages), mv, active.ind.held,
-      { atkAbility, defAbility, atkHpRatio: active.hp / active.maxHp, defHpRatio: b.foeHp / b.foeMaxHp });
+      { atkAbility, defAbility, atkHpRatio: active.hp / active.maxHp, defHpRatio: b.foeHp / b.foeMaxHp, atkHasStatus: !!active.status });
     if (atk.crit) state._critHit = true;
     if (atk.weather) state._weatherHit = true;
     let dmg = atk.dmg;
@@ -3494,8 +3520,8 @@ function battleAttack(moveIdx) {
     if (defAbility && defAbility.name === 'Sturdy' && foeWasFull && dmg >= b.foeHp && b.mode !== 'wild') { dmg = b.foeHp - 1; sturdyMsg = ` · 🗿 ${foeNameForMsg} ทนอยู่ด้วย Sturdy!`; }
     b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - dmg);
     b.msg += `${view.name} ใช้ ${mv.name}! ${atk.crit ? '🎯 คริติคอล! ' : ''}${atk.weather ? '🌦️ อากาศช่วย! ' : ''}-${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}${sturdyMsg}`;
-    b.msg += tryInflict(mv, b.foe, foeTypesForDef, foeNameForMsg, defAbility);
-    b.msg += applyStatFx(mv, active.stages, b.foe.stages, view.name, foeNameForMsg);
+    b.msg += tryInflict(mv, b.foe, foeTypesForDef, foeNameForMsg, defAbility, atkAbility);
+    b.msg += applyStatFx(mv, active.stages, b.foe.stages, view.name, foeNameForMsg, atkAbility, defAbility);
     if (defAbility && defAbility.onHitStatus && !b.foe.status && !active.status && Math.random() < defAbility.onHitChance
         && !(STATUS_IMMUNE[defAbility.onHitStatus] || []).some(t => view.types.includes(t))) {
       active.status = defAbility.onHitStatus; if (active.status === 'sleep') active.sleepT = rand(1, 3);
