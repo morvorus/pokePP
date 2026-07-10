@@ -1524,12 +1524,17 @@ function startCountdown() {
 
 function renderBallBar() {
   const bar = $('#ballBar');
-  bar.innerHTML = BALL_ORDER.map(k => {
+  const owned = BALL_ORDER.filter(k => (state.balls[k] || 0) > 0);   // โชว์แค่บอลที่มีจริง กันกินที่หน้าจอ
+  if (!owned.length) {
+    bar.innerHTML = `<div class="sr-sub" style="padding:8px 4px">🎒 ไม่มีบอลเลย — ไปซื้อที่ร้านค้าก่อนนะ</div>`;
+    return;
+  }
+  if (!owned.includes(state.selBall)) state.selBall = owned[0];   // บอลที่เลือกไว้หมดแล้ว สลับไปตัวที่ยังมี
+  bar.innerHTML = owned.map(k => {
     const b = BALLS[k], have = state.balls[k] || 0;
     const sel = state.selBall === k ? ' sel' : '';
-    const dis = have <= 0 ? ' disabled' : '';
     const tag = b.mult >= 999 ? '100%' : b.cond ? '★' : '×' + b.mult;
-    return `<div class="ball-opt${sel}${dis}" data-ball="${k}" title="${b.hint}">
+    return `<div class="ball-opt${sel}" data-ball="${k}" title="${b.hint}">
       <span class="bmult">${tag}</span>
       <div class="be">${itemIcon(b.emoji, b.img)}</div>
       <div class="bn">${b.name.replace(' Ball', '')}</div>
@@ -1538,7 +1543,6 @@ function renderBallBar() {
   bar.querySelectorAll('.ball-opt').forEach(el => {
     el.onclick = () => {
       const k = el.dataset.ball;
-      if ((state.balls[k] || 0) <= 0) { toast('❌ บอลชนิดนี้หมด', 'bad'); return; }
       if (currentSpawn && !throwing) { throwBall(k); }   // แตะบอล = โยนทันที
       else { state.selBall = k; save(); renderBallBar(); }
     };
@@ -2878,7 +2882,7 @@ function deletePreset(slot) {
 // ================================================================
 //  HALL OF FAME — โชว์ตัวเด็ดที่สุดในคลัง (ใช้สไปรต์จริงล้วน)
 // ================================================================
-function indRow(ind, sub) {
+function hofIndRow(ind, sub) {
   if (!ind) return '';
   const m = MON_BY_ID[ind.id];
   return `<div class="ind-row" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}
@@ -2938,11 +2942,11 @@ function renderHallOfFame() {
       <div class="stat-tile"><div class="st-num">${state.tower && state.tower.bestFloor || 0}</div><div class="st-lbl">🗼 ชั้นหอคอยสูงสุด</div></div>
     </div>
     <div style="font-size:12px;font-weight:700;margin-bottom:4px">💯 IV สูงสุดในคลัง</div>
-    ${indRow(topIv, `IV ${ivPercent(topIv)}% · นิสัย ${topIv.nature} · Lv.${topIv.level}`)}
+    ${hofIndRow(topIv, `IV ${ivPercent(topIv)}% · นิสัย ${topIv.nature} · Lv.${topIv.level}`)}
     <div style="font-size:12px;font-weight:700;margin:10px 0 4px">🤝 ตัวที่มิตรภาพดีที่สุด</div>
-    ${bestFriend ? indRow(bestFriend, `มิตรภาพ ${bestFriend.friend || 0}/${FRIEND_MAX}`) : '<div class="sr-sub">ยังไม่มี</div>'}
+    ${bestFriend ? hofIndRow(bestFriend, `มิตรภาพ ${bestFriend.friend || 0}/${FRIEND_MAX}`) : '<div class="sr-sub">ยังไม่มี</div>'}
     <div style="font-size:12px;font-weight:700;margin:10px 0 4px">🕰️ ตัวแรกที่จับได้</div>
-    ${indRow(oldest, `จับตอน ${new Date(oldest.ts || Date.now()).toLocaleDateString('th-TH')}`)}
+    ${hofIndRow(oldest, `จับตอน ${new Date(oldest.ts || Date.now()).toLocaleDateString('th-TH')}`)}
     <div style="font-size:12px;font-weight:700;margin:10px 0 4px">✨ แกลเลอรี Shiny (${shinies.length})</div>
     ${galleryRow(shinies, 'ยังไม่มีตัว Shiny')}
     <div style="font-size:12px;font-weight:700;margin:10px 0 4px">👑 แกลเลอรี Legendary (${legends.length})</div>
