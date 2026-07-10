@@ -122,9 +122,13 @@ main { flex: 1; padding: 12px; }
 }
 .spawn-card .deco {
   position: absolute; inset: 0; pointer-events: none; overflow: hidden;
-  font-size: 22px; opacity: .5;
+  opacity: .55;
 }
-.spawn-card .deco span { position: absolute; animation: floaty 6s ease-in-out infinite; }
+.spawn-card .deco span.deco-mon { position: absolute; animation: floaty 6s ease-in-out infinite; }
+.spawn-card .deco .deco-mon img {
+  width: 46px; height: 46px; object-fit: contain; image-rendering: pixelated;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,.35));
+}
 @keyframes floaty { 0%,100%{ transform: translateY(0) rotate(0);} 50%{ transform: translateY(-10px) rotate(8deg);} }
 .spawn-card.rare-glow { box-shadow: 0 0 0 2px #7aa7ff, var(--shadow); }
 .spawn-card.legend-glow { box-shadow: 0 0 0 2px var(--accent), 0 0 34px rgba(255,203,5,.4); }
@@ -271,7 +275,9 @@ main { flex: 1; padding: 12px; }
   min-height: 150px; box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,.08);
   display: flex; flex-direction: column; justify-content: flex-end;
 }
-.map-card .mc-deco { position: absolute; inset: 0; font-size: 26px; opacity: .35; pointer-events: none; }
+.map-card .mc-deco { position: absolute; inset: 0; opacity: .4; pointer-events: none; overflow: hidden; }
+.map-card .mc-deco .deco-mon { position: absolute; }
+.map-card .mc-deco .deco-mon img { width: 34px; height: 34px; object-fit: contain; image-rendering: pixelated; }
 .map-card .mc-body {
   position: relative; z-index: 2; padding: 10px 12px;
   background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.75));

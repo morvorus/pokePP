@@ -31,6 +31,17 @@ window.__sf = function (img) {
   const fb = (img.dataset.fb || '').split('|').filter(Boolean);
   if (fb.length) { img.dataset.fb = fb.slice(1).join('|'); img.src = fb[0]; }
 };
+// watchdog กลาง: ถ้ารูปค้าง (เน็ตช้า/CDN cold ไม่ยิง error) บังคับสลับ fallback หลัง 4 วิ กันจอว่างค้าง
+(function () {
+  const seen = new WeakSet();
+  setInterval(() => {
+    document.querySelectorAll('img[data-fb]').forEach(img => {
+      if (img.complete && img.naturalWidth > 0) return;   // โหลดสำเร็จแล้ว ข้าม
+      if (seen.has(img)) { if (!img.complete || img.naturalWidth === 0) __sf(img); seen.delete(img); }
+      else seen.add(img);   // รอบแรกที่เจอ ให้เวลาผ่านไปอีกรอบ (~4s) ก่อนตัดสินใจ
+    });
+  }, 4000);
+})();
 // ภาพไอเทม (บอล/เบอร์รี่/charm) จาก PokeAPI — แสดงภาพอย่างเดียว ไม่มี emoji
 // ถ้าโหลดพลาด (เน็ตกระตุก/CDN cold) ให้ retry จนขึ้น ไม่สลับเป็นอีโมจิ
 const ITEM_BASE = 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/items/';
@@ -57,6 +68,10 @@ function preloadItems() {
     'rare-candy',
   ].filter(Boolean);
   names.forEach(n => { const i = new Image(); i.src = ITEM_BASE + n + '.png'; });
+}
+// warm cache ล่วงหน้าให้สไปรต์ตกแต่งเขต (mascots) กันจอว่างตอน jsDelivr cold-cache
+function preloadMascots() {
+  REGIONS.forEach(r => (r.mascots || []).forEach(id => { const i = new Image(); i.src = SP.gif(id); }));
 }
 const SPAWN_MIN = 9000, SPAWN_MAX = 16000;
 const FLEE_MS = 45000;
@@ -135,7 +150,7 @@ const BERRY_ORDER = ['razz', 'golden'];
 const CHARM_MS = 30 * 60000;
 const CHARMS = {
   shiny: { name: 'Shiny Charm', emoji: '🔮', img: 'shiny-charm',    mult: 3,   price: 5000, desc: 'โอกาส Shiny ×3' },
-  catch: { name: 'Catch Charm', emoji: '🧲', img: 'catching-charm', mult: 1.5, price: 1200, desc: 'โอกาสจับ ×1.5' },
+  catch: { name: 'Catch Charm', emoji: '🧲', img: 'oval-charm', mult: 1.5, price: 1200, desc: 'โอกาสจับ ×1.5' },
   xp:    { name: 'XP Charm',    emoji: '📿', img: 'lucky-egg',      mult: 2,   price: 800,  desc: 'XP ที่ได้ ×2' },
 };
 const CHARM_ORDER = ['shiny', 'catch', 'xp'];
@@ -299,29 +314,29 @@ const GENDERLESS = new Set([81, 82, 100, 101, 120, 121, 132, 137, 144, 145, 146,
 // ---------- regions ----------
 const REGIONS = [
   { id: 'plains', name: 'ทุ่งหญ้าเริ่มต้น', emoji: '🌾', types: ['normal', 'grass', 'bug', 'flying'],
-    lvl: [2, 14], boost: 0, deco: ['🌾', '🌿', '🦋', '☁️', '🌻'],
+    lvl: [2, 14], boost: 0, mascots: [25, 133, 10, 16],
     bg: 'linear-gradient(180deg,#8fd0f0 0%,#87ceeb 42%,#7ec850 42%,#4a9e3f 100%)',
     desc: 'เขตมือใหม่ ปลอดภัย โปเกมอนธรรมดา' },
   { id: 'forest', name: 'ป่าลึกครึ้ม', emoji: '🌲', types: ['bug', 'grass', 'poison', 'flying'],
-    lvl: [6, 22], boost: 0, deco: ['🌲', '🍄', '🌿', '🦋', '🕸️'],
+    lvl: [6, 22], boost: 0, mascots: [1, 12, 48, 43],
     bg: 'linear-gradient(180deg,#3b6b2e 0%,#1f3d15 100%)', desc: 'ต้นไม้หนาทึบ เต็มไปด้วยแมลง' },
   { id: 'sea', name: 'ชายฝั่งทะเล', emoji: '🌊', types: ['water', 'ice', 'flying'],
-    lvl: [8, 26], boost: 0, deco: ['🌊', '🐚', '⛵', '☀️', '🐠'],
+    lvl: [8, 26], boost: 0, mascots: [7, 120, 116, 129],
     bg: 'linear-gradient(180deg,#7ec8f0 0%,#2b8fc9 45%,#12557f 100%)', desc: 'คลื่นซัดสาด โปเกมอนน้ำชุกชุม' },
   { id: 'cave', name: 'ถ้ำมืดใต้ดิน', emoji: '🪨', types: ['rock', 'ground', 'steel', 'dark', 'poison'],
-    lvl: [12, 32], boost: 1, deco: ['🪨', '💎', '🦇', '🕳️'],
+    lvl: [12, 32], boost: 1, mascots: [95, 41, 50, 74],
     bg: 'linear-gradient(180deg,#3a3a4a 0%,#161620 100%)', desc: 'อับแสง ระวังโปเกมอนหิน/ดิน', unlock: 8 },
   { id: 'volcano', name: 'ปล่องภูเขาไฟ', emoji: '🌋', types: ['fire', 'rock', 'ground'],
-    lvl: [18, 40], boost: 1, deco: ['🌋', '🔥', '🪨', '💥'],
+    lvl: [18, 40], boost: 1, mascots: [4, 58, 104, 37],
     bg: 'linear-gradient(180deg,#7a2b1a 0%,#3a0f08 100%)', desc: 'ร้อนระอุ โปเกมอนไฟดุร้าย', unlock: 12 },
   { id: 'power', name: 'โรงไฟฟ้าร้าง', emoji: '⚡', types: ['electric', 'steel', 'poison'],
-    lvl: [15, 36], boost: 1, deco: ['⚡', '🔌', '💡', '🔋'],
+    lvl: [15, 36], boost: 1, mascots: [25, 81, 100, 125],
     bg: 'linear-gradient(180deg,#4a4620 0%,#26240e 100%)', desc: 'กระแสไฟฟ้ารั่ว เต็มไปด้วยพลัง', unlock: 15 },
   { id: 'snow', name: 'ยอดเขาหิมะ', emoji: '❄️', types: ['ice', 'water', 'flying', 'rock'],
-    lvl: [22, 44], boost: 2, deco: ['❄️', '🏔️', '🌨️', '⛄'],
+    lvl: [22, 44], boost: 2, mascots: [144, 131, 361, 215],
     bg: 'linear-gradient(180deg,#dbeeff 0%,#9dc3e6 55%,#6f96c4 100%)', desc: 'หนาวเหน็บ ตัวหายากซ่อนอยู่', unlock: 25 },
   { id: 'mystic', name: 'ดินแดนลึกลับ', emoji: '🔮', types: ['psychic', 'ghost', 'dragon', 'fairy', 'dark'],
-    lvl: [30, 60], boost: 2, deco: ['🔮', '✨', '🌌', '👻', '🐉'],
+    lvl: [30, 60], boost: 2, mascots: [94, 150, 148, 359],
     bg: 'linear-gradient(180deg,#432a70 0%,#180830 100%)', desc: 'พลังลึกลับ โอกาสเจอเลเจนดารีสูง', unlock: 40 },
 ];
 const REGION_BY_ID = {};
@@ -872,8 +887,12 @@ function renderRegionBanner() {
   card.style.background = r.bg;
   card.classList.toggle('night', timeOfDay() === 'night');
   renderBoostStrip();
-  $('#spawnDeco').innerHTML = r.deco.map((d, i) =>
-    `<span style="left:${8 + i * 20}%;top:${10 + (i % 3) * 26}%;animation-delay:${i * .6}s">${d}</span>`).join('');
+  $('#spawnDeco').innerHTML = mascotDecoHtml(r.mascots);
+}
+// ตกแต่งด้วยสไปรต์โปเกมอนจริงที่เป็นตัวแทนธีมเขต (ลอย+โปร่งแสง) แทนอีโมจิ
+function mascotDecoHtml(ids) {
+  return (ids || []).map((id, i) =>
+    `<span class="deco-mon" style="left:${6 + i * 23}%;top:${8 + (i % 3) * 24}%;animation-delay:${i * .7}s">${spriteImg(id, false)}</span>`).join('');
 }
 function renderSpawn() {
   const card = $('#spawnCard');
@@ -1142,7 +1161,7 @@ function renderMap() {
       .map(t => `<span class="mc-rate rarity-${t}">${TIER_EMOJI[t]} ${TIER_LABEL[t]} ${rt[t] < 1 ? rt[t].toFixed(2) : rt[t].toFixed(t === 'superrare' ? 1 : 0)}%</span>`).join('');
     const beaten = state.badges[r.id];
     return `<div class="map-card${active ? ' active-region' : ''}${locked ? ' locked' : ''}" style="background:${r.bg}">
-      <div class="mc-deco">${r.deco.map((d, i) => `<span style="position:absolute;left:${10 + i * 22}%;top:${12 + (i % 3) * 24}%">${d}</span>`).join('')}</div>
+      <div class="mc-deco">${mascotDecoHtml(r.mascots)}</div>
       ${beaten ? '<div class="mc-badge">🏅</div>' : ''}
       <div class="mc-body">
         <div class="mc-name" data-go="${r.id}">${r.emoji} ${r.name}</div>
@@ -2598,6 +2617,7 @@ function init() {
   $('#battleModal').addEventListener('click', e => { if (e.target.id === 'battleModal' && battleState && battleState.over) endBattle(); });
 
   preloadItems();
+  preloadMascots();
   checkAchievements();
   scheduleSpawn(2200);
   logMsg('👋 ยินดีต้อนรับ! เลือกเขตในแผนที่ แล้วปาบอลจับโปเกมอนได้เลย', 'big');
