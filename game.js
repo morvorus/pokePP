@@ -2800,6 +2800,49 @@ function weatherBoosted(moveType) {   // ธาตุที่ได้บูส
   const w = WEATHERS[getWeather(state.region)];
   return !!(w && w.boost && w.boost.includes(moveType));
 }
+// ===== Stat Stages (-6..+6) แบบเกมจริง — ท่าบางท่ามีผลข้างเคียงปรับสเตตัสขึ้น/ลงชั่วคราวในแมตช์ =====
+function statStageMult(stage) {
+  stage = clamp(stage || 0, -6, 6);
+  return stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage);
+}
+function statsWithStages(stats, stages) {   // คืนสเตตัสชุดใหม่ที่คูณด้วย stage แล้ว (ไม่แก้ของเดิม)
+  if (!stages) return stats;
+  const out = {};
+  for (const k in stats) out[k] = k === 'hp' ? stats[k] : Math.max(1, Math.floor(stats[k] * statStageMult(stages[k])));
+  return out;
+}
+function freshStages() { return { atk: 0, def: 0, spatk: 0, spdef: 0, spd: 0 }; }
+// ท่าที่มีผลข้างเคียงปรับสเตตัส (คัดจากท่าจริงในเกมที่มีเอฟเฟกต์นี้จริง) — target: self = ปรับตัวเอง, foe = ปรับคู่ต่อสู้
+const MOVE_STAT_FX = {
+  'Flame Charge':  { stat: 'spd',   delta: 1,  target: 'self', chance: 1 },
+  'Overheat':      { stat: 'spatk', delta: -2, target: 'self', chance: 1 },
+  'Draco Meteor':  { stat: 'spatk', delta: -2, target: 'self', chance: 1 },
+  'Close Combat':  { stat: 'def',   delta: -1, target: 'self', chance: 1 },
+  'Superpower':    { stat: 'atk',   delta: -1, target: 'self', chance: 1 },
+  'Rock Tomb':     { stat: 'spd',   delta: -1, target: 'foe',  chance: 1 },
+  'Bulldoze':      { stat: 'spd',   delta: -1, target: 'foe',  chance: 1 },
+  'Play Rough':    { stat: 'atk',   delta: -1, target: 'foe',  chance: 0.1 },
+  'Crunch':        { stat: 'def',   delta: -1, target: 'foe',  chance: 0.2 },
+  'Iron Tail':     { stat: 'def',   delta: -1, target: 'foe',  chance: 0.3 },
+  'Moonblast':     { stat: 'spatk', delta: -1, target: 'foe',  chance: 0.3 },
+  'Shadow Ball':   { stat: 'spdef', delta: -1, target: 'foe',  chance: 0.2 },
+  'Psychic':       { stat: 'spdef', delta: -1, target: 'foe',  chance: 0.1 },
+};
+function applyStatFx(mv, casterStages, targetStages, casterName, targetName) {
+  const fx = MOVE_STAT_FX[mv.name]; if (!fx) return '';
+  if (Math.random() > fx.chance) return '';
+  const stages = fx.target === 'self' ? casterStages : targetStages;
+  const name = fx.target === 'self' ? casterName : targetName;
+  const before = stages[fx.stat] || 0;
+  stages[fx.stat] = clamp(before + fx.delta, -6, 6);
+  if (stages[fx.stat] === before) return '';   // ติดเพดานแล้ว ไม่มีอะไรเปลี่ยน
+  return ` · ${STAT_LABEL[fx.stat]} ${name} ${fx.delta > 0 ? '⬆️' : '⬇️'}`;
+}
+function stageBadges(stages) {   // แสดง badge สเตตัสที่เปลี่ยนไปแบบย่อ เช่น ATK+1 SPD-2
+  if (!stages) return '';
+  return Object.keys(stages).filter(k => stages[k]).map(k =>
+    `<span class="badge" style="font-size:9px;padding:1px 5px;background:${stages[k] > 0 ? 'rgba(71,209,108,.3)' : 'rgba(255,93,108,.3)'}">${STAT_LABEL[k]}${stages[k] > 0 ? '+' : ''}${stages[k]}</span>`).join(' ');
+}
 function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move, held) {
   const physical = atkStats.atk >= atkStats.spatk;
   const A = physical ? atkStats.atk : atkStats.spatk;
@@ -2834,7 +2877,7 @@ function applyFoeHeld(stats, held) {
 function buildBattleTeam(members) {
   return members.map(ind => {
     const s = statsWithHeld(ind);
-    return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, sitrusUsed: false, status: null, sleepT: 0, mega: null, dynamax: null };
+    return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, sitrusUsed: false, status: null, sleepT: 0, mega: null, dynamax: null, stages: freshStages() };
   });
 }
 function checkSitrus(active, b) {   // Sitrus Berry: ฟื้น HP 25% อัตโนมัติครั้งเดียวเมื่อ HP ต่ำกว่าครึ่ง
@@ -2896,7 +2939,7 @@ function startBattle(isBoss, bossData) {
     mode: isBoss ? 'boss' : 'wild',
     isBoss, bossData, foeMon, foeLevel, foeStats, foeHp, foeMaxHp, foeHeld,
     foeQueue: [{ mon: foeMon }], foeIdx: 0,
-    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0 },
+    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
     usedMega: false, usedDynamax: false,
     msg: isBoss ? `👑 บอส ${foeMon.name} ท้าดวล!` : `เจอ ${foeMon.name} ป่า — เลือกท่าโจมตี!`,
   };
@@ -2945,11 +2988,13 @@ function renderBattle() {
         <div class="bt-head"><span>${b.isBoss ? '👑 ' : ''}${foeName} Lv.${b.foeLevel} ${statusBadge(b.foe.status)} ${foeSpecialBadge}${b.foeHeld ? ` <span class="badge" style="background:#3a3a55" title="${HELD_ITEMS[b.foeHeld].desc}">${HELD_ITEMS[b.foeHeld].emoji} ${HELD_ITEMS[b.foeHeld].name}</span>` : ''} ${foeTypes.map(t => `<span class="badge t-${t}" style="font-size:9px;padding:1px 6px">${t}</span>`).join('')}</span>${spriteImg(foeSpriteId, false)}</div>
         <div class="bt-hpbar"><div class="${hpCls(b.foeHp, b.foeMaxHp)}" style="width:${foePct}%"></div></div>
         <div class="hp-txt" style="text-align:left">HP ${Math.ceil(b.foeHp)}/${b.foeMaxHp}</div>
+        <div style="text-align:left;margin-top:2px">${stageBadges(b.foe.stages)}</div>
       </div>
       <div class="bt-side me">
         <div class="bt-head">${spriteImg(view.spriteId, view.special ? false : active.ind.shiny)}<span>${view.name} Lv.${active.ind.level} ${genderIcon(active.ind.gender)} ${statusBadge(active.status)} ${specialBadge}</span></div>
         <div class="bt-hpbar"><div class="${hpCls(active.hp, active.maxHp)}" style="width:${myPct}%"></div></div>
         <div class="hp-txt" style="text-align:right">HP ${Math.ceil(active.hp)}/${active.maxHp}</div>
+        <div style="text-align:right;margin-top:2px">${stageBadges(active.stages)}</div>
       </div>
     </div>
     <div class="team-strip">${teamStrip}</div>
@@ -3110,13 +3155,14 @@ function foeTurn(b) {
     b.msg += ` · ${foeName} ใช้ ${mv.name}! แต่พลาดเป้า... 💨`;
     return;
   }
-  const atkRes = calcDamage({ types: foeTypesForAtk }, b.foeStats, b.foeLevel, { types: view.types }, active.stats, mv, b.foeHeld);
+  const atkRes = calcDamage({ types: foeTypesForAtk }, statsWithStages(b.foeStats, b.foe.stages), b.foeLevel, { types: view.types }, statsWithStages(active.stats, active.stages), mv, b.foeHeld);
   let dmg = atkRes.dmg;
   if (b.foe.status === 'burn') dmg = Math.floor(dmg * 0.6);
   const wasFull = active.hp === active.maxHp;
   active.hp = Math.max(0, active.hp - dmg);
   b.msg += ` · ${foeName} ใช้ ${mv.name}! ${atkRes.crit ? '🎯คริติคอล! ' : ''}${atkRes.weather ? '🌦️ ' : ''}-${dmg}`;
   b.msg += tryInflict(mv, active, view.types, view.name);
+  b.msg += applyStatFx(mv, b.foe.stages, active.stages, foeName, view.name);
   if (active.hp <= 0 && active.ind.held === 'focus-sash' && !active.sashUsed && wasFull) {
     active.hp = 1; active.sashUsed = true;
     b.msg += ` · 🎗️ ${aMon.name} ยึด Focus Sash รอดมาได้!`;
@@ -3252,7 +3298,7 @@ function battleAttack(moveIdx) {
       return false;
     }
     if (pPrio > 0) state._usedPriority = true;
-    const atk = calcDamage({ types: view.types }, active.stats, active.ind.level, { types: foeTypesForDef }, b.foeStats, mv, active.ind.held);
+    const atk = calcDamage({ types: view.types }, statsWithStages(active.stats, active.stages), active.ind.level, { types: foeTypesForDef }, statsWithStages(b.foeStats, b.foe.stages), mv, active.ind.held);
     if (atk.crit) state._critHit = true;
     if (atk.weather) state._weatherHit = true;
     let dmg = atk.dmg;
@@ -3262,6 +3308,7 @@ function battleAttack(moveIdx) {
     b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - dmg);
     b.msg += `${view.name} ใช้ ${mv.name}! ${atk.crit ? '🎯 คริติคอล! ' : ''}${atk.weather ? '🌦️ อากาศช่วย! ' : ''}-${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
     b.msg += tryInflict(mv, b.foe, foeTypesForDef, foeNameForMsg);
+    b.msg += applyStatFx(mv, active.stages, b.foe.stages, view.name, foeNameForMsg);
     if (active.ind.held === 'kings-rock' && Math.random() < 0.1) { b.foe.flinched = true; b.msg += ` · 👑 ${foeNameForMsg} สะดุ้ง!`; }
     if (b.foeHeld === 'rocky-helmet') {   // Rocky Helmet: ศัตรูสะท้อนดาเมจกลับ
       const recoil = Math.max(1, Math.floor(active.maxHp / 6));
@@ -3324,6 +3371,7 @@ function battleSwitch(idx) {
   const b = battleState; if (!b || b.over || battleBusy || idx === b.activeIdx) return;
   const t = b.team[idx];
   if (!t || t.hp <= 0) { toast('ตัวนี้หมดแรงแล้ว', 'bad'); return; }
+  b.team[b.activeIdx].stages = freshStages();   // สลับตัวออก = สเตตัสที่เปลี่ยนไว้รีเซ็ต แบบเกมจริง
   b.activeIdx = idx;
   const stage1 = `สลับมา ${MON_BY_ID[t.ind.id].name}!`;
   revealTurns(b, stage1, () => {                       // สลับตัวเสียเทิร์น ศัตรูโจมตีก่อน
@@ -3452,7 +3500,7 @@ function grantItemRewards(list) {
 function loadFoe(b, def) {
   b.foeMon = def.mon; b.foeLevel = def.level; b.foeStats = def.stats;
   b.foeMaxHp = def.maxHp; b.foeHp = def.maxHp; b.foeHeld = def.held || null;
-  b.foe = { status: null, sleepT: 0 };   // ศัตรูตัวใหม่ = สถานะเคลียร์
+  b.foe = { status: null, sleepT: 0, stages: freshStages() };   // ศัตรูตัวใหม่ = สถานะ/สเตตัสเคลียร์
 }
 function startTrainerBattle(gymId) {
   const g = GYMS.find(x => x.id === gymId); if (!g) return;
@@ -3476,7 +3524,7 @@ function startTrainerBattle(gymId) {
   battleState = {
     mode: 'trainer', isBoss: false, gym: g, foeQueue: queue, foeIdx: 0,
     foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp, foeHeld: queue[0].held || null,
-    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0 },
+    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
     usedMega: false, usedDynamax: false,
     msg: `${g.emoji} ${g.name} — ศัตรู ${g.count} ตัว! เลือกท่าโจมตี`,
   };
