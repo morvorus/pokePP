@@ -1660,6 +1660,7 @@ function releaseIndividual(uid) {
   if (idx < 0) return;
   const ind = state.caught[idx];
   if (ind.locked) { toast('🔒 ตัวนี้ถูกล็อกอยู่', 'bad'); return; }
+  if (!confirmAction(`ปล่อย ${MON_BY_ID[ind.id].name} ทิ้ง?`)) return;
   const refund = Math.round(TIER_COIN[ind.tier] * 0.4);
   state.caught.splice(idx, 1);
   state.party = state.party.filter(u => u !== uid);
