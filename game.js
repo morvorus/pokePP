@@ -2520,6 +2520,13 @@ function statsWithHeld(ind) {
   if (ind.held === 'assault-vest') s.spdef = Math.floor(s.spdef * 1.5);
   return s;
 }
+// ไอเทมถือของศัตรูตัวแรง (เอซยิม/บอส/บอสหอคอย) — สุ่มได้ 1 ชิ้นให้ท้าทายขึ้นจริง
+const FOE_HELD_POOL = ['life-orb', 'choice-band', 'choice-specs', 'expert-belt', 'scope-lens'];
+function applyFoeHeld(stats, held) {
+  if (held === 'choice-band') stats.atk = Math.floor(stats.atk * 1.5);
+  if (held === 'choice-specs') stats.spatk = Math.floor(stats.spatk * 1.5);
+  return stats;
+}
 function buildBattleTeam(members) {
   return members.map(ind => {
     const s = statsWithHeld(ind);
@@ -2543,13 +2550,14 @@ function foeChooseMove(foeMon, defTypes) {
 function startBattle(isBoss, bossData) {
   const members = partyMembers();
   if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน (ตั้ง Buddy/เข้าทีมจากคลัง)', 'bad'); return; }
-  let foeMon, foeLevel, foeStats, foeHp, foeMaxHp;
+  let foeMon, foeLevel, foeStats, foeHp, foeMaxHp, foeHeld = null;
   if (isBoss) {
     foeMon = bossData.mon; foeLevel = bossData.level;
     const base = statsForWild(foeMon, foeLevel);
     foeStats = { atk: Math.floor(base.atk * 1.25), def: Math.floor(base.def * 1.25),
       spatk: Math.floor(base.spatk * 1.25), spdef: Math.floor(base.spdef * 1.25), spd: base.spd };
     foeMaxHp = Math.floor(base.hp * 1.3); foeHp = foeMaxHp;
+    foeHeld = pick(FOE_HELD_POOL); applyFoeHeld(foeStats, foeHeld);   // บอสถือไอเทมด้วย ท้าทายขึ้นจริง
   } else {
     if (!currentSpawn) return;
     foeMon = currentSpawn.mon; foeLevel = currentSpawn.level;
@@ -2559,7 +2567,7 @@ function startBattle(isBoss, bossData) {
   const team = buildBattleTeam(members);
   battleState = {
     mode: isBoss ? 'boss' : 'wild',
-    isBoss, bossData, foeMon, foeLevel, foeStats, foeHp, foeMaxHp,
+    isBoss, bossData, foeMon, foeLevel, foeStats, foeHp, foeMaxHp, foeHeld,
     foeQueue: [{ mon: foeMon }], foeIdx: 0,
     team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0 },
     usedMega: false, usedDynamax: false,
@@ -2607,7 +2615,7 @@ function renderBattle() {
       <div class="bt-side foe">
         ${b.mode === 'trainer' ? `<div style="font-size:11px;color:#ffb3bb;font-weight:700">${b.gym.emoji} ${b.gym.name} · เหลือศัตรู ${b.foeQueue.length - b.foeIdx}/${b.foeQueue.length}</div>` : ''}
         ${b.mode === 'tower' ? `<div style="font-size:11px;color:#ffd76b;font-weight:700">🗼 ชั้น ${b.floorNow}${b.special ? ' · บอส!' : ''} · สูงสุด ${state.tower.bestFloor || 0}</div>` : ''}
-        <div class="bt-head"><span>${b.isBoss ? '👑 ' : ''}${foeName} Lv.${b.foeLevel} ${statusBadge(b.foe.status)} ${foeSpecialBadge} ${foeTypes.map(t => `<span class="badge t-${t}" style="font-size:9px;padding:1px 6px">${t}</span>`).join('')}</span>${spriteImg(foeSpriteId, false)}</div>
+        <div class="bt-head"><span>${b.isBoss ? '👑 ' : ''}${foeName} Lv.${b.foeLevel} ${statusBadge(b.foe.status)} ${foeSpecialBadge}${b.foeHeld ? ` <span class="badge" style="background:#3a3a55" title="${HELD_ITEMS[b.foeHeld].desc}">${HELD_ITEMS[b.foeHeld].emoji} ${HELD_ITEMS[b.foeHeld].name}</span>` : ''} ${foeTypes.map(t => `<span class="badge t-${t}" style="font-size:9px;padding:1px 6px">${t}</span>`).join('')}</span>${spriteImg(foeSpriteId, false)}</div>
         <div class="bt-hpbar"><div class="${hpCls(b.foeHp, b.foeMaxHp)}" style="width:${foePct}%"></div></div>
         <div class="hp-txt" style="text-align:left">HP ${Math.ceil(b.foeHp)}/${b.foeMaxHp}</div>
       </div>
@@ -2743,7 +2751,7 @@ function foeTurn(b) {
     b.msg += ` · ${foeName} ใช้ ${mv.name}! แต่พลาดเป้า... 💨`;
     return;
   }
-  const atkRes = calcDamage({ types: foeTypesForAtk }, b.foeStats, b.foeLevel, { types: view.types }, active.stats, mv);
+  const atkRes = calcDamage({ types: foeTypesForAtk }, b.foeStats, b.foeLevel, { types: view.types }, active.stats, mv, b.foeHeld);
   let dmg = atkRes.dmg;
   if (b.foe.status === 'burn') dmg = Math.floor(dmg * 0.6);
   const wasFull = active.hp === active.maxHp;
@@ -2967,12 +2975,15 @@ function startBossBattle(regionId) {
   startBattle(true, { mon: bossMon, level, region: r });
 }
 // โหลดศัตรูตัวถัดไปเข้า current-foe fields (ใช้ในโหมดเทรนเนอร์) — statMult ใช้บูสต์เอซ/บอสให้แรงขึ้นจริง
-function makeFoeDef(mon, level, statMult) {
+// giveHeld: true = สุ่มไอเทมถือให้ (ใช้กับเอซ/บอสเท่านั้น ให้ท้าทายขึ้นจริง ไม่ใช่แค่บวกสเตตัสเฉยๆ)
+function makeFoeDef(mon, level, statMult, giveHeld) {
   const base = statsForWild(mon, level);
   const m = statMult || 1;
+  const stats = { atk: Math.floor(base.atk * m), def: Math.floor(base.def * m), spatk: Math.floor(base.spatk * m), spdef: Math.floor(base.spdef * m), spd: Math.floor(base.spd * m) };
+  const held = giveHeld ? pick(FOE_HELD_POOL) : null;
+  if (held) applyFoeHeld(stats, held);
   return {
-    mon, level,
-    stats: { atk: Math.floor(base.atk * m), def: Math.floor(base.def * m), spatk: Math.floor(base.spatk * m), spdef: Math.floor(base.spdef * m), spd: Math.floor(base.spd * m) },
+    mon, level, stats, held,
     maxHp: Math.floor(base.hp * m),
   };
 }
@@ -2988,7 +2999,7 @@ function grantItemRewards(list) {
 }
 function loadFoe(b, def) {
   b.foeMon = def.mon; b.foeLevel = def.level; b.foeStats = def.stats;
-  b.foeMaxHp = def.maxHp; b.foeHp = def.maxHp;
+  b.foeMaxHp = def.maxHp; b.foeHp = def.maxHp; b.foeHeld = def.held || null;
   b.foe = { status: null, sleepT: 0 };   // ศัตรูตัวใหม่ = สถานะเคลียร์
 }
 function startTrainerBattle(gymId) {
@@ -3006,13 +3017,13 @@ function startTrainerBattle(gymId) {
   for (let i = 0; i < g.count; i++) {
     const isAce = i === g.count - 1;
     const mon = pick(pool);
-    const lv = clamp(g.lvl + rand(-2, 3) + (isAce ? 6 : 0), 1, 100);   // เอซ (ตัวสุดท้าย) เลเวลสูง+สเตตัสบูสต์ 25%
-    queue.push(makeFoeDef(mon, lv, isAce ? 1.25 : 1.0));
+    const lv = clamp(g.lvl + rand(-2, 3) + (isAce ? 6 : 0), 1, 100);   // เอซ (ตัวสุดท้าย) เลเวลสูง+สเตตัสบูสต์ 25%+ไอเทมถือ
+    queue.push(makeFoeDef(mon, lv, isAce ? 1.25 : 1.0, isAce));
   }
   const team = buildBattleTeam(members);
   battleState = {
     mode: 'trainer', isBoss: false, gym: g, foeQueue: queue, foeIdx: 0,
-    foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp,
+    foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp, foeHeld: queue[0].held || null,
     team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0 },
     usedMega: false, usedDynamax: false,
     msg: `${g.emoji} ${g.name} — ศัตรู ${g.count} ตัว! เลือกท่าโจมตี`,
@@ -3044,7 +3055,8 @@ function towerFoeDef(floor) {
     else if (floor >= TOWER_GMAX_FLOOR && gmaxFormFor(mon.id) && Math.random() < 0.7) special = 'gmax';
     else special = 'elite';
   }
-  return { mon, lvl, isBossFloor, special };
+  const held = isBossFloor ? pick(FOE_HELD_POOL) : null;   // ชั้นบอสถือไอเทมด้วย ท้าทายขึ้นจริง
+  return { mon, lvl, isBossFloor, special, held };
 }
 // เซ็ตศัตรูของชั้นนี้ลงใน battleState (ทับของเดิม แต่ทีมผู้เล่น/HP เดิมยังอยู่ — นี่คือความท้าทายของหอคอย)
 function applyTowerFoeToBattle(b, def, floor) {
@@ -3069,7 +3081,8 @@ function applyTowerFoeToBattle(b, def, floor) {
       spriteId = g.spriteId; name = g.name;
     }
   }
-  b.foeMon = def.mon; b.foeLevel = def.lvl; b.foeStats = fStats; b.foeMaxHp = fMaxHp; b.foeHp = fMaxHp;
+  if (def.held) applyFoeHeld(fStats, def.held);
+  b.foeMon = def.mon; b.foeLevel = def.lvl; b.foeStats = fStats; b.foeMaxHp = fMaxHp; b.foeHp = fMaxHp; b.foeHeld = def.held || null;
   b.foeTypes = types; b.foeSpriteId = spriteId; b.foeDisplayName = name; b.special = def.special;
   b.floorNow = floor; b.foe = { status: null, sleepT: 0 };
 }
