@@ -2254,6 +2254,7 @@ function renderMenu() {
   $('#profileBox').querySelectorAll('[data-savepreset]').forEach(el => el.onclick = () => savePreset(+el.dataset.savepreset));
   $('#profileBox').querySelectorAll('[data-loadpreset]').forEach(el => el.onclick = () => loadPreset(+el.dataset.loadpreset));
   $('#profileBox').querySelectorAll('[data-delpreset]').forEach(el => el.onclick = () => deletePreset(+el.dataset.delpreset));
+  renderHallOfFame();
   renderCloudUI();
   renderIdle();
   renderTower();
@@ -2709,6 +2710,53 @@ function deletePreset(slot) {
   if (!confirmAction(`ลบชุดทีม "${p.name}"?`)) return;
   state.teamPresets[slot] = null;
   save(); renderMenu();
+}
+
+// ================================================================
+//  HALL OF FAME — โชว์ตัวเด็ดที่สุดในคลัง (ใช้สไปรต์จริงล้วน)
+// ================================================================
+function indRow(ind, sub) {
+  if (!ind) return '';
+  const m = MON_BY_ID[ind.id];
+  return `<div class="ind-row" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}
+    <div class="ir-main"><div class="ir-name">${ind.shiny ? '✨' : ''}${ind.nick || m.name}</div>
+    <div class="ir-sub">${sub}</div></div></div>`;
+}
+function renderHallOfFame() {
+  const box = $('#hallOfFameBox'); if (!box) return;
+  if (!state.caught.length) { box.innerHTML = `<div class="sr-sub">ยังไม่มีตัวในคลัง — จับสักตัวก่อนเพื่อเริ่มห้องโชว์!</div>`; return; }
+  const byIv = [...state.caught].sort((a, b) => ivPercent(b) - ivPercent(a));
+  const topIv = byIv[0];
+  const shinies = state.caught.filter(c => c.shiny).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  const legends = state.caught.filter(c => c.tier === 'legendary').sort((a, b) => ivPercent(b) - ivPercent(a));
+  const oldest = [...state.caught].sort((a, b) => (a.ts || 0) - (b.ts || 0))[0];
+  const bestFriend = [...state.caught].sort((a, b) => (b.friend || 0) - (a.friend || 0))[0];
+  const ribbons = (state.contest && state.contest.ribbons) || {};
+  const totalRibbons = Object.values(ribbons).reduce((s, n) => s + n, 0);
+  const galleryRow = (list, emptyMsg) => list.length
+    ? `<div class="dex-grid">` + list.slice(0, 12).map(ind => {
+        const m = MON_BY_ID[ind.id];
+        return `<div class="dex-cell" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}<div class="dname">${ind.nick || m.name}</div><div class="dnum">IV ${ivPercent(ind)}%</div></div>`;
+      }).join('') + `</div>`
+    : `<div class="sr-sub">${emptyMsg}</div>`;
+  box.innerHTML = `
+    <div class="stat-grid" style="margin-bottom:10px">
+      <div class="stat-tile"><div class="st-num">${legends.length}</div><div class="st-lbl">👑 Legendary</div></div>
+      <div class="stat-tile"><div class="st-num">${shinies.length}</div><div class="st-lbl">✨ Shiny</div></div>
+      <div class="stat-tile"><div class="st-num">${totalRibbons}</div><div class="st-lbl">🎀 ริบบิ้นคอนเทสต์</div></div>
+      <div class="stat-tile"><div class="st-num">${state.tower && state.tower.bestFloor || 0}</div><div class="st-lbl">🗼 ชั้นหอคอยสูงสุด</div></div>
+    </div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:4px">💯 IV สูงสุดในคลัง</div>
+    ${indRow(topIv, `IV ${ivPercent(topIv)}% · นิสัย ${topIv.nature} · Lv.${topIv.level}`)}
+    <div style="font-size:12px;font-weight:700;margin:10px 0 4px">🤝 ตัวที่มิตรภาพดีที่สุด</div>
+    ${bestFriend ? indRow(bestFriend, `มิตรภาพ ${bestFriend.friend || 0}/${FRIEND_MAX}`) : '<div class="sr-sub">ยังไม่มี</div>'}
+    <div style="font-size:12px;font-weight:700;margin:10px 0 4px">🕰️ ตัวแรกที่จับได้</div>
+    ${indRow(oldest, `จับตอน ${new Date(oldest.ts || Date.now()).toLocaleDateString('th-TH')}`)}
+    <div style="font-size:12px;font-weight:700;margin:10px 0 4px">✨ แกลเลอรี Shiny (${shinies.length})</div>
+    ${galleryRow(shinies, 'ยังไม่มีตัว Shiny')}
+    <div style="font-size:12px;font-weight:700;margin:10px 0 4px">👑 แกลเลอรี Legendary (${legends.length})</div>
+    ${galleryRow(legends, 'ยังไม่มีตัว Legendary')}`;
+  box.querySelectorAll('[data-hof-uid]').forEach(el => el.onclick = () => openIndividualModal(el.dataset.hofUid));
 }
 
 // ================================================================
