@@ -464,6 +464,8 @@ const ACHIEVEMENTS = [
   { id: 'allribbons', ico: '🏵️', name: 'จอมประกวด', desc: 'ชนะที่ 1 ครบทั้ง 5 หมวดคอนเทสต์', reward: 1000,
     goal: s => CONTEST_CATEGORIES.every(c => ((s.contest && s.contest.ribbons && s.contest.ribbons[c.id]) || 0) > 0),
     prog: s => [CONTEST_CATEGORIES.filter(c => ((s.contest && s.contest.ribbons && s.contest.ribbons[c.id]) || 0) > 0).length, CONTEST_CATEGORIES.length] },
+  { id: 'firstrival', ico: '🔥', name: 'เอาชนะคู่แข่ง', desc: 'ชนะคู่แข่งประจำตัวครั้งแรก', reward: 300, goal: s => !!s._rivalWon, prog: s => [s._rivalWon ? 1 : 0, 1] },
+  { id: 'rival10', ico: '🥇', name: 'จอมยุทธ์คู่แข่ง', desc: 'ชนะคู่แข่งประจำตัวรวม 10 ครั้ง', reward: 1500, goal: s => ((s.rival && s.rival.wins) || 0) >= 10, prog: s => [(s.rival && s.rival.wins) || 0, 10] },
 ];
 
 // รางวัลจบเดกซ์ (กดรับเองเมื่อถึงเกณฑ์)
@@ -670,6 +672,7 @@ function newSave() {
     worldEvent: null,    // { id, until } อีเวนต์สุ่มตามฤดูกาลที่กำลังทำงาน
     nextEventCheck: 0,   // timestamp เช็คอีเวนต์สุ่มครั้งถัดไป
     merchant: null,       // { until, stock:[{id,bought}] } พ่อค้าเร่ที่กำลังอยู่ (ถ้ามี)
+    rival: { readyAt: 0, wins: 0, losses: 0 },   // คู่แข่งประจำตัว — สถิติชนะ/แพ้ + คูลดาวน์ท้าครั้งถัดไป
     eventHistory: [],    // ['id', ...] อีเวนต์ที่เคยเจอ (5 ล่าสุด)
     dexRewards: {},      // {rewardId:true} รับรางวัลจบเดกซ์แล้ว
     badges: {},          // {regionId:true} ชนะบอสแล้ว
@@ -2374,6 +2377,7 @@ function renderMenu() {
   $('#profileBox').querySelectorAll('[data-delpreset]').forEach(el => el.onclick = () => deletePreset(+el.dataset.delpreset));
   renderHallOfFame();
   renderMerchant();
+  renderRival();
   renderCloudUI();
   renderIdle();
   renderTower();
@@ -3369,7 +3373,10 @@ function faintActive(b, aMon) {
       state.tower.floor = 1;   // แพ้ = รีเซ็ตกลับชั้น 1 (สถิติสูงสุดยังเก็บไว้)
       b.msg += ` · 🗼 แพ้ที่ชั้น ${lostFloor}! หอคอยรีเซ็ตกลับชั้น 1 (สถิติสูงสุด ${state.tower.bestFloor || 0})`;
       save();
-    } else { b.msg += ' · แพ้! ลองใหม่'; }
+    } else {
+      b.msg += ' · แพ้! ลองใหม่';
+      if (b.isRival) { state.rival = state.rival || { readyAt: 0, wins: 0, losses: 0 }; state.rival.losses = (state.rival.losses || 0) + 1; save(); }
+    }
   } else { b.activeIdx = next; b.msg += ` ส่ง ${MON_BY_ID[b.team[next].ind.id].name} ลงสนาม!${applyIntimidate('player', b)}`; }
 }
 // นับถอยหลังไดนาแม็กซ์ — เรียกทุกครั้งที่ผู้เล่นขยับ (ไม่ว่าผลจะเป็นอย่างไร กันเทิร์นหลุดตอน KO ทันที)
@@ -3604,8 +3611,23 @@ function onFoeDown() {
       b.msg = `${downed} ล้ม! ${b.gym.emoji} ${b.gym.name} ส่ง ${b.foeMon.name} Lv.${b.foeLevel} ลงต่อ! (เหลือ ${b.foeQueue.length - b.foeIdx})${applyIntimidate('foe', b)}`;
       return;   // ยังไม่จบ สู้ตัวต่อไป
     }
-    // ชนะยิม
     b.over = true;
+    if (b.isRival) {   // ชนะคู่แข่ง (แยกจากยิม ไม่แตะ state.gymsBeaten)
+      state.rival = state.rival || { readyAt: 0, wins: 0, losses: 0 };
+      state.rival.wins = (state.rival.wins || 0) + 1;
+      const reward = b.gym.reward;
+      const bp = 15 + Math.floor(trainerLevel() * 1.5);
+      state.coins += reward;
+      state.battlePoints = (state.battlePoints || 0) + bp;
+      const itemMsg = grantItemRewards(b.gym.items);
+      gainTrainerXp(80);
+      state._rivalWon = true;
+      b.msg = `🔥 ชนะคู่แข่ง ${RIVAL_NAME}! +${reward}🪙 +${bp}🎖️BP${itemMsg ? ' +' + itemMsg : ''} (ชนะรวม ${state.rival.wins} ครั้ง)`;
+      logMsg(`🔥 ชนะคู่แข่ง <b>${RIVAL_NAME}</b>! +${reward}🪙 +${bp}BP ${itemMsg}`, 'big');
+      playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
+      return;
+    }
+    // ชนะยิม
     const g = b.gym, first = !state.gymsBeaten[g.id];
     state.gymsBeaten[g.id] = true;
     state.coins += g.reward;
@@ -3718,6 +3740,60 @@ function startTrainerBattle(gymId) {
   battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
   renderBattle();
   $('#battleModal').classList.remove('hidden');
+}
+
+// ================================================================
+//  คู่แข่งประจำตัว (Rival) — แยกจากยิม สเกลตามเลเวลเทรนเนอร์ ท้าซ้ำได้เรื่อยๆ
+// ================================================================
+const RIVAL_NAME = 'อาคาสึกิ';
+const RIVAL_CD = 5 * 60000;   // ท้าได้ทุก 5 นาที
+const RIVAL_TEAM_POOL = MONSTERS.filter(m => m.types.includes('fire') || m.types.includes('dragon'));
+function rivalReadyLeft() {
+  state.rival = state.rival || { readyAt: 0, wins: 0, losses: 0 };
+  return Math.max(0, state.rival.readyAt - Date.now());
+}
+function startRivalBattle() {
+  state.rival = state.rival || { readyAt: 0, wins: 0, losses: 0 };
+  if (rivalReadyLeft() > 0) { toast(`⏳ รอคู่แข่งพร้อมอีก ${Math.ceil(rivalReadyLeft() / 1000)} วิ`, 'bad'); return; }
+  const members = partyMembers();
+  if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
+  state.rival.readyAt = Date.now() + RIVAL_CD;
+  const tl = trainerLevel();
+  const rivalLvl = clamp(10 + tl * 3, 10, 100);
+  const pool = RIVAL_TEAM_POOL.length ? RIVAL_TEAM_POOL : MONSTERS;
+  const count = 3;
+  const queue = [];
+  for (let i = 0; i < count; i++) {
+    const isAce = i === count - 1;
+    const mon = pick(pool);
+    const lv = clamp(rivalLvl + rand(-2, 3) + (isAce ? 5 : 0), 1, 100);
+    queue.push(makeFoeDef(mon, lv, isAce ? 1.2 : 1.0, isAce));
+  }
+  const team = buildBattleTeam(members);
+  const rivalGym = { id: 'rival', name: `คู่แข่ง ${RIVAL_NAME}`, emoji: '🔥', reward: 300 + tl * 50, items: [['ultra', 2], ['candy', 2]] };
+  battleState = {
+    mode: 'trainer', isBoss: false, isRival: true, gym: rivalGym, foeQueue: queue, foeIdx: 0,
+    foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp, foeHeld: queue[0].held || null,
+    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
+    usedMega: false, usedDynamax: false,
+    msg: `🔥 คู่แข่ง ${RIVAL_NAME} ท้าดวล! ทีม ${count} ตัว!`,
+  };
+  battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
+  renderBattle();
+  $('#battleModal').classList.remove('hidden');
+}
+function renderRival() {
+  const box = $('#rivalBox'); if (!box) return;
+  state.rival = state.rival || { readyAt: 0, wins: 0, losses: 0 };
+  const left = Math.max(0, Math.ceil(rivalReadyLeft() / 1000));
+  const tl = trainerLevel();
+  box.innerHTML = `<div class="preset-row"><span class="pr-name">🔥 ${RIVAL_NAME} · Lv.~${clamp(10 + tl * 3, 10, 100)} · ชนะ ${state.rival.wins || 0} แพ้ ${state.rival.losses || 0}</span>
+    <div class="pr-actions"><button class="claim-btn" id="btnRival" ${left > 0 ? 'disabled' : ''}>${left > 0 ? `รอ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'ท้าดวล'}</button></div></div>`;
+  const btn = $('#btnRival'); if (btn) btn.onclick = startRivalBattle;
+}
+function updateRivalCd() {
+  if (!$('#rivalBox') || currentView !== 'menu') return;
+  renderRival();
 }
 
 // ================================================================
@@ -3975,6 +4051,7 @@ function init() {
   }, 30000);
   tryTriggerRandomEvent();   // เช็คทันทีตอนเปิดเกมด้วย (มีโอกาสเกิดตั้งแต่แรก)
   setInterval(updateMerchantCd, 1000);
+  setInterval(updateRivalCd, 1000);
   applyReduceMotion();
   window.addEventListener('beforeunload', () => { state.lastSeen = Date.now(); save(); });
 
