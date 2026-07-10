@@ -140,11 +140,12 @@ const BALLS = {
 const BALL_ORDER = ['poke', 'premier', 'great', 'luxury', 'ultra', 'net', 'dusk', 'quick', 'timer', 'repeat', 'heavy', 'beast', 'master'];
 
 // สภาพอากาศ (สุ่มต่อเขต) + กลางวัน/กลางคืน + อีเวนต์
+// dotImmune = ธาตุที่ไม่โดนดาเมจจากสภาพอากาศตอนจบเทิร์น (แบบพายุทราย/หิมะในเกมจริง — 1/16 ของ HP สูงสุด)
 const WEATHERS = {
   clear: { name: 'แจ่มใส', emoji: '☀️', boost: [] },
   rain:  { name: 'ฝนตก', emoji: '🌧️', boost: ['water', 'electric'] },
-  snow:  { name: 'หิมะโปรย', emoji: '🌨️', boost: ['ice'] },
-  sand:  { name: 'พายุทราย', emoji: '🏜️', boost: ['rock', 'ground', 'steel'] },
+  snow:  { name: 'หิมะโปรย', emoji: '🌨️', boost: ['ice'], dotImmune: ['ice'] },
+  sand:  { name: 'พายุทราย', emoji: '🏜️', boost: ['rock', 'ground', 'steel'], dotImmune: ['rock', 'ground', 'steel'] },
   fog:   { name: 'หมอกหนา', emoji: '🌫️', boost: ['ghost', 'dark', 'poison'] },
 };
 const NIGHT_BOOST = ['dark', 'ghost', 'psychic', 'fairy'];
@@ -2830,7 +2831,7 @@ function renderBattle() {
   const foeSpecialBadge = b.special ? `<span class="badge" style="background:${b.special === 'mega' ? 'linear-gradient(90deg,#8e5bff,#5a2ba8)' : b.special === 'gmax' ? 'linear-gradient(90deg,#ff6b6b,#c1122e)' : '#555'}">${b.special === 'mega' ? '💎 MEGA' : b.special === 'gmax' ? '💥 G-MAX' : '⭐ ELITE'}</span>` : '';
 
   $('#battleBox').innerHTML = `
-    ${curWeather.boost && curWeather.boost.length ? `<div style="font-size:11px;color:#9fd3ff;font-weight:700;text-align:center;margin-bottom:4px">${curWeather.emoji} ${curWeather.name} — ท่าธาตุ ${curWeather.boost.join('/')} แรงขึ้น ×1.2</div>` : ''}
+    ${curWeather.boost && curWeather.boost.length ? `<div style="font-size:11px;color:#9fd3ff;font-weight:700;text-align:center;margin-bottom:4px">${curWeather.emoji} ${curWeather.name} — ท่าธาตุ ${curWeather.boost.join('/')} แรงขึ้น ×1.2${curWeather.dotImmune ? ` · ธาตุอื่นโดนซัดทุกเทิร์น (ยกเว้น ${curWeather.dotImmune.join('/')})` : ''}</div>` : ''}
     <div class="battle-arena">
       <div class="bt-side foe">
         ${b.mode === 'trainer' ? `<div style="font-size:11px;color:#ffb3bb;font-weight:700">${b.gym.emoji} ${b.gym.name} · เหลือศัตรู ${b.foeQueue.length - b.foeIdx}/${b.foeQueue.length}</div>` : ''}
@@ -2961,11 +2962,36 @@ function tryInflict(move, target, targetTypes, name) {
   }
   return '';
 }
+// เอไอเทรนเนอร์ตัดสินใจเรียกตัวกลับ ถ้าอ่อนแรง (HP<=30%) และมีตัวสำรองเหลือ (ไม่ใช่เอซตัวสุดท้ายที่ต้องสู้จนจบเสมอ)
+// เลือกตัวสำรองที่โดนธาตุผู้เล่นเอาเปรียบน้อยที่สุดมาแทน — ตัวที่ถอยไปต่อท้ายคิว มีโอกาสถูกเรียกกลับมาสู้อีกทีแบบเต็ม HP
+function trainerTrySwitch(b, playerTypes) {
+  if (b.foeIdx >= b.foeQueue.length - 1) return false;
+  if (b.foeHp / b.foeMaxHp > 0.3) return false;
+  if (Math.random() > 0.4) return false;
+  let bestI = -1, bestVuln = Infinity;
+  for (let i = b.foeIdx + 1; i < b.foeQueue.length; i++) {
+    const vuln = playerTypes.reduce((s, t) => s + typeEffect(t, b.foeQueue[i].mon.types), 0);
+    if (vuln < bestVuln) { bestVuln = vuln; bestI = i; }
+  }
+  if (bestI < 0) return false;
+  const retreating = b.foeQueue[b.foeIdx];
+  const chosen = b.foeQueue[bestI];
+  b.foeQueue.splice(bestI, 1);
+  b.foeQueue.splice(b.foeIdx, 1, chosen);
+  b.foeQueue.push(retreating);
+  loadFoe(b, chosen);
+  return true;
+}
 function foeTurn(b) {
   if (b.over) return;
   const active = b.team[b.activeIdx];
   const aMon = MON_BY_ID[active.ind.id];
   const view = activeMonView(active);
+  const foeNameBefore = b.foeDisplayName || b.foeMon.name;
+  if (b.mode === 'trainer' && trainerTrySwitch(b, view.types)) {
+    b.msg += ` · ${b.gym.emoji} เรียก ${foeNameBefore} กลับ! ส่ง ${b.foeMon.name} Lv.${b.foeLevel} ลงแทน!`;
+    return;
+  }
   const gate = canAct(b.foe);
   const foeName = b.foeDisplayName || b.foeMon.name;
   const foeTypesForAtk = b.foeTypes || b.foeMon.types;
@@ -3015,6 +3041,27 @@ function tickDynamax(active, b) {
 function endRound(b) {
   if (b.over) return;
   const a = b.team[b.activeIdx];
+  const w = WEATHERS[getWeather(state.region)];
+  if (w.dotImmune && a && a.hp > 0) {   // ดาเมจสภาพอากาศ (พายุทราย/หิมะ) ใส่ฝ่ายเรา ถ้าธาตุไม่ต้าน
+    const aTypes = activeMonView(a).types;
+    if (!aTypes.some(t => w.dotImmune.includes(t))) {
+      const d = Math.max(1, Math.floor(a.maxHp / 16));
+      a.hp = Math.max(0, a.hp - d);
+      b.msg += ` · ${w.emoji} ${MON_BY_ID[a.ind.id].name} โดน${w.name}ซัด -${d}`;
+      if (a.hp <= 0) faintActive(b, MON_BY_ID[a.ind.id]);
+    }
+  }
+  if (!b.over && w.dotImmune && b.foeHp > 0) {   // ดาเมจสภาพอากาศใส่ฝ่ายศัตรู
+    const foeTypesNow = b.foeTypes || b.foeMon.types;
+    if (!foeTypesNow.some(t => w.dotImmune.includes(t))) {
+      const d = Math.max(1, Math.floor(b.foeMaxHp / 16));
+      b.foeHp = Math.max(b.mode === 'wild' ? 1 : 0, b.foeHp - d);
+      b.msg += ` · ${w.emoji} ${b.foeDisplayName || b.foeMon.name} โดน${w.name}ซัด -${d}`;
+      if (b.mode === 'wild' && currentSpawn) currentSpawn.hp = b.foeHp;
+      if (b.foeHp <= 0) onFoeDown();
+    }
+  }
+  if (b.over) return;
   if (a && a.hp > 0 && a.hp < a.maxHp && a.ind.held === 'leftovers') {   // Leftovers
     const heal = Math.max(1, Math.floor(a.maxHp / 16));
     a.hp = Math.min(a.maxHp, a.hp + heal); b.msg += ` · 🍖 ฟื้น ${heal}`;
