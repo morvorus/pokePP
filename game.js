@@ -373,7 +373,7 @@ function typeEffect(atkType, defTypes) {
 
 // พูลท่าโจมตีต่อธาตุ (หลายท่าต่อธาตุ — สุ่มเลือกแบบ deterministic ต่อสปีชีส์ เพื่อให้แต่ละตัวมีมูฟต่างกัน ไม่ใช่ท่าเดียวซ้ำทั้งธาตุ)
 const TYPE_MOVES = {
-  normal: [{ name: 'Body Slam', pow: 60, acc: 100 }, { name: 'Hyper Voice', pow: 90, acc: 100 }, { name: 'Double-Edge', pow: 100, acc: 100 }, { name: 'Extreme Speed', pow: 80, acc: 100 }, { name: 'Giga Impact', pow: 110, acc: 90 }, { name: 'Slam', pow: 65, acc: 75 }],
+  normal: [{ name: 'Body Slam', pow: 60, acc: 100 }, { name: 'Hyper Voice', pow: 90, acc: 100 }, { name: 'Double-Edge', pow: 100, acc: 100 }, { name: 'Extreme Speed', pow: 80, acc: 100, priority: 2 }, { name: 'Giga Impact', pow: 110, acc: 90 }, { name: 'Slam', pow: 65, acc: 75 }],
   fire: [{ name: 'Flamethrower', pow: 90, acc: 100 }, { name: 'Fire Blast', pow: 100, acc: 85 }, { name: 'Flame Charge', pow: 70, acc: 100 }, { name: 'Fire Punch', pow: 75, acc: 100 }, { name: 'Overheat', pow: 110, acc: 90 }, { name: 'Flare Blitz', pow: 100, acc: 100 }],
   water: [{ name: 'Surf', pow: 90, acc: 100 }, { name: 'Hydro Pump', pow: 100, acc: 80 }, { name: 'Scald', pow: 80, acc: 100 }, { name: 'Aqua Tail', pow: 75, acc: 90 }, { name: 'Waterfall', pow: 80, acc: 100 }, { name: 'Origin Pulse', pow: 110, acc: 100 }],
   electric: [{ name: 'Thunderbolt', pow: 90, acc: 100 }, { name: 'Thunder', pow: 100, acc: 70 }, { name: 'Wild Charge', pow: 90, acc: 100 }, { name: 'Discharge', pow: 80, acc: 100 }, { name: 'Volt Tackle', pow: 100, acc: 100 }, { name: 'Spark', pow: 65, acc: 100 }],
@@ -388,7 +388,7 @@ const TYPE_MOVES = {
   rock: [{ name: 'Rock Slide', pow: 75, acc: 90 }, { name: 'Stone Edge', pow: 100, acc: 80 }, { name: 'Rock Tomb', pow: 60, acc: 95 }, { name: 'Power Gem', pow: 80, acc: 100 }, { name: 'Rock Blast', pow: 65, acc: 90 }, { name: 'Ancient Power', pow: 60, acc: 100 }],
   ghost: [{ name: 'Shadow Ball', pow: 80, acc: 100 }, { name: 'Shadow Claw', pow: 70, acc: 100 }, { name: 'Phantom Force', pow: 90, acc: 100 }, { name: 'Shadow Punch', pow: 60, acc: 100 }, { name: 'Astonish', pow: 55, acc: 100 }, { name: 'Hex', pow: 65, acc: 100 }],
   dragon: [{ name: 'Dragon Pulse', pow: 85, acc: 100 }, { name: 'Dragon Claw', pow: 80, acc: 100 }, { name: 'Outrage', pow: 120, acc: 100 }, { name: 'Draco Meteor', pow: 110, acc: 90 }, { name: 'Dragon Breath', pow: 60, acc: 100 }, { name: 'Dual Chop', pow: 70, acc: 90 }],
-  dark: [{ name: 'Dark Pulse', pow: 80, acc: 100 }, { name: 'Crunch', pow: 80, acc: 100 }, { name: 'Foul Play', pow: 95, acc: 100 }, { name: 'Night Slash', pow: 70, acc: 100 }, { name: 'Sucker Punch', pow: 70, acc: 100 }, { name: 'Payback', pow: 60, acc: 100 }],
+  dark: [{ name: 'Dark Pulse', pow: 80, acc: 100 }, { name: 'Crunch', pow: 80, acc: 100 }, { name: 'Foul Play', pow: 95, acc: 100 }, { name: 'Night Slash', pow: 70, acc: 100 }, { name: 'Sucker Punch', pow: 70, acc: 100, priority: 1 }, { name: 'Payback', pow: 60, acc: 100 }],
   steel: [{ name: 'Iron Head', pow: 80, acc: 100 }, { name: 'Flash Cannon', pow: 90, acc: 100 }, { name: 'Meteor Mash', pow: 90, acc: 90 }, { name: 'Steel Wing', pow: 65, acc: 90 }, { name: 'Iron Tail', pow: 75, acc: 75 }, { name: 'Gyro Ball', pow: 80, acc: 100 }],
   fairy: [{ name: 'Moonblast', pow: 95, acc: 100 }, { name: 'Dazzling Gleam', pow: 80, acc: 100 }, { name: 'Play Rough', pow: 90, acc: 90 }, { name: 'Draining Kiss', pow: 60, acc: 100 }, { name: 'Fairy Wind', pow: 40, acc: 100 }, { name: 'Disarming Voice', pow: 40, acc: 100 }],
 };
@@ -406,10 +406,10 @@ function getMoves(id) {
     const base = hashIdx(`${id}-${t}`, pool.length);
     for (let i = 0; i < count; i++) {
       const mv = pool[(base + i) % pool.length];
-      moves.push({ type: t, name: mv.name, pow: mv.pow, acc: mv.acc });
+      moves.push({ type: t, name: mv.name, pow: mv.pow, acc: mv.acc, priority: mv.priority || 0 });
     }
   });
-  moves.push({ type: 'normal', name: 'Quick Attack', pow: 40, acc: 100 });   // ท่าติดตัว
+  moves.push({ type: 'normal', name: 'Quick Attack', pow: 40, acc: 100, priority: 1 });   // ท่าติดตัว — priority โจมตีก่อนเสมอ
   const seen = new Set();
   return moves.filter(mv => { if (seen.has(mv.name)) return false; seen.add(mv.name); return true; }).slice(0, 4);
 }
@@ -2574,7 +2574,8 @@ function renderBattle() {
   const moveBtns = moves.map((mv, i) => {
     const e = typeEffect(mv.type, foeTypes);
     const tag = e > 1 ? '↑' : e < 1 ? '↓' : '';
-    return `<button class="move-btn t-${mv.type}" data-mv="${i}">${mv.name} <b>${mv.pow}</b>${tag}<span class="mv-acc">🎯${mv.acc}%</span></button>`;
+    const prio = mv.priority > 0 ? ' ⚡' : '';
+    return `<button class="move-btn t-${mv.type}" data-mv="${i}" title="${mv.priority > 0 ? 'ท่า Priority — โจมตีก่อนเสมอ' : ''}">${mv.name}${prio} <b>${mv.pow}</b>${tag}<span class="mv-acc">🎯${mv.acc}%</span></button>`;
   }).join('');
 
   const canMega = !b.usedMega && !active.mega && !!(megaFormsFor(active.ind.id) || []).find(f => f.key === active.ind.megaKey);
@@ -2796,9 +2797,25 @@ function battleAttack(moveIdx) {
   }
   const foeTypesForDef = b.foeTypes || b.foeMon.types;
   const foeNameForMsg = b.foeDisplayName || b.foeMon.name;
+
+  // ลำดับการโจมตี: ท่า priority สูงกว่าไปก่อนเสมอ ถ้าเท่ากันตัวที่ SPD สูงกว่าไปก่อน
+  const foeMvPreview = foeChooseMove(b.foeMon, view.types);
+  const pPrio = mv.priority || 0, fPrio = foeMvPreview.priority || 0;
+  const foeFirst = fPrio !== pPrio ? fPrio > pPrio : (b.foeStats.spd > active.stats.spd);
+
+  if (foeFirst) {
+    foeTurn(b);
+    if (b.over || active.hp <= 0) {   // ผู้เล่นสลบก่อนจะได้โจมตี จบเทิร์นเลย
+      endRound(b);
+      if (b.mode === 'wild' && currentSpawn) renderSpawn();
+      save(); renderBattle(); return;
+    }
+  }
+
   if (!rollHit(mv)) {                     // ท่าพลาดเป้า — เสียเทิร์นเปล่า
     b.msg += `${view.name} ใช้ ${mv.name}! แต่พลาดเป้า... 💨`;
-    foeTurn(b); endRound(b);
+    if (!foeFirst) foeTurn(b);
+    endRound(b);
     if (b.mode === 'wild' && currentSpawn) renderSpawn();
     save(); renderBattle(); return;
   }
@@ -2820,7 +2837,7 @@ function battleAttack(moveIdx) {
     if (currentSpawn) renderSpawn();
     save(); renderBattle(); return;
   }
-  foeTurn(b);
+  if (!foeFirst) foeTurn(b);
   endRound(b);
   if (b.mode === 'wild' && currentSpawn) renderSpawn();
   save(); renderBattle();
