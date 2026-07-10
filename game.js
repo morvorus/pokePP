@@ -371,18 +371,44 @@ function typeEffect(atkType, defTypes) {
   return m;
 }
 
-// ท่าโจมตีมาตรฐานต่อธาตุ (ใช้สร้าง moveset ให้แต่ละตัว)
-const TYPE_MOVE = {
-  normal: { name: 'Body Slam', pow: 60 }, fire: { name: 'Flamethrower', pow: 90 }, water: { name: 'Surf', pow: 90 },
-  electric: { name: 'Thunderbolt', pow: 90 }, grass: { name: 'Energy Ball', pow: 85 }, ice: { name: 'Ice Beam', pow: 90 },
-  fighting: { name: 'Close Combat', pow: 100 }, poison: { name: 'Sludge Bomb', pow: 90 }, ground: { name: 'Earthquake', pow: 100 },
-  flying: { name: 'Air Slash', pow: 75 }, psychic: { name: 'Psychic', pow: 90 }, bug: { name: 'Bug Buzz', pow: 90 },
-  rock: { name: 'Rock Slide', pow: 75 }, ghost: { name: 'Shadow Ball', pow: 80 }, dragon: { name: 'Dragon Pulse', pow: 85 },
-  dark: { name: 'Dark Pulse', pow: 80 }, steel: { name: 'Iron Head', pow: 80 }, fairy: { name: 'Moonblast', pow: 95 },
+// พูลท่าโจมตีต่อธาตุ (หลายท่าต่อธาตุ — สุ่มเลือกแบบ deterministic ต่อสปีชีส์ เพื่อให้แต่ละตัวมีมูฟต่างกัน ไม่ใช่ท่าเดียวซ้ำทั้งธาตุ)
+const TYPE_MOVES = {
+  normal: [{ name: 'Body Slam', pow: 60 }, { name: 'Hyper Voice', pow: 90 }, { name: 'Double-Edge', pow: 100 }, { name: 'Extreme Speed', pow: 80 }, { name: 'Giga Impact', pow: 110 }, { name: 'Slam', pow: 65 }],
+  fire: [{ name: 'Flamethrower', pow: 90 }, { name: 'Fire Blast', pow: 100 }, { name: 'Flame Charge', pow: 70 }, { name: 'Fire Punch', pow: 75 }, { name: 'Overheat', pow: 110 }, { name: 'Flare Blitz', pow: 100 }],
+  water: [{ name: 'Surf', pow: 90 }, { name: 'Hydro Pump', pow: 100 }, { name: 'Scald', pow: 80 }, { name: 'Aqua Tail', pow: 75 }, { name: 'Waterfall', pow: 80 }, { name: 'Origin Pulse', pow: 110 }],
+  electric: [{ name: 'Thunderbolt', pow: 90 }, { name: 'Thunder', pow: 100 }, { name: 'Wild Charge', pow: 90 }, { name: 'Discharge', pow: 80 }, { name: 'Volt Tackle', pow: 100 }, { name: 'Spark', pow: 65 }],
+  grass: [{ name: 'Energy Ball', pow: 85 }, { name: 'Solar Beam', pow: 100 }, { name: 'Giga Drain', pow: 75 }, { name: 'Leaf Blade', pow: 90 }, { name: 'Petal Blizzard', pow: 90 }, { name: 'Power Whip', pow: 100 }],
+  ice: [{ name: 'Ice Beam', pow: 90 }, { name: 'Blizzard', pow: 100 }, { name: 'Ice Punch', pow: 75 }, { name: 'Icicle Crash', pow: 85 }, { name: 'Ice Shard', pow: 40 }, { name: 'Avalanche', pow: 80 }],
+  fighting: [{ name: 'Close Combat', pow: 100 }, { name: 'Focus Blast', pow: 100 }, { name: 'Brick Break', pow: 75 }, { name: 'Cross Chop', pow: 90 }, { name: 'Dynamic Punch', pow: 100 }, { name: 'Superpower', pow: 100 }],
+  poison: [{ name: 'Sludge Bomb', pow: 90 }, { name: 'Gunk Shot', pow: 100 }, { name: 'Poison Jab', pow: 75 }, { name: 'Sludge Wave', pow: 85 }, { name: 'Cross Poison', pow: 65 }, { name: 'Toxic Spikes', pow: 50 }],
+  ground: [{ name: 'Earthquake', pow: 100 }, { name: 'Earth Power', pow: 90 }, { name: 'Bulldoze', pow: 60 }, { name: 'Dig', pow: 80 }, { name: 'Mud Bomb', pow: 65 }, { name: "Fissure", pow: 95 }],
+  flying: [{ name: 'Air Slash', pow: 75 }, { name: 'Hurricane', pow: 100 }, { name: 'Brave Bird', pow: 120 }, { name: 'Aerial Ace', pow: 60 }, { name: 'Sky Attack', pow: 105 }, { name: 'Wing Attack', pow: 60 }],
+  psychic: [{ name: 'Psychic', pow: 90 }, { name: 'Psyshock', pow: 80 }, { name: 'Zen Headbutt', pow: 80 }, { name: 'Future Sight', pow: 100 }, { name: 'Psycho Cut', pow: 70 }, { name: 'Confusion', pow: 50 }],
+  bug: [{ name: 'Bug Buzz', pow: 90 }, { name: 'X-Scissor', pow: 80 }, { name: 'Megahorn', pow: 120 }, { name: 'Signal Beam', pow: 75 }, { name: 'Pin Missile', pow: 65 }, { name: 'Leech Life', pow: 80 }],
+  rock: [{ name: 'Rock Slide', pow: 75 }, { name: 'Stone Edge', pow: 100 }, { name: 'Rock Tomb', pow: 60 }, { name: 'Power Gem', pow: 80 }, { name: 'Rock Blast', pow: 65 }, { name: 'Ancient Power', pow: 60 }],
+  ghost: [{ name: 'Shadow Ball', pow: 80 }, { name: 'Shadow Claw', pow: 70 }, { name: 'Phantom Force', pow: 90 }, { name: 'Shadow Punch', pow: 60 }, { name: 'Astonish', pow: 55 }, { name: 'Hex', pow: 65 }],
+  dragon: [{ name: 'Dragon Pulse', pow: 85 }, { name: 'Dragon Claw', pow: 80 }, { name: 'Outrage', pow: 120 }, { name: 'Draco Meteor', pow: 110 }, { name: 'Dragon Breath', pow: 60 }, { name: 'Dual Chop', pow: 70 }],
+  dark: [{ name: 'Dark Pulse', pow: 80 }, { name: 'Crunch', pow: 80 }, { name: 'Foul Play', pow: 95 }, { name: 'Night Slash', pow: 70 }, { name: 'Sucker Punch', pow: 70 }, { name: 'Payback', pow: 60 }],
+  steel: [{ name: 'Iron Head', pow: 80 }, { name: 'Flash Cannon', pow: 90 }, { name: 'Meteor Mash', pow: 90 }, { name: 'Steel Wing', pow: 65 }, { name: 'Iron Tail', pow: 75 }, { name: 'Gyro Ball', pow: 80 }],
+  fairy: [{ name: 'Moonblast', pow: 95 }, { name: 'Dazzling Gleam', pow: 80 }, { name: 'Play Rough', pow: 90 }, { name: 'Draining Kiss', pow: 60 }, { name: 'Fairy Wind', pow: 40 }, { name: 'Misty Terrain', pow: 50 }],
 };
+function hashIdx(seedStr, len) {   // hash คงที่ (ไม่สุ่มใหม่ทุกครั้ง) เพื่อให้ moveset ของแต่ละตัวเดิมเสมอ
+  let h = 0;
+  for (let i = 0; i < seedStr.length; i++) h = (h * 31 + seedStr.charCodeAt(i)) >>> 0;
+  return h % len;
+}
 function getMoves(id) {
   const m = MON_BY_ID[id];
-  const moves = m.types.map(t => ({ type: t, name: TYPE_MOVE[t].name, pow: TYPE_MOVE[t].pow }));
+  const moves = [];
+  m.types.forEach((t, ti) => {
+    const pool = TYPE_MOVES[t];
+    const count = m.types.length === 1 ? Math.min(3, pool.length) : (ti === 0 ? 2 : 1);
+    const base = hashIdx(`${id}-${t}`, pool.length);
+    for (let i = 0; i < count; i++) {
+      const mv = pool[(base + i) % pool.length];
+      moves.push({ type: t, name: mv.name, pow: mv.pow });
+    }
+  });
   moves.push({ type: 'normal', name: 'Quick Attack', pow: 40 });   // ท่าติดตัว
   const seen = new Set();
   return moves.filter(mv => { if (seen.has(mv.name)) return false; seen.add(mv.name); return true; }).slice(0, 4);
