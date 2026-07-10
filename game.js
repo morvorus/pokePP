@@ -449,6 +449,10 @@ const ACHIEVEMENTS = [
   { id: 'firstgmax', ico: '💥', name: 'ยักษ์ตัวจริง', desc: 'ไดนาแม็กซ์เป็นร่าง G-Max จริงครั้งแรก', reward: 600, goal: s => !!s._gmaxed, prog: s => [s._gmaxed ? 1 : 0, 1] },
   { id: 'gotmegaring', ico: '💍', name: 'พร้อมเมก้า', desc: 'ปลดล็อกกำไลเมก้า', reward: 300, goal: s => !!s.hasMegaRing, prog: s => [s.hasMegaRing ? 1 : 0, 1] },
   { id: 'gotdynamaxband', ico: '⌚', name: 'พร้อมไดนาแม็กซ์', desc: 'ปลดล็อกกำไลไดนาแม็กซ์', reward: 300, goal: s => !!s.hasDynamaxBand, prog: s => [s.hasDynamaxBand ? 1 : 0, 1] },
+  { id: 'firstribbon', ico: '🎀', name: 'นักประกวดมือใหม่', desc: 'ชนะที่ 1 คอนเทสต์ครั้งแรก', reward: 250, goal: s => !!s._contestWon, prog: s => [s._contestWon ? 1 : 0, 1] },
+  { id: 'allribbons', ico: '🏵️', name: 'จอมประกวด', desc: 'ชนะที่ 1 ครบทั้ง 5 หมวดคอนเทสต์', reward: 1000,
+    goal: s => CONTEST_CATEGORIES.every(c => ((s.contest && s.contest.ribbons && s.contest.ribbons[c.id]) || 0) > 0),
+    prog: s => [CONTEST_CATEGORIES.filter(c => ((s.contest && s.contest.ribbons && s.contest.ribbons[c.id]) || 0) > 0).length, CONTEST_CATEGORIES.length] },
 ];
 
 // รางวัลจบเดกซ์ (กดรับเองเมื่อถึงเกณฑ์)
@@ -616,6 +620,7 @@ function newSave() {
     fishReadyAt: 0,      // คูลดาวน์ตกปลา (timestamp)
     safariTickets: 0,    // ตั๋ว Safari
     safari: { left: 0 }, // จำนวน spawn บูสต์ที่เหลือใน Safari
+    contest: { readyAt: 0, ribbons: {} },   // คูลดาวน์คอนเทสต์ + ริบบิ้นที่ได้ {categoryId: count}
     amulets: 0,          // Amulet Coin (+5%/ชิ้น สูงสุด 10)
     streaks: { common: 0, uncommon: 0, rare: 0, superrare: 0, legendary: 0 },  // สตรีคจับต่อเนื่องรายระดับ
     bestStreaks: {},     // สตรีคสูงสุดที่เคยทำ
@@ -1186,6 +1191,90 @@ function updateFishBtn() {
   const left = Math.ceil(((state.fishReadyAt || 0) - Date.now()) / 1000);
   if (left > 0) { btn.disabled = true; btn.textContent = `🎣 รอ ${left} วิ`; }
   else { btn.disabled = false; btn.textContent = '🎣 ตกปลา'; }
+}
+// ===== คอนเทสต์ (Pokémon Contest) — ส่ง Buddy ประกวด 5 หมวด ให้ IV/นิสัย/ธาตุมีประโยชน์นอกสนามสู้ =====
+const CONTEST_CD = 90000;   // คูลดาวน์ 90 วินาทีต่อครั้ง
+const CONTEST_CATEGORIES = [
+  { id: 'cool',   name: 'เท่ห์ (Cool)',   emoji: '🕶️', types: ['fire', 'dragon', 'dark'],       natureStat: 'atk' },
+  { id: 'beauty', name: 'สวย (Beauty)',   emoji: '💧', types: ['water', 'ice', 'fairy'],        natureStat: 'spatk' },
+  { id: 'cute',   name: 'น่ารัก (Cute)',  emoji: '🎀', types: ['normal', 'fairy', 'electric'],  natureStat: 'spd' },
+  { id: 'smart',  name: 'ฉลาด (Smart)',   emoji: '🧠', types: ['psychic', 'ghost', 'dark'],     natureStat: 'spdef' },
+  { id: 'tough',  name: 'แกร่ง (Tough)',  emoji: '💪', types: ['fighting', 'rock', 'ground'],   natureStat: 'def' },
+];
+const CONTEST_RANK_COIN = { 1: 800, 2: 400, 3: 200, 4: 80 };
+function contestScore(ind, cat) {
+  const m = MON_BY_ID[ind.id];
+  let score = ivPercent(ind);                                              // 0-100 พื้นฐานจาก IV
+  if (m.types.some(t => cat.types.includes(t))) score += 25;                // ธาตุตรงหมวด
+  const nat = NATURES.find(n => n.name === ind.nature);
+  if (nat && nat.up === cat.natureStat) score += 15;                        // นิสัยเสริมสเตตัสที่หมวดนี้ชอบ
+  if (ind.shiny) score += 10;
+  score += Math.min(20, ind.level / 5);                                    // เลเวลช่วยเล็กน้อย
+  score += Math.random() * 15;                                             // ฟอร์มวันนี้ (สุ่มเล็กน้อยให้มีลุ้น)
+  return Math.round(score);
+}
+function contestRivalScore() { return Math.round(30 + trainerLevel() * 1.2 + Math.random() * 40); }
+function enterContest(uid, catId) {
+  const now = Date.now();
+  state.contest = state.contest || { readyAt: 0, ribbons: {} };
+  if (now < (state.contest.readyAt || 0)) { toast(`🎀 รอคอนเทสต์พร้อมอีก ${Math.ceil((state.contest.readyAt - now) / 1000)} วิ`, 'bad'); return; }
+  const ind = indByUid(uid); if (!ind) return;
+  const cat = CONTEST_CATEGORIES.find(c => c.id === catId); if (!cat) return;
+  state.contest.readyAt = now + CONTEST_CD;
+  const myScore = contestScore(ind, cat);
+  const rivals = [contestRivalScore(), contestRivalScore(), contestRivalScore()];
+  const rank = [myScore, ...rivals].sort((a, b) => b - a).indexOf(myScore) + 1;
+  const coins = CONTEST_RANK_COIN[rank] || 80;
+  state.coins += coins;
+  let extra = '';
+  if (rank === 1) {
+    state.contest.ribbons[cat.id] = (state.contest.ribbons[cat.id] || 0) + 1;
+    state.candies = (state.candies || 0) + 1;
+    state._contestWon = true;
+    extra = ' + 🎀 ริบบิ้น + 🍬×1';
+  }
+  const rankLabel = ['🥇 ที่ 1', '🥈 ที่ 2', '🥉 ที่ 3', '🍃 ที่ 4'][rank - 1];
+  const name = ind.nick || MON_BY_ID[ind.id].name;
+  toast(`${cat.emoji} ${name} ได้ ${rankLabel}! คะแนน ${myScore} (คู่แข่ง ${rivals.join('/')}) +${coins}🪙${extra}`, rank === 1 ? 'good' : '');
+  logMsg(`${cat.emoji} คอนเทสต์ ${cat.name}: ${name} ได้ ${rankLabel} (${myScore} คะแนน)${extra}`, rank === 1 ? 'big' : '');
+  checkAchievements();
+  save(); renderTopbar(); renderContest();
+}
+function renderContest() {
+  const list = $('#contestList'), entrantBox = $('#contestEntrant');
+  if (!list || !entrantBox) return;
+  state.contest = state.contest || { readyAt: 0, ribbons: {} };
+  const buddy = getBuddy();
+  if (!buddy) {
+    entrantBox.innerHTML = '';
+    list.innerHTML = `<div class="quest"><div class="quest-name">ยังไม่มี Buddy — ตั้ง Buddy ก่อนเพื่อส่งเข้าประกวด</div></div>`;
+    return;
+  }
+  const bm = MON_BY_ID[buddy.id];
+  entrantBox.innerHTML = `<div class="egg-item" style="margin-bottom:10px">
+    ${spriteImg(buddy.id, buddy.shiny)}
+    <div class="eb"><div class="si-name">${buddy.shiny ? '✨' : ''}${buddy.nick || bm.name} ส่งเข้าประกวด</div>
+    <div class="si-desc">IV ${ivPercent(buddy)}% · นิสัย ${buddy.nature} · Lv.${buddy.level}${buddy.shiny ? ' · Shiny' : ''}</div></div></div>`;
+  const cd = Math.max(0, Math.ceil(((state.contest.readyAt || 0) - Date.now()) / 1000));
+  list.innerHTML = CONTEST_CATEGORIES.map(cat => {
+    const ribbons = state.contest.ribbons[cat.id] || 0;
+    const typeMatch = bm.types.some(t => cat.types.includes(t));
+    return `<div class="quest">
+      <div class="quest-top"><div class="quest-name">${cat.emoji} ${cat.name}${typeMatch ? ' <span style="color:var(--good)">(ธาตุตรง!)</span>' : ''}</div>
+      <div class="quest-reward">${ribbons ? `🎀×${ribbons}` : ''}</div></div>
+      <div class="quest-foot"><span>รางวัลที่ 1: +${CONTEST_RANK_COIN[1]}🪙 + 🎀 + 🍬</span>
+        <button class="claim-btn" data-contest="${cat.id}" ${cd > 0 ? 'disabled' : ''}>${cd > 0 ? `รอ ${cd}วิ` : 'ประกวด'}</button>
+      </div></div>`;
+  }).join('');
+  list.querySelectorAll('[data-contest]').forEach(b => b.onclick = () => enterContest(buddy.uid, b.dataset.contest));
+}
+function updateContestCd() {   // อัปเดตนับถอยหลังปุ่มคอนเทสต์ทุกวินาที โดยไม่ต้อง re-render ทั้งก้อน
+  const list = $('#contestList'); if (!list || currentView !== 'quest') return;
+  const cd = Math.max(0, Math.ceil(((state.contest && state.contest.readyAt || 0) - Date.now()) / 1000));
+  list.querySelectorAll('[data-contest]').forEach(btn => {
+    btn.disabled = cd > 0;
+    btn.textContent = cd > 0 ? `รอ ${cd}วิ` : 'ประกวด';
+  });
 }
 function fleeSpawn() {
   if (!currentSpawn) return;
@@ -2088,6 +2177,7 @@ function renderQuests() {
   }).join('');
   $('#questList').querySelectorAll('.claim-btn[data-key]').forEach(btn => btn.onclick = () => claimQuest(btn.dataset.key));
   renderEggs();
+  renderContest();
 }
 function renderEggs() {
   const box = $('#eggList');
@@ -3408,6 +3498,7 @@ function init() {
   $('#safariBtn').addEventListener('click', enterSafari);
   updateFishBtn();
   setInterval(updateFishBtn, 1000);
+  setInterval(updateContestCd, 1000);
   $('#toMapBtn').addEventListener('click', () => switchView('map'));
   document.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => switchView(b.dataset.view));
   $('#dexSearch').addEventListener('input', renderDex);
