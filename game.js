@@ -2492,6 +2492,10 @@ function gainXpTo(ind, amount) {
 function gainTrainerXp(n) { state.trainerXp = (state.trainerXp || 0) + n; }
 function trainerLevel() { return Math.floor(Math.pow((state.trainerXp || 0) / 60, 0.5)) + 1; }
 
+function weatherBoosted(moveType) {   // ธาตุที่ได้บูสต์จากสภาพอากาศปัจจุบันของเขต (ใช้ทั้งฝั่งเราและศัตรู)
+  const w = WEATHERS[getWeather(state.region)];
+  return !!(w && w.boost && w.boost.includes(moveType));
+}
 function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move, held) {
   const physical = atkStats.atk >= atkStats.spatk;
   const A = physical ? atkStats.atk : atkStats.spatk;
@@ -2500,12 +2504,13 @@ function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move, held) {
   const power = move ? move.pow : 55;
   const eff = typeEffect(moveType, defMon.types);
   const stab = atkMon.types.includes(moveType) ? 1.5 : 1;
+  const weather = weatherBoosted(moveType);
   const crit = Math.random() < (held === 'scope-lens' ? 4 / 16 : 1 / 16);   // คริติคอล 6.25% (Scope Lens ×4 ~25%)
   let dmg = (((2 * atkLevel / 5 + 2) * power * A / Math.max(1, D)) / 50 + 2);
-  dmg = dmg * stab * eff * (0.85 + Math.random() * 0.15) * (crit ? 1.5 : 1);
+  dmg = dmg * stab * eff * (0.85 + Math.random() * 0.15) * (crit ? 1.5 : 1) * (weather ? 1.2 : 1);
   if (held === 'life-orb') dmg *= 1.3;                      // Life Orb
   if (held === 'expert-belt' && eff > 1) dmg *= 1.2;        // Expert Belt (ธาตุได้เปรียบ)
-  return { dmg: Math.max(1, Math.floor(dmg)), eff, crit };
+  return { dmg: Math.max(1, Math.floor(dmg)), eff, crit, weather };
 }
 // ใส่ผล Held Item ที่ปรับสเตตัส (ตอนสร้างทีมสู้)
 function statsWithHeld(ind) {
@@ -2581,12 +2586,14 @@ function renderBattle() {
   const foeTypes = b.foeTypes || b.foeMon.types;
   const foeSpriteId = b.foeSpriteId || b.foeMon.id;
   const foeName = b.foeDisplayName || b.foeMon.name;
+  const curWeather = WEATHERS[getWeather(state.region)];
   const moves = getMoves(active.ind.id);
   const moveBtns = moves.map((mv, i) => {
     const e = typeEffect(mv.type, foeTypes);
     const tag = e > 1 ? '↑' : e < 1 ? '↓' : '';
     const prio = mv.priority > 0 ? ' ⚡' : '';
-    return `<button class="move-btn t-${mv.type}" data-mv="${i}" title="${mv.priority > 0 ? 'ท่า Priority — โจมตีก่อนเสมอ' : ''}">${mv.name}${prio} <b>${mv.pow}</b>${tag}<span class="mv-acc">🎯${mv.acc}%</span></button>`;
+    const wBoost = weatherBoosted(mv.type) ? ` ${curWeather.emoji}` : '';
+    return `<button class="move-btn t-${mv.type}" data-mv="${i}" title="${mv.priority > 0 ? 'ท่า Priority — โจมตีก่อนเสมอ' : ''}">${mv.name}${prio} <b>${mv.pow}</b>${tag}${wBoost}<span class="mv-acc">🎯${mv.acc}%</span></button>`;
   }).join('');
 
   const canMega = !b.usedMega && !active.mega && !!(megaFormsFor(active.ind.id) || []).find(f => f.key === active.ind.megaKey);
@@ -2595,6 +2602,7 @@ function renderBattle() {
   const foeSpecialBadge = b.special ? `<span class="badge" style="background:${b.special === 'mega' ? 'linear-gradient(90deg,#8e5bff,#5a2ba8)' : b.special === 'gmax' ? 'linear-gradient(90deg,#ff6b6b,#c1122e)' : '#555'}">${b.special === 'mega' ? '💎 MEGA' : b.special === 'gmax' ? '💥 G-MAX' : '⭐ ELITE'}</span>` : '';
 
   $('#battleBox').innerHTML = `
+    ${curWeather.boost && curWeather.boost.length ? `<div style="font-size:11px;color:#9fd3ff;font-weight:700;text-align:center;margin-bottom:4px">${curWeather.emoji} ${curWeather.name} — ท่าธาตุ ${curWeather.boost.join('/')} แรงขึ้น ×1.2</div>` : ''}
     <div class="battle-arena">
       <div class="bt-side foe">
         ${b.mode === 'trainer' ? `<div style="font-size:11px;color:#ffb3bb;font-weight:700">${b.gym.emoji} ${b.gym.name} · เหลือศัตรู ${b.foeQueue.length - b.foeIdx}/${b.foeQueue.length}</div>` : ''}
@@ -2740,7 +2748,7 @@ function foeTurn(b) {
   if (b.foe.status === 'burn') dmg = Math.floor(dmg * 0.6);
   const wasFull = active.hp === active.maxHp;
   active.hp = Math.max(0, active.hp - dmg);
-  b.msg += ` · ${foeName} ใช้ ${mv.name}! ${atkRes.crit ? '🎯คริติคอล! ' : ''}-${dmg}`;
+  b.msg += ` · ${foeName} ใช้ ${mv.name}! ${atkRes.crit ? '🎯คริติคอล! ' : ''}${atkRes.weather ? '🌦️ ' : ''}-${dmg}`;
   b.msg += tryInflict(mv, active, view.types, view.name);
   if (active.hp <= 0 && active.ind.held === 'focus-sash' && !active.sashUsed && wasFull) {
     active.hp = 1; active.sashUsed = true;
@@ -2840,7 +2848,7 @@ function battleAttack(moveIdx) {
   if (wasDynamaxed) dmg = Math.floor(dmg * DYNAMAX_DMG_MULT);   // โบนัสดาเมจไดนาแม็กซ์
   const koMode = b.mode !== 'wild';
   b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - dmg);
-  b.msg += `${view.name} ใช้ ${mv.name}! ${atk.crit ? '🎯 คริติคอล! ' : ''}-${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
+  b.msg += `${view.name} ใช้ ${mv.name}! ${atk.crit ? '🎯 คริติคอล! ' : ''}${atk.weather ? '🌦️ อากาศช่วย! ' : ''}-${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
   b.msg += tryInflict(mv, b.foe, foeTypesForDef, foeNameForMsg);
   if (b.mode === 'wild' && currentSpawn) currentSpawn.hp = b.foeHp;
 
