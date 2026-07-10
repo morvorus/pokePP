@@ -467,6 +467,8 @@ const ACHIEVEMENTS = [
     prog: s => [CONTEST_CATEGORIES.filter(c => ((s.contest && s.contest.ribbons && s.contest.ribbons[c.id]) || 0) > 0).length, CONTEST_CATEGORIES.length] },
   { id: 'firstrival', ico: '🔥', name: 'เอาชนะคู่แข่ง', desc: 'ชนะคู่แข่งประจำตัวครั้งแรก', reward: 300, goal: s => !!s._rivalWon, prog: s => [s._rivalWon ? 1 : 0, 1] },
   { id: 'rival10', ico: '🥇', name: 'จอมยุทธ์คู่แข่ง', desc: 'ชนะคู่แข่งประจำตัวรวม 10 ครั้ง', reward: 1500, goal: s => ((s.rival && s.rival.wins) || 0) >= 10, prog: s => [(s.rival && s.rival.wins) || 0, 10] },
+  { id: 'firstmerchant', ico: '🧳', name: 'นักช้อปเร่ร่อน', desc: 'ซื้อของจากพ่อค้าเร่ครั้งแรก', reward: 150, goal: s => !!s._merchantBought, prog: s => [s._merchantBought ? 1 : 0, 1] },
+  { id: 'firstharvest', ico: '🌾', name: 'ชาวไร่มือใหม่', desc: 'เก็บเกี่ยวไร่เบอร์รี่ครั้งแรก', reward: 150, goal: s => !!s._farmHarvested, prog: s => [s._farmHarvested ? 1 : 0, 1] },
 ];
 
 // รางวัลจบเดกซ์ (กดรับเองเมื่อถึงเกณฑ์)
@@ -1326,6 +1328,9 @@ function harvestPlot(plotIdx) {
   const kind = plot.berry, yieldN = FARM_YIELD[kind];
   state.berries[kind] = (state.berries[kind] || 0) + yieldN;
   state.farm[plotIdx] = { berry: null, readyAt: 0 };
+  bumpQuest('farmHarvest');
+  state._farmHarvested = true;
+  checkAchievements();
   save(); toast(`🌾 เก็บเกี่ยว ${BERRIES[kind].name} ×${yieldN}!`, 'good'); renderFarm(); renderBerryBar();
 }
 function renderFarm() {
@@ -1388,6 +1393,8 @@ function buyFromMerchant(dealId) {
   if (!spend(price)) return;
   deal.give();
   entry.bought = true;
+  state._merchantBought = true;
+  checkAchievements();
   save(); toast(`🧳 ซื้อ ${deal.name} จากพ่อค้าเร่แล้ว!`, 'good'); renderMerchant(); renderTopbar();
 }
 function renderMerchant() {
@@ -2270,6 +2277,8 @@ const QUEST_DEFS = [
   { type: 'fishCatch', gen: () => { const n = rand(2, 5); return { target: n, name: `ตกปลาได้โปเกมอน ${n} ตัว`, rewardCoins: 100 + n * 20, rewardBall: ['net', 2] }; } },
   { type: 'contestEnter', gen: () => { const n = rand(1, 2); return { target: n, name: `ส่งเข้าประกวดคอนเทสต์ ${n} ครั้ง`, rewardCoins: 120, rewardBall: ['premier', 2] }; } },
   { type: 'evolvePokemon', gen: () => { const n = 1; return { target: n, name: `วิวัฒนาการโปเกมอน ${n} ตัว`, rewardCoins: 250, rewardBall: ['ultra', 1] }; } },
+  { type: 'farmHarvest', gen: () => { const n = rand(1, 2); return { target: n, name: `เก็บเกี่ยวไร่เบอร์รี่ ${n} ครั้ง`, rewardCoins: 100, rewardBall: ['great', 2] }; } },
+  { type: 'rivalBattle', gen: () => { const n = 1; return { target: n, name: `ท้าคู่แข่งประจำตัว ${n} ครั้ง`, rewardCoins: 150, rewardBall: ['ultra', 1] }; } },
 ];
 function pickN(arr, n) {   // สุ่มหยิบ n ตัวไม่ซ้ำจาก arr
   const pool = [...arr], out = [];
@@ -3784,6 +3793,7 @@ function startRivalBattle() {
   const members = partyMembers();
   if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
   state.rival.readyAt = Date.now() + RIVAL_CD;
+  bumpQuest('rivalBattle');
   const tl = trainerLevel();
   const rivalLvl = clamp(10 + tl * 3, 10, 100);
   const pool = RIVAL_TEAM_POOL.length ? RIVAL_TEAM_POOL : MONSTERS;
