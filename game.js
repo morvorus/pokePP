@@ -69,9 +69,10 @@ function preloadItems() {
   ].filter(Boolean);
   names.forEach(n => { const i = new Image(); i.src = ITEM_BASE + n + '.png'; });
 }
-// warm cache ล่วงหน้าให้สไปรต์ตกแต่งเขต (mascots) กันจอว่างตอน jsDelivr cold-cache
+// warm cache ล่วงหน้าให้สไปรต์ตกแต่งเขต+อีเวนต์ (mascots) กันจอว่างตอน jsDelivr cold-cache
 function preloadMascots() {
   REGIONS.forEach(r => (r.mascots || []).forEach(id => { const i = new Image(); i.src = SP.gif(id); }));
+  RANDOM_EVENTS.forEach(e => (e.mascots || []).forEach(id => { const i = new Image(); i.src = SP.gif(id); }));
 }
 const SPAWN_MIN = 9000, SPAWN_MAX = 16000;
 const FLEE_MS = 45000;
@@ -138,6 +139,41 @@ const WEATHERS = {
 const NIGHT_BOOST = ['dark', 'ghost', 'psychic', 'fairy'];
 const DAY_BOOST = ['normal', 'grass', 'bug', 'flying', 'fire'];
 const WEATHER_MS = 7 * 60000;   // อากาศเปลี่ยนทุก ~7 นาที
+
+// ===== อีเวนต์สุ่มตามฤดูกาล (World Events) =====
+// โผล่มาเองแบบสุ่มระหว่างเล่น มีธีม/เอฟเฟกต์ต่างกัน ตกแต่งด้วยสไปรต์จริง
+const RANDOM_EVENTS = [
+  { id: 'halloween', name: 'คืนปล่อยผี', emoji: '🎃', types: ['ghost', 'dark', 'poison'],
+    shinyMult: 2.5, coinMult: 1.3, legMult: 2, mascots: [92, 302, 197, 94],
+    tint: 'linear-gradient(180deg, rgba(60,20,80,.5), rgba(20,5,30,.65))', desc: 'ผีและเงามืดออกอาละวาด' },
+  { id: 'newyear', name: 'เทศกาลปีใหม่', emoji: '🎆', types: ['fire', 'fairy', 'normal'],
+    shinyMult: 1.8, coinMult: 1.6, legMult: 1.5, mascots: [39, 700, 133, 143],
+    tint: 'linear-gradient(180deg, rgba(80,20,40,.4), rgba(30,5,20,.55))', desc: 'พลุสว่างไสวทั่วแผ่นดิน' },
+  { id: 'summer', name: 'เทศกาลซัมเมอร์', emoji: '🏖️', types: ['fire', 'water', 'grass'],
+    shinyMult: 1.5, coinMult: 1.2, legMult: 1.2, mascots: [7, 4, 1, 130],
+    tint: 'linear-gradient(180deg, rgba(255,190,60,.3), rgba(255,140,20,.25))', desc: 'แดดจัด โปเกมอนคึกคักผิดปกติ' },
+  { id: 'valentine', name: 'วันแห่งความรัก', emoji: '💗', types: ['fairy', 'normal', 'psychic'],
+    shinyMult: 1.8, coinMult: 1.3, legMult: 1, mascots: [35, 113, 196, 700],
+    tint: 'linear-gradient(180deg, rgba(255,90,150,.3), rgba(150,20,70,.4))', desc: 'มิตรภาพและความรักลอยฟุ้ง' },
+  { id: 'fullmoon', name: 'คืนพระจันทร์เต็มดวง', emoji: '🌕', types: ['dark', 'psychic', 'ghost', 'fairy'],
+    shinyMult: 3, coinMult: 1, legMult: 3, mascots: [302, 127, 197, 94],
+    tint: 'linear-gradient(180deg, rgba(20,30,70,.55), rgba(5,8,25,.7))', desc: 'แสงจันทร์ปลุกพลังลึกลับ · Shiny พุ่ง!' },
+  { id: 'legendhunt', name: 'ล่าตำนาน', emoji: '👑', types: [],
+    shinyMult: 1.3, coinMult: 1.4, legMult: 6, mascots: [144, 145, 146, 150],
+    tint: 'linear-gradient(180deg, rgba(255,203,5,.25), rgba(120,90,0,.35))', desc: 'สัญญาณพลังเลเจนดารีแผ่กระจาย!' },
+  { id: 'goldrush', name: 'ตื่นทอง', emoji: '💰', types: ['ground', 'rock', 'steel'],
+    shinyMult: 1.2, coinMult: 2.5, legMult: 1, mascots: [113, 81, 95, 74],
+    tint: 'linear-gradient(180deg, rgba(255,203,5,.3), rgba(150,110,10,.4))', desc: 'เหรียญกระจายเกลื่อนทุกที่' },
+  { id: 'bugswarm', name: 'ฝูงแมลงบุก', emoji: '🐛', types: ['bug', 'grass', 'poison'],
+    shinyMult: 1.5, coinMult: 1.1, legMult: 1, mascots: [12, 127, 214, 48],
+    tint: 'linear-gradient(180deg, rgba(140,180,40,.35), rgba(60,90,10,.45))', desc: 'ฝูงแมลงอพยพครั้งใหญ่' },
+  { id: 'stormsurge', name: 'พายุคลื่นยักษ์', emoji: '🌊', types: ['water', 'electric', 'ice'],
+    shinyMult: 1.6, coinMult: 1.3, legMult: 1.3, mascots: [130, 131, 9, 116],
+    tint: 'linear-gradient(180deg, rgba(20,80,140,.4), rgba(5,30,60,.55))', desc: 'คลื่นลมแรง โปเกมอนน้ำหนีขึ้นฝั่ง' },
+];
+const EVENT_MS_MIN = 8 * 60000, EVENT_MS_MAX = 18 * 60000;   // อีเวนต์อยู่ 8-18 นาที
+const EVENT_CHECK_MS = 3 * 60000;                              // เช็คทุก 3 นาทีว่าจะสุ่มเกิดไหม
+const EVENT_CHANCE = 0.22;                                     // 22% ต่อการเช็คแต่ละครั้ง
 
 // เบอร์รี่ (โยนก่อนปาบอลเพื่อเพิ่มโอกาสจับ)
 const BERRIES = {
@@ -279,6 +315,8 @@ const ACHIEVEMENTS = [
   { id: 'perfect', ico: '💯', name: 'สมบูรณ์แบบ', desc: 'จับตัวที่ IV 100%', reward: 800, goal: s => s.caught.some(c => ivPercent(c) === 100), prog: s => [Math.max(0, ...s.caught.map(ivPercent), 0), 100] },
   { id: 'boss1', ico: '🏆', name: 'ผู้พิชิตเขต', desc: 'ชนะบอสประจำเขตครั้งแรก', reward: 300, goal: s => Object.keys(s.badges || {}).length >= 1, prog: s => [Object.keys(s.badges || {}).length, 1] },
   { id: 'allregion', ico: '🗺️', name: 'นักเดินทาง', desc: 'ปลดล็อกครบทุกเขต', reward: 700, goal: s => REGIONS.every(r => !r.unlock || s.unlocked[r.id]), prog: s => [REGIONS.filter(r => !r.unlock || s.unlocked[r.id]).length, REGIONS.length] },
+  { id: 'firstevent', ico: '🎉', name: 'ผู้มาเยือนตามฤดู', desc: 'เจออีเวนต์สุ่มตามฤดูกาลครั้งแรก', reward: 200, goal: s => (s.eventHistory || []).length >= 1, prog: s => [(s.eventHistory || []).length, 1] },
+  { id: 'eventmaster', ico: '🌟', name: 'นักล่าอีเวนต์', desc: 'เจออีเวนต์สุ่มครบ 5 ครั้ง', reward: 900, goal: s => (s.eventHistory || []).length >= 5, prog: s => [(s.eventHistory || []).length, 5] },
 ];
 
 // รางวัลจบเดกซ์ (กดรับเองเมื่อถึงเกณฑ์)
@@ -425,6 +463,9 @@ function newSave() {
     region: 'plains',
     unlocked: { plains: true },
     weather: {},         // {regionId:{type,until}}
+    worldEvent: null,    // { id, until } อีเวนต์สุ่มตามฤดูกาลที่กำลังทำงาน
+    nextEventCheck: 0,   // timestamp เช็คอีเวนต์สุ่มครั้งถัดไป
+    eventHistory: [],    // ['id', ...] อีเวนต์ที่เคยเจอ (5 ล่าสุด)
     dexRewards: {},      // {rewardId:true} รับรางวัลจบเดกซ์แล้ว
     badges: {},          // {regionId:true} ชนะบอสแล้ว
     caught: [],          // รายตัว: {uid,id,level,xp,tier,shiny,nature,gender,iv{},locked}
@@ -434,7 +475,8 @@ function newSave() {
     eggs: [],
     quests: [], questDate: '',
     achievements: {},    // {achId:true} รับรางวัลแล้ว
-    settings: { sound: true, music: false, spawnSpeed: 'normal' },
+    settings: { sound: true, music: false, spawnSpeed: 'normal',
+      rareAlerts: true, eventAlerts: true, mascotDeco: true, reduceMotion: false, confirmRelease: true },
     trainerXp: 0,
     streak: 0, lastLogin: '',
     lastSeen: Date.now(), playSec: 0,
@@ -444,10 +486,18 @@ function newSave() {
     createdAt: Date.now(),
   };
 }
+// รวม save เก่า/นอก กับ newSave() — merge แบบ deep เฉพาะ settings กันคีย์ใหม่ที่ save เก่าไม่มีกลายเป็น undefined
+function mergeSave(obj) {
+  const fresh = newSave();
+  const defaultSettings = fresh.settings;   // จับค่า default ไว้ก่อน เพราะ Object.assign ด้านล่างจะรีแอสไซน์ fresh.settings ทิ้ง
+  const merged = Object.assign(fresh, obj || {});
+  merged.settings = Object.assign({}, defaultSettings, (obj && obj.settings) || {});
+  return merged;
+}
 function load() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) { state = Object.assign(newSave(), JSON.parse(raw)); migrateSave(); return; }
+    if (raw) { state = mergeSave(JSON.parse(raw)); migrateSave(); return; }
   } catch (e) { console.warn('load failed', e); }
   state = newSave();
 }
@@ -547,6 +597,7 @@ function logMsg(msg, kind) {
   while (box.children.length > 5) box.lastChild.remove();
 }
 function showRareAlert(mon, tier, shiny) {
+  if (!state.settings.rareAlerts) return;
   const el = $('#rareAlert');
   const label = shiny ? '✨ SHINY!' : '⭐ ' + TIER_LABEL[tier];
   el.className = 'rare-alert' + (shiny ? ' shiny' : '');
@@ -556,6 +607,12 @@ function showRareAlert(mon, tier, shiny) {
   el._t = setTimeout(() => el.classList.add('hidden'), 6000);
 }
 function hideRareAlert() { $('#rareAlert').classList.add('hidden'); }
+function applyReduceMotion() {
+  document.getElementById('app').classList.toggle('reduce-motion', !!state.settings.reduceMotion);
+}
+function confirmAction(msg) {
+  return state.settings.confirmRelease === false ? true : confirm(msg);
+}
 
 // ================================================================
 //  individual pokemon helpers
@@ -726,10 +783,49 @@ function getWeather(regionId) {
   state.weather[regionId] = { type, until: Date.now() + WEATHER_MS };
   return type;
 }
+// ---------- อีเวนต์สุ่มตามฤดูกาล (World Events) ----------
+function currentWorldEvent() {
+  const we = state.worldEvent;
+  if (!we) return null;
+  if (we.until <= Date.now()) { state.worldEvent = null; renderRegionBanner(); return null; }
+  return RANDOM_EVENTS.find(e => e.id === we.id) || null;
+}
+function tryTriggerRandomEvent() {
+  const now = Date.now();
+  if (currentWorldEvent()) return;                     // มีอีเวนต์ทำงานอยู่แล้ว
+  if (now < (state.nextEventCheck || 0)) return;
+  state.nextEventCheck = now + EVENT_CHECK_MS;
+  if (Math.random() < EVENT_CHANCE) activateRandomEvent();
+  save();
+}
+function activateRandomEvent(forceId) {
+  const ev = forceId ? RANDOM_EVENTS.find(e => e.id === forceId) : pick(RANDOM_EVENTS);
+  if (!ev) return;
+  const dur = rand(EVENT_MS_MIN, EVENT_MS_MAX);
+  state.worldEvent = { id: ev.id, until: Date.now() + dur };
+  state.eventHistory = [ev.id, ...(state.eventHistory || [])].slice(0, 8);
+  save(); renderRegionBanner();
+  if (state.settings.eventAlerts) {
+    showEventBanner(ev, Math.round(dur / 60000));
+    playSfx('rare');
+  }
+  logMsg(`${ev.emoji} <b>อีเวนต์เริ่ม: ${ev.name}</b> — ${ev.desc} (${Math.round(dur / 60000)} นาที)`, 'big');
+  checkAchievements();
+}
+function showEventBanner(ev, minutes) {
+  const el = $('#rareAlert');
+  el.className = 'rare-alert event-alert';
+  el.innerHTML = `<div class="ra-tier">${ev.emoji} อีเวนต์สุ่ม!</div><b>${ev.name}</b><br><span style="font-size:11px;opacity:.85">${ev.desc} · ${minutes} นาที</span>`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.add('hidden'), 7000);
+  el.classList.remove('hidden');
+}
 function spawnBoostTypes() {
   const set = new Set();
   (WEATHERS[getWeather(state.region)].boost).forEach(t => set.add(t));
   (timeOfDay() === 'night' ? NIGHT_BOOST : DAY_BOOST).forEach(t => set.add(t));
+  const we = currentWorldEvent();
+  if (we) we.types.forEach(t => set.add(t));
   return set;
 }
 function shinyMultiplier() {
@@ -737,6 +833,8 @@ function shinyMultiplier() {
   if (isEventActive()) m *= 2;         // อีเวนต์สุดสัปดาห์ shiny ×2
   if (timeOfDay() === 'night') m *= 1.3;
   if (boostActive('shiny')) m *= CHARMS.shiny.mult;   // Shiny Charm ×3
+  const we = currentWorldEvent();
+  if (we) m *= we.shinyMult;           // อีเวนต์สุ่มตามฤดูกาล
   return m;
 }
 // ชั้น2 แบบ PokeMeow: Common 40% · Uncommon 30% · Rare 27% · Super Rare 3% (legendary แยกอิสระ)
@@ -781,10 +879,11 @@ function doSpawn() {
     return;
   }
   const r = region();
-  const luck = r.boost + (isEventActive() ? 1 : 0);
+  const we = currentWorldEvent();
+  const luck = r.boost + (isEventActive() ? 1 : 0) + (we ? 1 : 0);
   let mon;
   // ชั้น1: legendary สุ่มแยกอิสระ (1/666 ปรับตามเขต/อีเวนต์)
-  const legChance = LEGENDARY_CHANCE * (1 + r.boost * 0.6) * (isEventActive() ? 2 : 1);
+  const legChance = LEGENDARY_CHANCE * (1 + r.boost * 0.6) * (isEventActive() ? 2 : 1) * (we ? we.legMult : 1);
   const legPool = r._byTier.legendary.length ? r._byTier.legendary : MONSTERS.filter(m => m._tier === 'legendary');
   if (Math.random() < legChance && legPool.length) {
     mon = pick(legPool);
@@ -880,17 +979,31 @@ function renderRegionBanner() {
   $('#rbName').textContent = r.name;
   const w = WEATHERS[getWeather(r.id)];
   const timeIco = timeOfDay() === 'night' ? '🌙' : '☀️';
-  const ev = isEventActive() ? ' · <b style="color:var(--accent)">✨อีเวนต์ x2</b>' : '';
+  const ev = isEventActive() ? ' · <b style="color:var(--accent)">✨อีเวนต์สุดสัปดาห์ x2</b>' : '';
   const safari = (state.safari && state.safari.left > 0) ? ` · <b style="color:#ffd76b">🎫 Safari เหลือ ${state.safari.left}</b>` : '';
   $('#rbLvl').innerHTML = `${timeIco} · ${w.emoji}${w.name}${ev}${safari}`;
   const card = $('#spawnCard');
   card.style.background = r.bg;
   card.classList.toggle('night', timeOfDay() === 'night');
   renderBoostStrip();
-  $('#spawnDeco').innerHTML = mascotDecoHtml(r.mascots);
+
+  const we = currentWorldEvent();
+  const ribbon = $('#eventRibbon');
+  if (we) {
+    const left = Math.max(0, Math.ceil((state.worldEvent.until - Date.now()) / 60000));
+    ribbon.innerHTML = `${we.emoji} <b>${we.name}</b> · ${we.desc} · เหลือ ${left} นาที`;
+    ribbon.classList.remove('hidden');
+    card.querySelector('.scrim').style.background = we.tint;
+    $('#spawnDeco').innerHTML = mascotDecoHtml(we.mascots);
+  } else {
+    ribbon.classList.add('hidden');
+    card.querySelector('.scrim').style.background = '';
+    $('#spawnDeco').innerHTML = mascotDecoHtml(r.mascots);
+  }
 }
 // ตกแต่งด้วยสไปรต์โปเกมอนจริงที่เป็นตัวแทนธีมเขต (ลอย+โปร่งแสง) แทนอีโมจิ
 function mascotDecoHtml(ids) {
+  if (state.settings && state.settings.mascotDeco === false) return '';
   return (ids || []).map((id, i) =>
     `<span class="deco-mon" style="left:${6 + i * 23}%;top:${8 + (i % 3) * 24}%;animation-delay:${i * .7}s">${spriteImg(id, false)}</span>`).join('');
 }
@@ -1066,7 +1179,8 @@ function onCatchSuccess(ballKey) {
   state.totalCaught++;
 
   const amuletMul = 1 + Math.min(state.amulets || 0, AMULET_MAX) * 0.05;   // Amulet Coin
-  const coins = Math.round(TIER_COIN[tier] * (1 + level / 100) * (shiny ? 3 : 1) * amuletMul);
+  const eventCoinMul = currentWorldEvent() ? currentWorldEvent().coinMult : 1;
+  const coins = Math.round(TIER_COIN[tier] * (1 + level / 100) * (shiny ? 3 : 1) * amuletMul * eventCoinMul);
   const xp = Math.round(TIER_XP[tier] * (1 + level / 50) * (boostActive('xp') ? CHARMS.xp.mult : 1));
   state.coins += coins;
 
@@ -1313,7 +1427,7 @@ function bulkSelectAll() {
 function bulkDoRelease() {
   const uids = [...bulkSelected].filter(uid => { const ind = indByUid(uid); return ind && !ind.locked; });
   if (!uids.length) { toast('ไม่มีตัวที่เลือก (หรือถูกล็อกทั้งหมด)', 'bad'); return; }
-  if (!confirm(`ปล่อย ${uids.length} ตัว? (ตัวล็อกจะถูกข้าม)`)) return;
+  if (!confirmAction(`ปล่อย ${uids.length} ตัว? (ตัวล็อกจะถูกข้าม)`)) return;
   let refund = 0;
   uids.forEach(uid => { const ind = indByUid(uid); if (ind) refund += Math.round(TIER_COIN[ind.tier] * 0.4); });
   const set = new Set(uids);
@@ -1522,7 +1636,7 @@ function tradeNpc(uid) {
   const ind = state.caught[idx];
   if (ind.locked) { toast('🔒 ตัวนี้ถูกล็อกอยู่', 'bad'); return; }
   if (inParty(uid)) { toast('❌ เอาออกจากทีมก่อนเทรด', 'bad'); return; }
-  if (!confirm(`เทรด ${MON_BY_ID[ind.id].name} กับ NPC เพื่อสุ่มตัวใหม่? (ตัวเดิมจะหายไป)`)) return;
+  if (!confirmAction(`เทรด ${MON_BY_ID[ind.id].name} กับ NPC เพื่อสุ่มตัวใหม่? (ตัวเดิมจะหายไป)`)) return;
   // สุ่มตัวใหม่: ระดับเดียวกันหรือลุ้นอัปเกรด, เลเวลใกล้เคียง
   let tierIdx = TIER_ORDER.indexOf(ind.tier);
   if (Math.random() < 0.25 && tierIdx < TIER_ORDER.length - 1) tierIdx++;   // 25% ได้ระดับสูงขึ้น
@@ -1781,12 +1895,36 @@ function renderMenu() {
       <div class="toggle${st.music ? ' on' : ''}" id="tMusic"></div>
     </div>
     <div class="set-row">
+      <div class="sr-label">⭐ แจ้งเตือนตัวหายาก<div class="sr-sub">ป๊อปอัพมุมขวาบนเมื่อเจอ Rare/Shiny</div></div>
+      <div class="toggle${st.rareAlerts ? ' on' : ''}" id="tRareAlert"></div>
+    </div>
+    <div class="set-row">
+      <div class="sr-label">🎉 แจ้งเตือนอีเวนต์ฤดูกาล<div class="sr-sub">ป๊อปอัพเมื่ออีเวนต์สุ่มเริ่ม/เพลงพิเศษ</div></div>
+      <div class="toggle${st.eventAlerts ? ' on' : ''}" id="tEventAlert"></div>
+    </div>
+    <div class="set-row">
+      <div class="sr-label">🐾 ตกแต่งด้วยสไปรต์เขต<div class="sr-sub">แสดงโปเกมอนลอยตกแต่งพื้นหลัง (ปิดช่วยเร็วขึ้นบนเครื่องช้า)</div></div>
+      <div class="toggle${st.mascotDeco ? ' on' : ''}" id="tMascotDeco"></div>
+    </div>
+    <div class="set-row">
+      <div class="sr-label">🎬 ลดแอนิเมชัน<div class="sr-sub">ปิดการเคลื่อนไหว/สั่นไหวส่วนใหญ่ (accessibility)</div></div>
+      <div class="toggle${st.reduceMotion ? ' on' : ''}" id="tReduceMotion"></div>
+    </div>
+    <div class="set-row">
+      <div class="sr-label">⚠️ ยืนยันก่อนปล่อย<div class="sr-sub">ถามยืนยันทุกครั้งก่อนปล่อย/เทรดโปเกมอน</div></div>
+      <div class="toggle${st.confirmRelease ? ' on' : ''}" id="tConfirmRelease"></div>
+    </div>
+    <div class="set-row">
       <div class="sr-label">⏱️ ความเร็วการปรากฏ<div class="sr-sub">ปรับเวลารอโปเกมอนใหม่</div></div>
       <select class="set-select" id="selSpeed">
         <option value="fast"${st.spawnSpeed === 'fast' ? ' selected' : ''}>เร็ว</option>
         <option value="normal"${st.spawnSpeed === 'normal' ? ' selected' : ''}>ปกติ</option>
         <option value="slow"${st.spawnSpeed === 'slow' ? ' selected' : ''}>ช้า</option>
       </select>
+    </div>
+    <div class="set-row" style="flex-direction:column;align-items:stretch">
+      <div class="sr-label">🎉 อีเวนต์ฤดูกาลล่าสุด<div class="sr-sub">${(state.eventHistory || []).length ? '' : 'ยังไม่เคยเจออีเวนต์'}</div></div>
+      <div class="badge-strip">${(state.eventHistory || []).map(id => { const e = RANDOM_EVENTS.find(x => x.id === id); return e ? `<span class="pill">${e.emoji} ${e.name}</span>` : ''; }).join('')}</div>
     </div>
     <div class="set-row" style="flex-direction:column;align-items:stretch">
       <div class="sr-label">💾 สำรอง / กู้คืนเซฟ<div class="sr-sub">คัดลอกโค้ดเก็บไว้ หรือวางโค้ดเพื่อกู้คืน (สำคัญเวลาฝังเว็บ)</div></div>
@@ -1804,6 +1942,11 @@ function renderMenu() {
 
   $('#tSound').onclick = () => { st.sound = !st.sound; save(); renderMenu(); };
   $('#tMusic').onclick = () => { st.music = !st.music; save(); st.music ? startMusic() : stopMusic(); renderMenu(); };
+  $('#tRareAlert').onclick = () => { st.rareAlerts = !st.rareAlerts; save(); renderMenu(); };
+  $('#tEventAlert').onclick = () => { st.eventAlerts = !st.eventAlerts; save(); renderMenu(); };
+  $('#tMascotDeco').onclick = () => { st.mascotDeco = !st.mascotDeco; save(); renderMenu(); renderRegionBanner(); };
+  $('#tReduceMotion').onclick = () => { st.reduceMotion = !st.reduceMotion; save(); applyReduceMotion(); renderMenu(); };
+  $('#tConfirmRelease').onclick = () => { st.confirmRelease = !st.confirmRelease; save(); renderMenu(); };
   $('#selSpeed').onchange = e => { st.spawnSpeed = e.target.value; save(); toast('⏱️ ปรับความเร็วแล้ว', 'good'); };
   $('#btnExport').onclick = () => { $('#saveIO').value = exportSave(); toast('📤 สร้างโค้ดเซฟแล้ว — คัดลอกเก็บไว้', 'good'); };
   $('#btnCopy').onclick = () => {
@@ -1959,7 +2102,7 @@ function importSave(code) {
   try { obj = JSON.parse(decodeURIComponent(escape(atob(code)))); }
   catch (e) { try { obj = JSON.parse(code); } catch (e2) { toast('❌ โค้ดเซฟไม่ถูกต้อง', 'bad'); return; } }
   if (!obj || typeof obj !== 'object' || !('caught' in obj)) { toast('❌ โค้ดเซฟไม่ถูกต้อง', 'bad'); return; }
-  state = Object.assign(newSave(), obj);
+  state = mergeSave(obj);
   save();
   toast('✅ กู้คืนเซฟสำเร็จ!', 'good');
   clearSpawn(); renderRegionBanner(); renderTopbar(); renderBallBar(); ensureDailyQuests();
@@ -2510,7 +2653,7 @@ async function initCloud() {
   renderCloudUI();
 }
 function applyCloudSave(data, silent) {
-  state = Object.assign(newSave(), data);
+  state = mergeSave(data);
   migrateSave();
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
   ensureDailyQuests(); fillDexFilter();
@@ -2627,6 +2770,15 @@ function init() {
     state.playSec = (state.playSec || 0) + 20; save();
     if (currentView === 'home') renderRegionBanner();
   }, 20000);
+  // เช็คว่าจะสุ่มเกิดอีเวนต์ฤดูกาลไหม + รีเฟรชป้ายเมื่อหมดเวลา
+  setInterval(() => {
+    const before = !!state.worldEvent;
+    tryTriggerRandomEvent();
+    if (before && !state.worldEvent) renderRegionBanner();   // อีเวนต์เพิ่งหมดเวลา
+    if (currentView === 'home') renderRegionBanner();
+  }, 30000);
+  tryTriggerRandomEvent();   // เช็คทันทีตอนเปิดเกมด้วย (มีโอกาสเกิดตั้งแต่แรก)
+  applyReduceMotion();
   window.addEventListener('beforeunload', () => { state.lastSeen = Date.now(); save(); });
 
   if (!state.tutorialDone) setTimeout(showTutorial, 400);

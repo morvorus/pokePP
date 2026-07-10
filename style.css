@@ -16,6 +16,11 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; }
+/* ปิดแอนิเมชันส่วนใหญ่เมื่อผู้เล่นเปิดตัวเลือก "ลดแอนิเมชัน" */
+#app.reduce-motion *, #app.reduce-motion *::before, #app.reduce-motion *::after {
+  animation-duration: 0.001ms !important; animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important; scroll-behavior: auto !important;
+}
 body {
   font-family: "Segoe UI", "Noto Sans Thai", system-ui, sans-serif;
   background: radial-gradient(1200px 600px at 50% -10%, #23285a 0%, var(--bg) 60%);
@@ -77,6 +82,23 @@ body {
 .rare-alert.hidden { display: none; }
 .rare-alert .ra-tier { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
 @keyframes rareIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
+.rare-alert.event-alert {
+  max-width: 260px; border-color: #ff9d4d;
+  background: linear-gradient(135deg,#4a1f00,#1f0d00);
+  box-shadow: 0 0 26px rgba(255,157,77,.5);
+  line-height: 1.4;
+}
+
+/* ===== Event ribbon (บนหน้าล่า เมื่ออีเวนต์สุ่มทำงาน) ===== */
+.event-ribbon {
+  width: 100%; margin-top: 4px; padding: 8px 12px; border-radius: 10px;
+  background: linear-gradient(90deg, rgba(255,157,77,.22), rgba(255,90,150,.18));
+  border: 1px solid rgba(255,157,77,.5);
+  font-size: 12px; font-weight: 700; text-align: center;
+  animation: eventPulse 2.4s ease-in-out infinite;
+}
+.event-ribbon.hidden { display: none; }
+@keyframes eventPulse { 0%,100%{ opacity:1; } 50%{ opacity:.75; } }
 
 /* ===== Views ===== */
 main { flex: 1; padding: 12px; }
