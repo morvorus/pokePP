@@ -442,6 +442,13 @@ const ACHIEVEMENTS = [
   { id: 'tower10', ico: '🗼', name: 'นักไต่หอคอย', desc: 'ขึ้นหอคอยถึงชั้น 10', reward: 400, goal: s => (s.tower && s.tower.bestFloor || 0) >= 10, prog: s => [(s.tower && s.tower.bestFloor) || 0, 10] },
   { id: 'tower25', ico: '🏯', name: 'ผู้พิชิตหอคอย', desc: 'ขึ้นหอคอยถึงชั้น 25', reward: 1500, goal: s => (s.tower && s.tower.bestFloor || 0) >= 25, prog: s => [(s.tower && s.tower.bestFloor) || 0, 25] },
   { id: 'tower50', ico: '👑', name: 'ราชาหอคอย', desc: 'ขึ้นหอคอยถึงชั้น 50', reward: 5000, goal: s => (s.tower && s.tower.bestFloor || 0) >= 50, prog: s => [(s.tower && s.tower.bestFloor) || 0, 50] },
+  { id: 'firstcrit', ico: '🎯', name: 'จุดอ่อน!', desc: 'โจมตีติดคริติคอลครั้งแรก', reward: 150, goal: s => !!s._critHit, prog: s => [s._critHit ? 1 : 0, 1] },
+  { id: 'firstpriority', ico: '⚡', name: 'ไวเป็นสายฟ้า', desc: 'ใช้ท่า Priority แซงคิวสำเร็จครั้งแรก', reward: 150, goal: s => !!s._usedPriority, prog: s => [s._usedPriority ? 1 : 0, 1] },
+  { id: 'firstweatherhit', ico: '🌦️', name: 'พลังธรรมชาติ', desc: 'โจมตีด้วยท่าที่สภาพอากาศช่วยบูสต์ครั้งแรก', reward: 150, goal: s => !!s._weatherHit, prog: s => [s._weatherHit ? 1 : 0, 1] },
+  { id: 'firstquickclaw', ico: '🍀', name: 'โชคเข้าข้าง', desc: 'Quick Claw แซงคิวโจมตีก่อนสำเร็จครั้งแรก', reward: 200, goal: s => !!s._quickClawSaved, prog: s => [s._quickClawSaved ? 1 : 0, 1] },
+  { id: 'firstgmax', ico: '💥', name: 'ยักษ์ตัวจริง', desc: 'ไดนาแม็กซ์เป็นร่าง G-Max จริงครั้งแรก', reward: 600, goal: s => !!s._gmaxed, prog: s => [s._gmaxed ? 1 : 0, 1] },
+  { id: 'gotmegaring', ico: '💍', name: 'พร้อมเมก้า', desc: 'ปลดล็อกกำไลเมก้า', reward: 300, goal: s => !!s.hasMegaRing, prog: s => [s.hasMegaRing ? 1 : 0, 1] },
+  { id: 'gotdynamaxband', ico: '⌚', name: 'พร้อมไดนาแม็กซ์', desc: 'ปลดล็อกกำไลไดนาแม็กซ์', reward: 300, goal: s => !!s.hasDynamaxBand, prog: s => [s.hasDynamaxBand ? 1 : 0, 1] },
 ];
 
 // รางวัลจบเดกซ์ (กดรับเองเมื่อถึงเกณฑ์)
@@ -1956,8 +1963,8 @@ function renderShop() {
     { emoji: '🥚', name: EGG_KINDS.gold.name + ' ✨', desc: `ฟักครบ ${EGG_KINDS.gold.catches} ตัว · ออก Super Rare/Legendary · ลุ้น Shiny สูง`, price: EGG_KINDS.gold.price, act: () => buyEgg('gold') },
     { emoji: '💎', img: 'shiny-stone', name: 'หินวิวัฒนาการ', desc: 'วิวัฒนาการตัวที่ต้องใช้ไอเทม', price: STONE_PRICE, act: () => { if (spend(STONE_PRICE)) { state.stones = (state.stones || 0) + 1; toast('💎 +1 หินวิวัฒนาการ', 'good'); postBuy(); } } },
     { emoji: '💥', img: 'comet-shard', name: `พลังงานไดนาแม็กซ์ (มี ${state.maxEnergy || 0})`, desc: 'ใช้ครั้งละ 1 ในการต่อสู้ · HP×2 + ดาเมจ +30% เป็นเวลา 3 เทิร์น', price: MAX_ENERGY_PRICE, act: () => { if (spend(MAX_ENERGY_PRICE)) { state.maxEnergy = (state.maxEnergy || 0) + 1; toast('💥 +1 พลังงานไดนาแม็กซ์', 'good'); postBuy(); } } },
-    { emoji: '💍', img: 'mega-ring', name: state.hasMegaRing ? 'กำไลเมก้า (มีแล้ว)' : 'กำไลเมก้า', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนเมก้าอีโวลูชันตัวไหนก็ได้ทั้งหมด', price: MEGA_RING_PRICE, act: () => { if (state.hasMegaRing) { toast('มีกำไลเมก้าอยู่แล้ว', ''); return; } if (spend(MEGA_RING_PRICE)) { state.hasMegaRing = true; toast('💍 ได้กำไลเมก้าแล้ว! เมก้าอีโวลูชันได้ในการต่อสู้', 'good'); postBuy(); } } },
-    { emoji: '⌚', img: 'macho-brace', name: state.hasDynamaxBand ? 'กำไลไดนาแม็กซ์ (มีแล้ว)' : 'กำไลไดนาแม็กซ์', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนไดนาแม็กซ์ตัวไหนก็ได้ทั้งหมด', price: DYNAMAX_BAND_PRICE, act: () => { if (state.hasDynamaxBand) { toast('มีกำไลไดนาแม็กซ์อยู่แล้ว', ''); return; } if (spend(DYNAMAX_BAND_PRICE)) { state.hasDynamaxBand = true; toast('⌚ ได้กำไลไดนาแม็กซ์แล้ว! ไดนาแม็กซ์ได้ในการต่อสู้', 'good'); postBuy(); } } },
+    { emoji: '💍', img: 'mega-ring', name: state.hasMegaRing ? 'กำไลเมก้า (มีแล้ว)' : 'กำไลเมก้า', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนเมก้าอีโวลูชันตัวไหนก็ได้ทั้งหมด', price: MEGA_RING_PRICE, act: () => { if (state.hasMegaRing) { toast('มีกำไลเมก้าอยู่แล้ว', ''); return; } if (spend(MEGA_RING_PRICE)) { state.hasMegaRing = true; toast('💍 ได้กำไลเมก้าแล้ว! เมก้าอีโวลูชันได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
+    { emoji: '⌚', img: 'macho-brace', name: state.hasDynamaxBand ? 'กำไลไดนาแม็กซ์ (มีแล้ว)' : 'กำไลไดนาแม็กซ์', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนไดนาแม็กซ์ตัวไหนก็ได้ทั้งหมด', price: DYNAMAX_BAND_PRICE, act: () => { if (state.hasDynamaxBand) { toast('มีกำไลไดนาแม็กซ์อยู่แล้ว', ''); return; } if (spend(DYNAMAX_BAND_PRICE)) { state.hasDynamaxBand = true; toast('⌚ ได้กำไลไดนาแม็กซ์แล้ว! ไดนาแม็กซ์ได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
     { emoji: '🔮', img: 'shiny-charm', name: `Shiny Charm (${state.shinyCharms || 0}/${SHINY_CHARM_MAX})`, desc: `ติดตัวถาวร เพิ่มโอกาส Shiny +${Math.round(SHINY_CHARM_PER * 100)}% ทบต้น (ไม่หมดอายุ)`, price: SHINY_CHARM_PRICE, act: buyShinyCharm },
     { emoji: CHARMS.catch.emoji, img: CHARMS.catch.img, name: 'Catch Charm', desc: CHARMS.catch.desc + ' · 30 นาที', price: CHARMS.catch.price, act: () => buyCharm('catch') },
     { emoji: CHARMS.xp.emoji, img: CHARMS.xp.img, name: 'XP Charm', desc: CHARMS.xp.desc + ' · 30 นาที', price: CHARMS.xp.price, act: () => buyCharm('xp') },
@@ -2818,6 +2825,7 @@ function battleDynamax() {
   active.maxHp = newMax;
   active.dynamax = { turnsLeft: DYNAMAX_TURNS, isGmax };
   state._dynamaxed = true;
+  if (isGmax) state._gmaxed = true;
   const dispName = isGmax ? gmaxFormFor(active.ind.id).name : MON_BY_ID[active.ind.id].name;
   b.msg = `💥 ${MON_BY_ID[active.ind.id].name} ไดนาแม็กซ์เป็น <b>${dispName}</b>! HP/พลังโจมตีพุ่งขึ้น!`;
   logMsg(`💥 ไดนาแม็กซ์! <b>${dispName}</b>`, 'big');
@@ -2958,14 +2966,17 @@ function battleAttack(moveIdx) {
   const pPrio = mv.priority || 0, fPrio = foeMvPreview.priority || 0;
   let foeFirst = fPrio !== pPrio ? fPrio > pPrio : (b.foeStats.spd > active.stats.spd);
   const quickClawSave = foeFirst && active.ind.held === 'quick-claw' && Math.random() < 0.2;   // Quick Claw: 20% แซงคิวได้แม้ช้ากว่า
-  if (quickClawSave) { foeFirst = false; b.msg += `🍀 Quick Claw! ${view.name} แซงคิวโจมตีก่อน! · `; }
+  if (quickClawSave) { foeFirst = false; b.msg += `🍀 Quick Claw! ${view.name} แซงคิวโจมตีก่อน! · `; state._quickClawSaved = true; }
 
   function playerHalf() {   // คืนค่า true ถ้าเทิร์นจบทันที (KO/ป่าอ่อนแรงสุดขีด) ไม่ต้องรอศัตรูตอบโต้
     if (!rollHit(mv)) {
       b.msg += `${view.name} ใช้ ${mv.name}! แต่พลาดเป้า... 💨`;
       return false;
     }
+    if (pPrio > 0) state._usedPriority = true;
     const atk = calcDamage({ types: view.types }, active.stats, active.ind.level, { types: foeTypesForDef }, b.foeStats, mv, active.ind.held);
+    if (atk.crit) state._critHit = true;
+    if (atk.weather) state._weatherHit = true;
     let dmg = atk.dmg;
     if (active.status === 'burn') dmg = Math.floor(dmg * 0.6);   // ไหม้ลดพลังโจมตี
     if (wasDynamaxed) dmg = Math.floor(dmg * DYNAMAX_DMG_MULT);   // โบนัสดาเมจไดนาแม็กซ์
@@ -3001,13 +3012,14 @@ function battleAttack(moveIdx) {
       const ended = playerHalf();
       if (!ended) endRound(b);
       if (b.mode === 'wild' && currentSpawn) renderSpawn();
-      save(); renderBattle();
+      checkAchievements(); save(); renderBattle();
     });
     return;
   }
 
   const ended = playerHalf();
-  if (ended) { save(); renderBattle(); return; }   // จบเทิร์นทันที ไม่มีฝ่ายสองให้รอ
+  if (ended) { checkAchievements(); save(); renderBattle(); return; }   // จบเทิร์นทันที ไม่มีฝ่ายสองให้รอ
+  checkAchievements();
   const stage1 = b.msg;
   revealTurns(b, stage1, () => {
     b.msg = '';
