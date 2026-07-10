@@ -669,6 +669,7 @@ function newSave() {
     weather: {},         // {regionId:{type,until}}
     worldEvent: null,    // { id, until } อีเวนต์สุ่มตามฤดูกาลที่กำลังทำงาน
     nextEventCheck: 0,   // timestamp เช็คอีเวนต์สุ่มครั้งถัดไป
+    merchant: null,       // { until, stock:[{id,bought}] } พ่อค้าเร่ที่กำลังอยู่ (ถ้ามี)
     eventHistory: [],    // ['id', ...] อีเวนต์ที่เคยเจอ (5 ล่าสุด)
     dexRewards: {},      // {rewardId:true} รับรางวัลจบเดกซ์แล้ว
     badges: {},          // {regionId:true} ชนะบอสแล้ว
@@ -1346,6 +1347,62 @@ function renderFarm() {
 function updateFarmCd() {   // อัปเดตนับถอยหลังไร่เบอร์รี่ทุกวินาที (เรียก renderFarm ใหม่เฉพาะตอนมีแปลงกำลังโต)
   if (!$('#farmBox') || currentView !== 'quest') return;
   if ((state.farm || []).some(p => p.berry)) renderFarm();
+}
+// ===== พ่อค้าเร่ (Wandering Merchant) — โผล่มาแบบสุ่ม มีของลดราคาจำกัดจำนวน =====
+const MERCHANT_CHANCE = 0.04;      // โอกาสโผล่มาต่อการเช็ค (เช็คทุก 30 วิ เหมือนอีเวนต์สุ่ม)
+const MERCHANT_STAY_MS = 15 * 60000;   // อยู่ 15 นาทีถ้าไม่ถูกซื้อหมด
+const MERCHANT_DISCOUNT = 0.7;     // ลดราคา 30%
+const MERCHANT_DEALS = [
+  { id: 'net3',   name: 'Net Ball ×3',    emoji: BALLS.net.emoji,   img: BALLS.net.img,   basePrice: BALLS.net.price * 3,   give: () => { state.balls.net = (state.balls.net || 0) + 3; } },
+  { id: 'dusk3',  name: 'Dusk Ball ×3',   emoji: BALLS.dusk.emoji,  img: BALLS.dusk.img,  basePrice: BALLS.dusk.price * 3,  give: () => { state.balls.dusk = (state.balls.dusk || 0) + 3; } },
+  { id: 'quick3', name: 'Quick Ball ×3',  emoji: BALLS.quick.emoji, img: BALLS.quick.img, basePrice: BALLS.quick.price * 3, give: () => { state.balls.quick = (state.balls.quick || 0) + 3; } },
+  { id: 'ultra2', name: 'Ultra Ball ×2',  emoji: BALLS.ultra.emoji, img: BALLS.ultra.img, basePrice: BALLS.ultra.price * 2, give: () => { state.balls.ultra = (state.balls.ultra || 0) + 2; } },
+  { id: 'candy3', name: 'Rare Candy ×3',  emoji: '🍬', img: 'rare-candy', basePrice: 450, give: () => { state.candies = (state.candies || 0) + 3; } },
+  { id: 'golden2', name: 'Golden Razz ×2', emoji: BERRIES.golden.emoji, img: BERRIES.golden.img, basePrice: BERRIES.golden.price * 2, give: () => { state.berries.golden = (state.berries.golden || 0) + 2; } },
+  { id: 'lifeorb', name: 'Life Orb',      emoji: HELD_ITEMS['life-orb'].emoji,     img: HELD_ITEMS['life-orb'].img,     basePrice: HELD_ITEMS['life-orb'].price,     give: () => { state.heldInv['life-orb'] = (state.heldInv['life-orb'] || 0) + 1; } },
+  { id: 'shellbell', name: 'Shell Bell',  emoji: HELD_ITEMS['shell-bell'].emoji,   img: HELD_ITEMS['shell-bell'].img,   basePrice: HELD_ITEMS['shell-bell'].price,   give: () => { state.heldInv['shell-bell'] = (state.heldInv['shell-bell'] || 0) + 1; } },
+  { id: 'lockbox1', name: 'กล่องสุ่ม (Lockbox)', emoji: '🎁', img: null, basePrice: 1200, give: () => { state.lockboxes = (state.lockboxes || 0) + 1; } },
+];
+function tryTriggerMerchant() {
+  if (state.merchant && state.merchant.until > Date.now()) return;   // อยู่แล้ว ไม่สุ่มซ้ำ
+  if (Math.random() < MERCHANT_CHANCE) spawnMerchant();
+}
+function spawnMerchant() {
+  const picks = pickN(MERCHANT_DEALS, 3);
+  state.merchant = { until: Date.now() + MERCHANT_STAY_MS, stock: picks.map(d => ({ id: d.id, bought: false })) };
+  save();
+  toast('🧳 พ่อค้าเร่ปรากฏตัว! มีของลดราคาจำนวนจำกัด', 'good');
+  logMsg('🧳 พ่อค้าเร่มาเยือน! ของมีจำกัด รีบไปดูในเมนู ⚙️', 'big');
+  if (currentView === 'menu') renderMenu();
+}
+function buyFromMerchant(dealId) {
+  if (!state.merchant || state.merchant.until <= Date.now()) { toast('❌ พ่อค้าเร่จากไปแล้ว', 'bad'); return; }
+  const entry = state.merchant.stock.find(s => s.id === dealId);
+  if (!entry || entry.bought) return;
+  const deal = MERCHANT_DEALS.find(d => d.id === dealId); if (!deal) return;
+  const price = Math.round(deal.basePrice * MERCHANT_DISCOUNT);
+  if (!spend(price)) return;
+  deal.give();
+  entry.bought = true;
+  save(); toast(`🧳 ซื้อ ${deal.name} จากพ่อค้าเร่แล้ว!`, 'good'); renderMerchant(); renderTopbar();
+}
+function renderMerchant() {
+  const box = $('#merchantBox'); if (!box) return;
+  const active = state.merchant && state.merchant.until > Date.now();
+  if (!active) { box.innerHTML = `<div class="sr-sub">ยังไม่มีพ่อค้าเร่ตอนนี้ — เขาจะโผล่มาแบบสุ่มเป็นระยะๆ ระหว่างเล่น</div>`; return; }
+  const left = Math.max(0, Math.ceil((state.merchant.until - Date.now()) / 1000));
+  box.innerHTML = `<div class="sr-sub" style="margin-bottom:6px">⏳ อยู่อีก ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} · ซื้อได้ชิ้นละ 1 เท่านั้น</div>` +
+    state.merchant.stock.map(entry => {
+      const deal = MERCHANT_DEALS.find(d => d.id === entry.id); if (!deal) return '';
+      const price = Math.round(deal.basePrice * MERCHANT_DISCOUNT);
+      return `<div class="preset-row"><span class="pr-name">${itemIcon(deal.emoji, deal.img)} ${deal.name} <s style="color:var(--muted);font-size:10px">${deal.basePrice}🪙</s></span>
+        <div class="pr-actions"><button class="claim-btn${entry.bought ? ' done' : ''}" data-buymerchant="${deal.id}" ${entry.bought ? 'disabled' : ''}>${entry.bought ? 'ซื้อแล้ว ✓' : `${price}🪙`}</button></div></div>`;
+    }).join('');
+  box.querySelectorAll('[data-buymerchant]').forEach(el => el.onclick = () => buyFromMerchant(el.dataset.buymerchant));
+}
+function updateMerchantCd() {
+  if (!$('#merchantBox') || currentView !== 'menu') return;
+  if (state.merchant && state.merchant.until > Date.now()) renderMerchant();
 }
 function fleeSpawn() {
   if (!currentSpawn) return;
@@ -2316,6 +2373,7 @@ function renderMenu() {
   $('#profileBox').querySelectorAll('[data-loadpreset]').forEach(el => el.onclick = () => loadPreset(+el.dataset.loadpreset));
   $('#profileBox').querySelectorAll('[data-delpreset]').forEach(el => el.onclick = () => deletePreset(+el.dataset.delpreset));
   renderHallOfFame();
+  renderMerchant();
   renderCloudUI();
   renderIdle();
   renderTower();
@@ -3907,14 +3965,16 @@ function init() {
     state.playSec = (state.playSec || 0) + 20; save();
     if (currentView === 'home') renderRegionBanner();
   }, 20000);
-  // เช็คว่าจะสุ่มเกิดอีเวนต์ฤดูกาลไหม + รีเฟรชป้ายเมื่อหมดเวลา
+  // เช็คว่าจะสุ่มเกิดอีเวนต์ฤดูกาล/พ่อค้าเร่ไหม + รีเฟรชป้ายเมื่อหมดเวลา
   setInterval(() => {
     const before = !!state.worldEvent;
     tryTriggerRandomEvent();
+    tryTriggerMerchant();
     if (before && !state.worldEvent) renderRegionBanner();   // อีเวนต์เพิ่งหมดเวลา
     if (currentView === 'home') renderRegionBanner();
   }, 30000);
   tryTriggerRandomEvent();   // เช็คทันทีตอนเปิดเกมด้วย (มีโอกาสเกิดตั้งแต่แรก)
+  setInterval(updateMerchantCd, 1000);
   applyReduceMotion();
   window.addEventListener('beforeunload', () => { state.lastSeen = Date.now(); save(); });
 
