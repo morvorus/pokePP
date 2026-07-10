@@ -774,8 +774,13 @@ const REGION_MUSIC = {
   cave:    { root: 48, tempo: 700, wave: 'triangle' },
   volcano: { root: 53, tempo: 470, wave: 'sawtooth' },
   power:   { root: 64, tempo: 430, wave: 'square' },
+  desert:  { root: 58, tempo: 500, wave: 'sawtooth' },
+  swamp:   { root: 50, tempo: 640, wave: 'triangle' },
   snow:    { root: 67, tempo: 640, wave: 'sine' },
+  deepsea: { root: 45, tempo: 680, wave: 'sine' },
   mystic:  { root: 55, tempo: 580, wave: 'triangle' },
+  ruins:   { root: 52, tempo: 600, wave: 'triangle' },
+  sky:     { root: 69, tempo: 460, wave: 'sine' },
 };
 let musicTimer = null, musicStep = 0;
 function midiFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
@@ -1287,6 +1292,7 @@ function enterContest(uid, catId) {
   const name = ind.nick || MON_BY_ID[ind.id].name;
   toast(`${cat.emoji} ${name} ได้ ${rankLabel}! คะแนน ${myScore} (คู่แข่ง ${rivals.join('/')}) +${coins}🪙${extra}`, rank === 1 ? 'good' : '');
   logMsg(`${cat.emoji} คอนเทสต์ ${cat.name}: ${name} ได้ ${rankLabel} (${myScore} คะแนน)${extra}`, rank === 1 ? 'big' : '');
+  if (rank === 1) playSfx('rare');
   checkAchievements(); bumpQuest('contestEnter');
   save(); renderTopbar(); renderContest();
 }
@@ -2416,7 +2422,7 @@ function checkAchievements() {
       any = true;
     }
   });
-  if (any) { save(); renderTopbar(); if (currentView === 'menu') renderMenu(); }
+  if (any) { playSfx('rare'); save(); renderTopbar(); if (currentView === 'menu') renderMenu(); }
 }
 
 // ================================================================
