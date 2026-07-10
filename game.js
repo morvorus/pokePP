@@ -3733,30 +3733,33 @@ function onFoeDown() {
       playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
       return;
     }
-    // ชนะยิม
+    // ชนะยิม — รางวัลเต็มแค่ครั้งแรก กันฟาร์มยิมสูงๆ (โดยเฉพาะแชมป์ 16000🪙) ซ้ำไม่จำกัดจนเศรษฐกิจพัง
     const g = b.gym, first = !state.gymsBeaten[g.id];
     state.gymsBeaten[g.id] = true;
-    state.coins += g.reward;
+    const coinsEarned = first ? g.reward : Math.round(g.reward * 0.3);
+    state.coins += coinsEarned;
     const bp = (GYMS.indexOf(g) + 1) * (first ? 20 : 8);
     state.battlePoints = (state.battlePoints || 0) + bp;
-    const itemMsg = grantItemRewards(g.items);
+    const itemMsg = first ? grantItemRewards(g.items) : '';
     if (first) { state.fishTokens = (state.fishTokens || 0) + 8; state.lockboxes = (state.lockboxes || 0) + 1; }
     gainTrainerXp(150);
-    b.msg = `🏆 ชนะ ${g.emoji} ${g.name}! +${g.reward}🪙 +${bp}🎖️BP${itemMsg ? ' +' + itemMsg : ''}${first ? ' +🎁กล่องสุ่ม (ชนะครั้งแรก!)' : ''}`;
-    logMsg(`🏆 พิชิต <b>${g.name}</b>! +${g.reward}🪙 +${bp}BP ${itemMsg}`, 'big');
+    b.msg = `🏆 ชนะ ${g.emoji} ${g.name}! +${coinsEarned}🪙 +${bp}🎖️BP${itemMsg ? ' +' + itemMsg : ''}${first ? ' +🎁กล่องสุ่ม (ชนะครั้งแรก!)' : ' (ชนะซ้ำ — รางวัลลดลง)'}`;
+    logMsg(`🏆 พิชิต <b>${g.name}</b>! +${coinsEarned}🪙 +${bp}BP ${itemMsg}`, 'big');
     playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
     return;
   }
   b.over = true;
   if (b.isBoss) {
+    const first = !state.badges[b.bossData.region.id];   // รางวัลเต็มแค่ครั้งแรก กันฟาร์มบอสซ้ำไม่จำกัด
     state.badges[b.bossData.region.id] = true;
-    const reward = 200 + b.foeLevel * 10;
-    const bp = 40;
+    const baseReward = 200 + b.foeLevel * 10;
+    const reward = first ? baseReward : Math.round(baseReward * 0.3);
+    const bp = first ? 40 : 15;
     state.coins += reward;
     state.battlePoints = (state.battlePoints || 0) + bp;
-    state.balls.ultra = (state.balls.ultra || 0) + 2;
+    if (first) state.balls.ultra = (state.balls.ultra || 0) + 2;
     gainXpTo(active.ind, Math.round(b.foeLevel * 2.5)); gainTrainerXp(80);
-    b.msg = `🏆 ชนะบอส ${b.foeMon.name}! ได้ 🏅 เหรียญตรา + ${reward}🪙 + ${bp}🎖️BP + Ultra Ball ×2`;
+    b.msg = `🏆 ชนะบอส ${b.foeMon.name}! ได้ 🏅 เหรียญตรา + ${reward}🪙 + ${bp}🎖️BP${first ? ' + Ultra Ball ×2' : ' (ชนะซ้ำ — รางวัลลดลง)'}`;
     logMsg(`🏆 ชนะบอสเขต <b>${b.bossData.region.name}</b>! +${reward}🪙 +${bp}BP`, 'big');
     playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
   } else {
