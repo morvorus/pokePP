@@ -2855,6 +2855,25 @@ function loginCalendarHtml() {
       </div>`;
     }).join('') + `</div>`;
 }
+function readyStatusHtml() {
+  const now = Date.now();
+  const mk = (name, readyAt) => ({ name, ready: (readyAt || 0) <= now, left: (readyAt || 0) - now });
+  const items = [
+    mk('ยิม', state.gymReadyAt),
+    mk('บอส', state.bossReadyAt),
+    mk('คอนเทสต์', state.contest && state.contest.readyAt),
+    mk('คู่แข่ง', state.rival && state.rival.readyAt),
+    mk('ตกปลา', state.fishReadyAt),
+  ];
+  const farm = state.farm || [];
+  const farmReady = farm.filter(p => p.berry && p.readyAt <= now).length;
+  const farmGrowing = farm.filter(p => p.berry && p.readyAt > now).length;
+  const chip = (label, ready, extra) => `<span class="badge" style="font-size:10px;padding:3px 8px;background:${ready ? 'rgba(71,209,108,.25)' : 'rgba(255,255,255,.06)'}">${ready ? '✅' : '⏳'} ${label}${extra || ''}</span>`;
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 2px">` +
+    items.map(it => chip(it.name, it.ready, it.ready ? '' : ` ${Math.ceil(it.left / 1000)}วิ`)).join('') +
+    (farmReady > 0 ? chip('ไร่', true, ` ${farmReady} แปลง`) : farmGrowing > 0 ? `<span class="badge" style="font-size:10px;padding:3px 8px;background:rgba(255,255,255,.06)">🌱 ไร่กำลังโต ${farmGrowing}</span>` : '') +
+    `</div>`;
+}
 function renderProfile() {
   const b = getBuddy();
   const tl = trainerLevel();
@@ -2872,6 +2891,8 @@ function renderProfile() {
       <div><div class="profile-lv">👤 เทรนเนอร์ Lv.${tl}</div>
         <div class="profile-sub">Trainer XP ${state.trainerXp || 0} / ${nextXp} · 🔥 streak ${state.streak || 0} วัน</div></div>
     </div>
+    <div style="margin-top:8px;font-size:12px;font-weight:700">⏱️ สถานะพร้อมใช้</div>
+    ${readyStatusHtml()}
     <div style="margin-top:8px;font-size:12px;font-weight:700">📅 ปฏิทินล็อกอิน (วนทุก 7 วัน)</div>
     ${loginCalendarHtml()}
     <div class="stat-grid">
