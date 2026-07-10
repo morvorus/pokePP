@@ -203,6 +203,71 @@ const HELD_ITEMS = {
 };
 const HELD_ORDER = Object.keys(HELD_ITEMS);
 
+// ===== Mega Evolution — ข้อมูลจริงจาก PokeAPI (สเตตัส/ธาตุ/spriteId ของร่างเมก้าจริง) =====
+// key ของ MEGA_FORMS = id สายพันธุ์ปกติ, ค่าคือ array (บางตัวมี X/Y สองร่าง)
+const MEGA_FORMS = {
+  3:   [{ key: 'venusaur-mega',   spriteId: 10033, stone: 'venusaurite',    name: 'Mega Venusaur',   types: ['grass', 'poison'],   stats: { hp: 80, atk: 100, def: 123, spatk: 122, spdef: 120, spd: 80 } }],
+  6:   [{ key: 'charizard-mega-x', spriteId: 10034, stone: 'charizardite-x', name: 'Mega Charizard X', types: ['fire', 'dragon'],   stats: { hp: 78, atk: 130, def: 111, spatk: 130, spdef: 85, spd: 100 } },
+        { key: 'charizard-mega-y', spriteId: 10035, stone: 'charizardite-y', name: 'Mega Charizard Y', types: ['fire', 'flying'],   stats: { hp: 78, atk: 104, def: 78, spatk: 159, spdef: 115, spd: 100 } }],
+  9:   [{ key: 'blastoise-mega',  spriteId: 10036, stone: 'blastoisinite',  name: 'Mega Blastoise',  types: ['water'],             stats: { hp: 79, atk: 103, def: 120, spatk: 135, spdef: 115, spd: 78 } }],
+  65:  [{ key: 'alakazam-mega',   spriteId: 10037, stone: 'alakazite',      name: 'Mega Alakazam',   types: ['psychic'],           stats: { hp: 55, atk: 50, def: 65, spatk: 175, spdef: 105, spd: 150 } }],
+  94:  [{ key: 'gengar-mega',     spriteId: 10038, stone: 'gengarite',      name: 'Mega Gengar',     types: ['ghost', 'poison'],   stats: { hp: 60, atk: 65, def: 80, spatk: 170, spdef: 95, spd: 130 } }],
+  115: [{ key: 'kangaskhan-mega', spriteId: 10039, stone: 'kangaskhanite',  name: 'Mega Kangaskhan', types: ['normal'],            stats: { hp: 105, atk: 125, def: 100, spatk: 60, spdef: 100, spd: 100 } }],
+  130: [{ key: 'gyarados-mega',   spriteId: 10041, stone: 'gyaradosite',    name: 'Mega Gyarados',   types: ['water', 'dark'],     stats: { hp: 95, atk: 155, def: 109, spatk: 70, spdef: 130, spd: 81 } }],
+  142: [{ key: 'aerodactyl-mega', spriteId: 10042, stone: 'aerodactylite',  name: 'Mega Aerodactyl',  types: ['rock', 'flying'],    stats: { hp: 80, atk: 135, def: 85, spatk: 70, spdef: 95, spd: 150 } }],
+  150: [{ key: 'mewtwo-mega-x',  spriteId: 10043, stone: 'mewtwonite-x',   name: 'Mega Mewtwo X',   types: ['psychic', 'fighting'], stats: { hp: 106, atk: 190, def: 100, spatk: 154, spdef: 100, spd: 130 } },
+        { key: 'mewtwo-mega-y',  spriteId: 10044, stone: 'mewtwonite-y',   name: 'Mega Mewtwo Y',   types: ['psychic'],           stats: { hp: 106, atk: 150, def: 70, spatk: 194, spdef: 120, spd: 140 } }],
+  181: [{ key: 'ampharos-mega',  spriteId: 10045, stone: 'ampharosite',    name: 'Mega Ampharos',   types: ['electric', 'dragon'], stats: { hp: 90, atk: 95, def: 105, spatk: 165, spdef: 110, spd: 45 } }],
+  212: [{ key: 'scizor-mega',    spriteId: 10046, stone: 'scizorite',      name: 'Mega Scizor',     types: ['bug', 'steel'],      stats: { hp: 70, atk: 150, def: 140, spatk: 65, spdef: 100, spd: 75 } }],
+  214: [{ key: 'heracross-mega', spriteId: 10047, stone: 'heracronite',    name: 'Mega Heracross',  types: ['bug', 'fighting'],   stats: { hp: 80, atk: 185, def: 115, spatk: 40, spdef: 105, spd: 75 } }],
+  229: [{ key: 'houndoom-mega',  spriteId: 10048, stone: 'houndoominite',  name: 'Mega Houndoom',   types: ['dark', 'fire'],      stats: { hp: 75, atk: 90, def: 90, spatk: 140, spdef: 90, spd: 115 } }],
+  248: [{ key: 'tyranitar-mega', spriteId: 10049, stone: 'tyranitarite',   name: 'Mega Tyranitar',  types: ['rock', 'dark'],      stats: { hp: 100, atk: 164, def: 150, spatk: 95, spdef: 120, spd: 71 } }],
+  257: [{ key: 'blaziken-mega',  spriteId: 10050, stone: 'blazikenite',    name: 'Mega Blaziken',   types: ['fire', 'fighting'],  stats: { hp: 80, atk: 160, def: 80, spatk: 130, spdef: 80, spd: 100 } }],
+  282: [{ key: 'gardevoir-mega', spriteId: 10051, stone: 'gardevoirite',   name: 'Mega Gardevoir',  types: ['psychic', 'fairy'],  stats: { hp: 68, atk: 85, def: 65, spatk: 165, spdef: 135, spd: 100 } }],
+  303: [{ key: 'mawile-mega',    spriteId: 10052, stone: 'mawilite',       name: 'Mega Mawile',     types: ['steel', 'fairy'],    stats: { hp: 50, atk: 105, def: 125, spatk: 55, spdef: 95, spd: 50 } }],
+  306: [{ key: 'aggron-mega',    spriteId: 10053, stone: 'aggronite',      name: 'Mega Aggron',     types: ['steel'],             stats: { hp: 70, atk: 140, def: 230, spatk: 60, spdef: 80, spd: 50 } }],
+  308: [{ key: 'medicham-mega',  spriteId: 10054, stone: 'medichamite',    name: 'Mega Medicham',   types: ['fighting', 'psychic'], stats: { hp: 60, atk: 100, def: 85, spatk: 80, spdef: 85, spd: 100 } }],
+  310: [{ key: 'manectric-mega', spriteId: 10055, stone: 'manectite',      name: 'Mega Manectric',  types: ['electric'],          stats: { hp: 70, atk: 75, def: 80, spatk: 135, spdef: 80, spd: 135 } }],
+  354: [{ key: 'banette-mega',   spriteId: 10056, stone: 'banettite',      name: 'Mega Banette',    types: ['ghost'],             stats: { hp: 64, atk: 165, def: 75, spatk: 93, spdef: 83, spd: 75 } }],
+  359: [{ key: 'absol-mega',     spriteId: 10057, stone: 'absolite',       name: 'Mega Absol',      types: ['dark'],              stats: { hp: 65, atk: 150, def: 60, spatk: 115, spdef: 60, spd: 115 } }],
+  373: [{ key: 'salamence-mega', spriteId: 10089, stone: 'salamencite',    name: 'Mega Salamence',  types: ['dragon', 'flying'],  stats: { hp: 95, atk: 145, def: 130, spatk: 120, spdef: 90, spd: 120 } }],
+  376: [{ key: 'metagross-mega', spriteId: 10076, stone: 'metagrossite',   name: 'Mega Metagross',  types: ['steel', 'psychic'],  stats: { hp: 80, atk: 145, def: 150, spatk: 105, spdef: 110, spd: 110 } }],
+  384: [{ key: 'rayquaza-mega',  spriteId: 10079, stone: 'red-orb',        name: 'Mega Rayquaza',   types: ['dragon', 'flying'],  stats: { hp: 105, atk: 180, def: 100, spatk: 180, spdef: 100, spd: 115 } }],
+  445: [{ key: 'garchomp-mega',  spriteId: 10058, stone: 'garchompite',    name: 'Mega Garchomp',   types: ['dragon', 'ground'],  stats: { hp: 108, atk: 170, def: 115, spatk: 120, spdef: 95, spd: 92 } }],
+  448: [{ key: 'lucario-mega',   spriteId: 10059, stone: 'lucarionite',    name: 'Mega Lucario',    types: ['fighting', 'steel'], stats: { hp: 70, atk: 145, def: 88, spatk: 140, spdef: 70, spd: 112 } }],
+  460: [{ key: 'abomasnow-mega', spriteId: 10060, stone: 'abomasite',      name: 'Mega Abomasnow',  types: ['grass', 'ice'],      stats: { hp: 90, atk: 132, def: 105, spatk: 132, spdef: 105, spd: 30 } }],
+};
+// ราคาหินเมก้าในร้าน (แพงตามพลัง)
+const MEGA_STONE_PRICE = 3500;
+
+// ===== Gigantamax — สายพันธุ์ที่มีร่าง G-Max จริง (spriteId จาก PokeAPI) =====
+const GMAX_FORMS = {
+  6: { key: 'charizard-gmax', spriteId: 10196, name: 'G-Max Charizard' },
+  12: { key: 'butterfree-gmax', spriteId: 10198, name: 'G-Max Butterfree' },
+  25: { key: 'pikachu-gmax', spriteId: 10199, name: 'G-Max Pikachu' },
+  52: { key: 'meowth-gmax', spriteId: 10200, name: 'G-Max Meowth' },
+  68: { key: 'machamp-gmax', spriteId: 10201, name: 'G-Max Machamp' },
+  94: { key: 'gengar-gmax', spriteId: 10202, name: 'G-Max Gengar' },
+  99: { key: 'kingler-gmax', spriteId: 10203, name: 'G-Max Kingler' },
+  131: { key: 'lapras-gmax', spriteId: 10204, name: 'G-Max Lapras' },
+  133: { key: 'eevee-gmax', spriteId: 10205, name: 'G-Max Eevee' },
+  143: { key: 'snorlax-gmax', spriteId: 10206, name: 'G-Max Snorlax' },
+  569: { key: 'garbodor-gmax', spriteId: 10207, name: 'G-Max Garbodor' },
+  809: { key: 'melmetal-gmax', spriteId: 10208, name: 'G-Max Melmetal' },
+  823: { key: 'corviknight-gmax', spriteId: 10212, name: 'G-Max Corviknight' },
+  826: { key: 'orbeetle-gmax', spriteId: 10213, name: 'G-Max Orbeetle' },
+  834: { key: 'drednaw-gmax', spriteId: 10214, name: 'G-Max Drednaw' },
+  839: { key: 'coalossal-gmax', spriteId: 10215, name: 'G-Max Coalossal' },
+  849: { key: 'toxtricity-gmax', spriteId: 10219, name: 'G-Max Toxtricity' },
+  851: { key: 'centiskorch-gmax', spriteId: 10220, name: 'G-Max Centiskorch' },
+  858: { key: 'hatterene-gmax', spriteId: 10221, name: 'G-Max Hatterene' },
+  892: { key: 'urshifu-gmax', spriteId: 10226, name: 'G-Max Urshifu' },
+};
+const DYNAMAX_TURNS = 3;          // ไดนาแม็กซ์อยู่ได้กี่เทิร์น
+const DYNAMAX_HP_MULT = 2;        // HP ระหว่างไดนาแม็กซ์ ×2
+const DYNAMAX_DMG_MULT = 1.3;     // ดาเมจโบนัสระหว่างไดนาแม็กซ์
+const MAX_ENERGY_PRICE = 600;
+
 // ยิม/เทรนเนอร์ — สู้ทีมหลายตัว ปลดล็อกทีละด่าน (แบบเดินสายยิม PokeMeow)
 const GYMS = [
   { id: 'g1', name: 'ยิมหญ้า',    emoji: '🌿', type: 'grass',    lvl: 18, count: 2, reward: 300 },
@@ -317,6 +382,8 @@ const ACHIEVEMENTS = [
   { id: 'allregion', ico: '🗺️', name: 'นักเดินทาง', desc: 'ปลดล็อกครบทุกเขต', reward: 700, goal: s => REGIONS.every(r => !r.unlock || s.unlocked[r.id]), prog: s => [REGIONS.filter(r => !r.unlock || s.unlocked[r.id]).length, REGIONS.length] },
   { id: 'firstevent', ico: '🎉', name: 'ผู้มาเยือนตามฤดู', desc: 'เจออีเวนต์สุ่มตามฤดูกาลครั้งแรก', reward: 200, goal: s => (s.eventHistory || []).length >= 1, prog: s => [(s.eventHistory || []).length, 1] },
   { id: 'eventmaster', ico: '🌟', name: 'นักล่าอีเวนต์', desc: 'เจออีเวนต์สุ่มครบ 5 ครั้ง', reward: 900, goal: s => (s.eventHistory || []).length >= 5, prog: s => [(s.eventHistory || []).length, 5] },
+  { id: 'firstmega', ico: '💎', name: 'พลังเมก้า', desc: 'เมก้าอีโวลูชันครั้งแรก', reward: 500, goal: s => !!s._megaEvolved, prog: s => [s._megaEvolved ? 1 : 0, 1] },
+  { id: 'firstdynamax', ico: '💥', name: 'ยักษ์ปรากฏ', desc: 'ไดนาแม็กซ์ครั้งแรก', reward: 500, goal: s => !!s._dynamaxed, prog: s => [s._dynamaxed ? 1 : 0, 1] },
 ];
 
 // รางวัลจบเดกซ์ (กดรับเองเมื่อถึงเกณฑ์)
@@ -456,6 +523,8 @@ function newSave() {
     lockboxes: 0,        // กล่องสุ่ม
     catchbot: { pkLvl: 0, durLvl: 0, profLvl: 0, active: false, startedAt: 0 },
     heldInv: {},         // คลัง Held Item ที่ยังไม่ได้สวม {key:count}
+    megaStoneInv: {},    // คลังหินเมก้าที่ยังไม่ได้แนบ {stoneKey:count}
+    maxEnergy: 0,        // พลังงานไดนาแม็กซ์ (ใช้ครั้งละ 1 ในการต่อสู้)
     gymsBeaten: {},      // {gymId:true} ยิมที่ชนะแล้ว
     battlePoints: 0,     // BP จากชนะยิม/บอส ใช้แลกของใน BP Shop
     bpBought: {},        // {itemId: count} จำนวนที่แลกไปแล้ว (ใช้กันของ limited)
@@ -636,8 +705,8 @@ function ivPercent(ind) {
   const sum = Object.values(ind.iv).reduce((a, b) => a + b, 0);
   return Math.round((sum / 186) * 100);
 }
-function calcStats(ind) {
-  const b = MON_BY_ID[ind.id].stats, iv = ind.iv, L = ind.level;
+function calcStats(ind, baseOverride) {
+  const b = baseOverride || MON_BY_ID[ind.id].stats, iv = ind.iv, L = ind.level;
   const nat = NATURES.find(n => n.name === ind.nature) || NATURES[0];
   const s = key => {
     let v = Math.floor((2 * b[key] + iv[key]) * L / 100) + 5;
@@ -653,6 +722,32 @@ function calcStats(ind) {
 function speciesCount(id) { return state.caught.filter(c => c.id === id).length; }
 function indByUid(uid) { return state.caught.find(c => c.uid === uid) || null; }
 function boostActive(type) { return (state.activeBoosts && state.activeBoosts[type] || 0) > Date.now(); }
+// ---------- Mega Evolution / Gigantamax helpers ----------
+function megaFormsFor(id) { return MEGA_FORMS[id] || null; }
+function gmaxFormFor(id) { return GMAX_FORMS[id] || null; }
+function attuneStone(uid, stoneKey) {
+  const ind = indByUid(uid); if (!ind) return;
+  const forms = megaFormsFor(ind.id) || [];
+  const form = forms.find(f => f.stone === stoneKey); if (!form) return;
+  if ((state.megaStoneInv[stoneKey] || 0) <= 0) { toast('❌ ไม่มีหินนี้', 'bad'); return; }
+  if (ind.megaKey) { const prev = forms.find(f => f.key === ind.megaKey); if (prev) state.megaStoneInv[prev.stone] = (state.megaStoneInv[prev.stone] || 0) + 1; }
+  state.megaStoneInv[stoneKey]--;
+  ind.megaKey = form.key;
+  save(); toast(`💎 แนบ ${form.stone} ให้ ${MON_BY_ID[ind.id].name} แล้ว`, 'good');
+}
+function detachStone(uid) {
+  const ind = indByUid(uid); if (!ind || !ind.megaKey) return;
+  const forms = megaFormsFor(ind.id) || [];
+  const form = forms.find(f => f.key === ind.megaKey);
+  if (form) state.megaStoneInv[form.stone] = (state.megaStoneInv[form.stone] || 0) + 1;
+  ind.megaKey = null;
+  save(); toast('ถอดหินเมก้าแล้ว', '');
+}
+function buyMegaStone(stone, price) {
+  if (!spend(price)) return;
+  state.megaStoneInv[stone] = (state.megaStoneInv[stone] || 0) + 1;
+  save(); toast(`💎 ซื้อ ${stone} แล้ว — แนบได้ในหน้าโปเกมอน`, 'good');
+}
 function renderBoostStrip() {
   const el = $('#boostStrip'); if (!el) return;
   const active = CHARM_ORDER.filter(k => boostActive(k));
@@ -1551,6 +1646,29 @@ function heldSectionHtml(ind) {
   }
   return html;
 }
+function megaSectionHtml(ind) {
+  const forms = megaFormsFor(ind.id);
+  const gmax = gmaxFormFor(ind.id);
+  if (!forms && !gmax) return '';
+  let html = '<div class="ms-title">💎 เมก้าอีโวลูชัน / ไดนาแม็กซ์</div>';
+  if (forms) {
+    const attuned = forms.find(f => f.key === ind.megaKey);
+    if (attuned) {
+      html += `<div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px">
+        ${itemIcon('💎', attuned.stone)} <b>${attuned.name}</b>
+        <button class="claim-btn" id="mgUnattach" style="padding:4px 10px">ถอด</button></div>`;
+    }
+    html += `<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:6px">` +
+      forms.filter(f => f.key !== ind.megaKey).map(f => {
+        const have = state.megaStoneInv[f.stone] || 0;
+        return have > 0
+          ? `<button class="pill" data-attune="${f.stone}" style="cursor:pointer;border:none;display:inline-flex;align-items:center;gap:4px">${itemIcon('💎', f.stone)} แนบ ${f.name} ×${have}</button>`
+          : `<button class="pill" data-buystone="${f.stone}" style="cursor:pointer;border:none;display:inline-flex;align-items:center;gap:4px">${itemIcon('💎', f.stone)} ซื้อ ${f.name} (${MEGA_STONE_PRICE}🪙)</button>`;
+      }).join('') + `</div>`;
+  }
+  if (gmax) html += `<div style="font-size:12px;color:var(--muted)">⚡ สายพันธุ์นี้ไดนาแม็กซ์แล้วได้ร่าง <b>${gmax.name}</b> พิเศษ!</div>`;
+  return html;
+}
 function evoText(m) {
   if (!m.evolvesTo) return '';
   const to = MON_BY_ID[m.evolvesTo];
@@ -1589,6 +1707,7 @@ function openIndividualModal(uid) {
       ${getMoves(ind.id).map(mv => `<span class="pill t-${mv.type}" style="color:#fff">${mv.name} <b>${mv.pow}</b></span>`).join('')}
     </div>
     <div class="moveset" id="heldSection">${heldSectionHtml(ind)}</div>
+    ${(megaFormsFor(ind.id) || gmaxFormFor(ind.id)) ? `<div class="moveset" id="megaSection">${megaSectionHtml(ind)}</div>` : ''}
     ${evoText(m)}
     <div class="modal-actions">
       <button class="btn-primary" id="mBuddy" ${isBuddy ? 'disabled' : ''}>${isBuddy ? '⭐ หัวหน้าทีม' : 'ตั้งเป็นหัวหน้า'}</button>
@@ -1629,6 +1748,11 @@ function openIndividualModal(uid) {
   const un = $('#hUnequip'); if (un) un.onclick = () => { unequipHeld(uid); openIndividualModal(uid); };
   $('#modalBox').querySelectorAll('[data-held]').forEach(b =>
     b.onclick = () => { equipHeld(uid, b.dataset.held); openIndividualModal(uid); });
+  const mgu = $('#mgUnattach'); if (mgu) mgu.onclick = () => { detachStone(uid); openIndividualModal(uid); };
+  $('#modalBox').querySelectorAll('[data-attune]').forEach(b =>
+    b.onclick = () => { attuneStone(uid, b.dataset.attune); openIndividualModal(uid); });
+  $('#modalBox').querySelectorAll('[data-buystone]').forEach(b =>
+    b.onclick = () => { buyMegaStone(b.dataset.buystone, MEGA_STONE_PRICE); openIndividualModal(uid); });
 }
 function tradeNpc(uid) {
   const idx = state.caught.findIndex(c => c.uid === uid);
@@ -1694,6 +1818,7 @@ function renderShop() {
     { emoji: '🥚', name: EGG_KINDS.rare.name, desc: `ฟักครบ ${EGG_KINDS.rare.catches} ตัว · ออก Rare/Super Rare`, price: EGG_KINDS.rare.price, act: () => buyEgg('rare') },
     { emoji: '🥚', name: EGG_KINDS.gold.name + ' ✨', desc: `ฟักครบ ${EGG_KINDS.gold.catches} ตัว · ออก Super Rare/Legendary · ลุ้น Shiny สูง`, price: EGG_KINDS.gold.price, act: () => buyEgg('gold') },
     { emoji: '💎', name: 'หินวิวัฒนาการ', desc: 'วิวัฒนาการตัวที่ต้องใช้ไอเทม', price: STONE_PRICE, act: () => { if (spend(STONE_PRICE)) { state.stones = (state.stones || 0) + 1; toast('💎 +1 หินวิวัฒนาการ', 'good'); postBuy(); } } },
+    { emoji: '💥', name: `พลังงานไดนาแม็กซ์ (มี ${state.maxEnergy || 0})`, desc: 'ใช้ครั้งละ 1 ในการต่อสู้ · HP×2 + ดาเมจ +30% เป็นเวลา 3 เทิร์น', price: MAX_ENERGY_PRICE, act: () => { if (spend(MAX_ENERGY_PRICE)) { state.maxEnergy = (state.maxEnergy || 0) + 1; toast('💥 +1 พลังงานไดนาแม็กซ์', 'good'); postBuy(); } } },
     { emoji: CHARMS.shiny.emoji, img: CHARMS.shiny.img, name: 'Shiny Charm', desc: CHARMS.shiny.desc + ' · 30 นาที (กดใช้ในเมนู)', price: CHARMS.shiny.price, act: () => buyCharm('shiny') },
     { emoji: CHARMS.catch.emoji, img: CHARMS.catch.img, name: 'Catch Charm', desc: CHARMS.catch.desc + ' · 30 นาที', price: CHARMS.catch.price, act: () => buyCharm('catch') },
     { emoji: CHARMS.xp.emoji, img: CHARMS.xp.img, name: 'XP Charm', desc: CHARMS.xp.desc + ' · 30 นาที', price: CHARMS.xp.price, act: () => buyCharm('xp') },
@@ -2305,6 +2430,12 @@ function statsWithHeld(ind) {
   if (ind.held === 'assault-vest') s.spdef = Math.floor(s.spdef * 1.5);
   return s;
 }
+function buildBattleTeam(members) {
+  return members.map(ind => {
+    const s = statsWithHeld(ind);
+    return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, status: null, sleepT: 0, mega: null, dynamax: null };
+  });
+}
 function foeChooseMove(foeMon, defTypes) {
   const moves = getMoves(foeMon.id);
   let best = moves[0], score = -1;
@@ -2327,12 +2458,13 @@ function startBattle(isBoss, bossData) {
     foeStats = statsForWild(foeMon, foeLevel);
     foeMaxHp = currentSpawn.maxHp; foeHp = currentSpawn.hp;
   }
-  const team = members.map(ind => { const s = statsWithHeld(ind); return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, status: null, sleepT: 0 }; });
+  const team = buildBattleTeam(members);
   battleState = {
     mode: isBoss ? 'boss' : 'wild',
     isBoss, bossData, foeMon, foeLevel, foeStats, foeHp, foeMaxHp,
     foeQueue: [{ mon: foeMon }], foeIdx: 0,
     team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0 },
+    usedMega: false, usedDynamax: false,
     msg: isBoss ? `👑 บอส ${foeMon.name} ท้าดวล!` : `เจอ ${foeMon.name} ป่า — เลือกท่าโจมตี!`,
   };
   renderBattle();
@@ -2342,6 +2474,7 @@ function renderBattle() {
   const b = battleState; if (!b) return;
   const active = b.team[b.activeIdx];
   const mon = MON_BY_ID[active.ind.id];
+  const view = activeMonView(active);
   const hpCls = (hp, max) => { const p = hp / max * 100; return p <= 20 ? 'crit' : p <= 50 ? 'low' : ''; };
   const foePct = clamp(b.foeHp / b.foeMaxHp * 100, 0, 100);
   const myPct = clamp(active.hp / active.maxHp * 100, 0, 100);
@@ -2359,6 +2492,10 @@ function renderBattle() {
     return `<button class="move-btn t-${mv.type}" data-mv="${i}">${mv.name} <b>${mv.pow}</b>${tag}</button>`;
   }).join('');
 
+  const canMega = !b.usedMega && !active.mega && !!(megaFormsFor(active.ind.id) || []).find(f => f.key === active.ind.megaKey);
+  const canDynamax = !b.usedDynamax && !active.dynamax && (state.maxEnergy || 0) > 0;
+  const specialBadge = view.special ? `<span class="badge" style="background:linear-gradient(90deg,#ff6b6b,#ffcb05)">${active.mega ? '💎 MEGA' : '💥 G-MAX'}</span>` : (active.dynamax ? `<span class="badge" style="background:#e23b4e">💥 DYNAMAX ${active.dynamax.turnsLeft}T</span>` : '');
+
   $('#battleBox').innerHTML = `
     <div class="battle-arena">
       <div class="bt-side foe">
@@ -2368,7 +2505,7 @@ function renderBattle() {
         <div class="hp-txt" style="text-align:left">HP ${Math.ceil(b.foeHp)}/${b.foeMaxHp}</div>
       </div>
       <div class="bt-side me">
-        <div class="bt-head">${spriteImg(active.ind.id, active.ind.shiny)}<span>${mon.name} Lv.${active.ind.level} ${genderIcon(active.ind.gender)} ${statusBadge(active.status)}</span></div>
+        <div class="bt-head">${spriteImg(view.spriteId, view.special ? false : active.ind.shiny)}<span>${view.name} Lv.${active.ind.level} ${genderIcon(active.ind.gender)} ${statusBadge(active.status)} ${specialBadge}</span></div>
         <div class="bt-hpbar"><div class="${hpCls(active.hp, active.maxHp)}" style="width:${myPct}%"></div></div>
         <div class="hp-txt" style="text-align:right">HP ${Math.ceil(active.hp)}/${active.maxHp}</div>
       </div>
@@ -2377,7 +2514,11 @@ function renderBattle() {
     <div class="bt-log">${b.msg}</div>
     ${b.over
       ? `<div class="bt-actions"><button class="bt-flee" id="btDone">ปิด</button></div>`
-      : `<div class="move-grid">${moveBtns}</div>
+      : `${(canMega || canDynamax) ? `<div class="bt-actions" style="margin-bottom:6px">
+           ${canMega ? `<button class="bt-flee" id="btMega" style="background:linear-gradient(180deg,#8e5bff,#5a2ba8);color:#fff">💎 เมก้าอีโวลูชัน</button>` : ''}
+           ${canDynamax ? `<button class="bt-flee" id="btDynamax" style="background:linear-gradient(180deg,#ff6b6b,#c1122e);color:#fff">💥 ไดนาแม็กซ์ (${state.maxEnergy}⚡)</button>` : ''}
+         </div>` : ''}
+         <div class="move-grid">${moveBtns}</div>
          <div class="bt-actions"><button class="bt-flee" id="btFlee">${b.isBoss ? 'ยอมแพ้' : 'หนี'}</button></div>`}`;
 
   if (b.over) $('#btDone').onclick = endBattle;
@@ -2385,6 +2526,8 @@ function renderBattle() {
     $('#btFlee').onclick = endBattle;
     $('#battleBox').querySelectorAll('.move-btn[data-mv]').forEach(el => el.onclick = () => battleAttack(+el.dataset.mv));
     $('#battleBox').querySelectorAll('.team-chip[data-sw]').forEach(el => el.onclick = () => battleSwitch(+el.dataset.sw));
+    const mgBtn = $('#btMega'); if (mgBtn) mgBtn.onclick = battleMegaEvolve;
+    const dyBtn = $('#btDynamax'); if (dyBtn) dyBtn.onclick = battleDynamax;
   }
 }
 // ===== สถานะผิดปกติ (Status) =====
@@ -2409,6 +2552,60 @@ function canAct(ent) {   // ตรวจว่าขยับได้ไหม 
   if (st === 'para' && Math.random() < 0.25) return { can: false, note: 'อัมพาต ขยับไม่ได้' };
   return { can: true };
 }
+// ===== Mega Evolution / Dynamax ระหว่างการต่อสู้ =====
+// คืนธาตุ/สไปรต์/ชื่อ "ที่ใช้จริงตอนนี้" ของฝั่งผู้เล่น (ปกติ/เมก้า/G-Max) — ไม่แก้ข้อมูลตัวจริงถาวร
+function activeMonView(active) {
+  const base = MON_BY_ID[active.ind.id];
+  if (active.mega) return { types: active.mega.types, spriteId: active.mega.spriteId, name: active.mega.name, special: true };
+  if (active.dynamax && active.dynamax.isGmax) {
+    const g = gmaxFormFor(active.ind.id);
+    return { types: base.types, spriteId: g.spriteId, name: g.name, special: true };
+  }
+  return { types: base.types, spriteId: active.ind.id, name: base.name, special: false };
+}
+function battleMegaEvolve() {
+  const b = battleState; if (!b || b.over || b.usedMega) return;
+  const active = b.team[b.activeIdx];
+  const forms = megaFormsFor(active.ind.id) || [];
+  const form = forms.find(f => f.key === active.ind.megaKey);
+  if (!form) { toast('❌ ไม่มีหินเมก้าแนบอยู่ (แนบได้ในหน้าโปเกมอน)', 'bad'); return; }
+  const newStats = calcStats(active.ind, form.stats);
+  const gained = newStats.hp - active.maxHp;
+  active.maxHp = newStats.hp; active.hp = Math.max(1, active.hp + gained);
+  active.stats = newStats;
+  active.mega = form;
+  b.usedMega = true;
+  state._megaEvolved = true;
+  b.msg = `💎 ${MON_BY_ID[active.ind.id].name} เมก้าอีโวลูชันเป็น <b>${form.name}</b>!`;
+  logMsg(`💎 เมก้าอีโวลูชัน: <b>${form.name}</b>!`, 'big');
+  playSfx('rare'); checkAchievements();
+  save(); renderBattle();
+}
+function battleDynamax() {
+  const b = battleState; if (!b || b.over || b.usedDynamax) return;
+  if ((state.maxEnergy || 0) <= 0) { toast('❌ ไม่มีพลังงานไดนาแม็กซ์ (ซื้อได้ที่ร้าน)', 'bad'); return; }
+  const active = b.team[b.activeIdx];
+  state.maxEnergy--; b.usedDynamax = true;
+  const isGmax = !!gmaxFormFor(active.ind.id);
+  const newMax = Math.round(active.maxHp * DYNAMAX_HP_MULT);
+  active.hp = active.hp + (newMax - active.maxHp);
+  active.maxHp = newMax;
+  active.dynamax = { turnsLeft: DYNAMAX_TURNS, isGmax };
+  state._dynamaxed = true;
+  const dispName = isGmax ? gmaxFormFor(active.ind.id).name : MON_BY_ID[active.ind.id].name;
+  b.msg = `💥 ${MON_BY_ID[active.ind.id].name} ไดนาแม็กซ์เป็น <b>${dispName}</b>! HP/พลังโจมตีพุ่งขึ้น!`;
+  logMsg(`💥 ไดนาแม็กซ์! <b>${dispName}</b>`, 'big');
+  playSfx('rare'); checkAchievements();
+  save(); renderBattle();
+}
+function revertDynamax(active, b) {
+  if (!active.dynamax) return;
+  const origMax = Math.round(active.maxHp / DYNAMAX_HP_MULT);
+  active.hp = Math.max(1, Math.round(active.hp / DYNAMAX_HP_MULT));
+  active.maxHp = origMax;
+  active.dynamax = null;
+  if (b) b.msg += ` · ${MON_BY_ID[active.ind.id].name} คืนร่างจากไดนาแม็กซ์`;
+}
 function tryInflict(move, target, targetTypes, name) {
   if (target.status) return '';
   const ts = TYPE_STATUS[move.type]; if (!ts) return '';
@@ -2424,16 +2621,17 @@ function foeTurn(b) {
   if (b.over) return;
   const active = b.team[b.activeIdx];
   const aMon = MON_BY_ID[active.ind.id];
+  const view = activeMonView(active);
   const gate = canAct(b.foe);
   if (gate.note) b.msg += ` · ${b.foeMon.name} ${gate.note}`;
   if (!gate.can) return;
-  const mv = foeChooseMove(b.foeMon, aMon.types);
-  let dmg = calcDamage(b.foeMon, b.foeStats, b.foeLevel, aMon, active.stats, mv).dmg;
+  const mv = foeChooseMove(b.foeMon, view.types);
+  let dmg = calcDamage(b.foeMon, b.foeStats, b.foeLevel, { types: view.types }, active.stats, mv).dmg;
   if (b.foe.status === 'burn') dmg = Math.floor(dmg * 0.6);
   const wasFull = active.hp === active.maxHp;
   active.hp = Math.max(0, active.hp - dmg);
   b.msg += ` · ${b.foeMon.name} ใช้ ${mv.name}! -${dmg}`;
-  b.msg += tryInflict(mv, active, aMon.types, aMon.name);
+  b.msg += tryInflict(mv, active, view.types, view.name);
   if (active.hp <= 0 && active.ind.held === 'focus-sash' && !active.sashUsed && wasFull) {
     active.hp = 1; active.sashUsed = true;
     b.msg += ` · 🎗️ ${aMon.name} ยึด Focus Sash รอดมาได้!`;
@@ -2447,6 +2645,13 @@ function faintActive(b, aMon) {
     b.over = true; b.lost = true;
     b.msg += b.mode === 'wild' ? ` · แต่โปเกมอนป่ายังเหลือ HP ${Math.ceil(b.foeHp)}` : ' · แพ้! ลองใหม่';
   } else { b.activeIdx = next; b.msg += ` ส่ง ${MON_BY_ID[b.team[next].ind.id].name} ลงสนาม!`; }
+}
+// นับถอยหลังไดนาแม็กซ์ — เรียกทุกครั้งที่ผู้เล่นขยับ (ไม่ว่าผลจะเป็นอย่างไร กันเทิร์นหลุดตอน KO ทันที)
+function tickDynamax(active, b) {
+  if (active && active.hp > 0 && active.dynamax) {
+    active.dynamax.turnsLeft--;
+    if (active.dynamax.turnsLeft <= 0) revertDynamax(active, b);
+  }
 }
 function endRound(b) {
   if (b.over) return;
@@ -2473,21 +2678,25 @@ function battleAttack(moveIdx) {
   const b = battleState; if (!b || b.over) return;
   const active = b.team[b.activeIdx];
   const mon = MON_BY_ID[active.ind.id];
+  const view = activeMonView(active);
   const mv = getMoves(active.ind.id)[moveIdx] || getMoves(active.ind.id)[0];
   b.msg = '';
   const gate = canAct(active);
   if (gate.note) b.msg += `${mon.name} ${gate.note} · `;
+  const wasDynamaxed = !!active.dynamax;   // เช็คก่อน tick เพื่อใช้คำนวณโบนัสดาเมจของเทิร์นนี้
+  tickDynamax(active, b);                  // เทิร์นผู้เล่นผ่านไปแล้ว นับถอยหลังเสมอไม่ว่าผลจะเป็นอย่างไร
   if (!gate.can) {                        // ผู้เล่นขยับไม่ได้ → ข้ามไปเทิร์นศัตรู
     foeTurn(b); endRound(b);
     if (b.mode === 'wild' && currentSpawn) renderSpawn();
     save(); renderBattle(); return;
   }
-  let atk = calcDamage(mon, active.stats, active.ind.level, b.foeMon, b.foeStats, mv, active.ind.held);
+  let atk = calcDamage({ types: view.types }, active.stats, active.ind.level, b.foeMon, b.foeStats, mv, active.ind.held);
   let dmg = atk.dmg;
   if (active.status === 'burn') dmg = Math.floor(dmg * 0.6);   // ไหม้ลดพลังโจมตี
+  if (wasDynamaxed) dmg = Math.floor(dmg * DYNAMAX_DMG_MULT);   // โบนัสดาเมจไดนาแม็กซ์
   const koMode = b.mode !== 'wild';
   b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - dmg);
-  b.msg += `${mon.name} ใช้ ${mv.name}! -${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
+  b.msg += `${view.name} ใช้ ${mv.name}! -${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
   b.msg += tryInflict(mv, b.foe, b.foeMon.types, b.foeMon.name);
   if (b.mode === 'wild' && currentSpawn) currentSpawn.hp = b.foeHp;
 
@@ -2606,11 +2815,12 @@ function startTrainerBattle(gymId) {
     const lv = g.lvl + rand(-2, 2) + (i === g.count - 1 ? 3 : 0);   // ตัวสุดท้ายแรงกว่า
     queue.push(makeFoeDef(mon, lv));
   }
-  const team = members.map(ind => { const s = statsWithHeld(ind); return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, status: null, sleepT: 0 }; });
+  const team = buildBattleTeam(members);
   battleState = {
     mode: 'trainer', isBoss: false, gym: g, foeQueue: queue, foeIdx: 0,
     foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp,
     team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0 },
+    usedMega: false, usedDynamax: false,
     msg: `${g.emoji} ${g.name} — ศัตรู ${g.count} ตัว! เลือกท่าโจมตี`,
   };
   renderBattle();
