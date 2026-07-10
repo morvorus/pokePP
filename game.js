@@ -660,6 +660,7 @@ function newSave() {
     seen: {},            // {id:true}
     party: [],           // [uid,...] ทีมสูงสุด 6 ตัว (party[0] = หัวหน้า/Buddy)
     buddyUid: null,      // เก็บไว้เผื่อ save เก่า (ใช้ party แทน)
+    teamPresets: [null, null, null],   // ชุดทีมสำรอง 3 ช่อง {name, uids:[...]}
     eggs: [],
     quests: [], questDate: '',
     achievements: {},    // {achId:true} รับรางวัลแล้ว
@@ -2250,6 +2251,9 @@ function renderMenu() {
   $('#profileBox').innerHTML = renderProfile();
   $('#profileBox').querySelectorAll('.party-mini[data-uid]').forEach(el =>
     el.onclick = () => openIndividualModal(el.dataset.uid));
+  $('#profileBox').querySelectorAll('[data-savepreset]').forEach(el => el.onclick = () => savePreset(+el.dataset.savepreset));
+  $('#profileBox').querySelectorAll('[data-loadpreset]').forEach(el => el.onclick = () => loadPreset(+el.dataset.loadpreset));
+  $('#profileBox').querySelectorAll('[data-delpreset]').forEach(el => el.onclick = () => deletePreset(+el.dataset.delpreset));
   renderCloudUI();
   renderIdle();
   renderTower();
@@ -2660,7 +2664,46 @@ function renderProfile() {
     </div>
     <div style="margin-top:6px;font-size:11px;color:var(--muted)">🪙 Amulet Coin ${state.amulets || 0}/${AMULET_MAX} (เงิน +${(state.amulets || 0) * 5}%)</div>
     <div style="margin-top:10px;font-size:12px;font-weight:700">👥 ทีม (${state.party.length}/6)</div>
-    ${partyStrip}</div>`;
+    ${partyStrip}
+    <div style="margin-top:12px;font-size:12px;font-weight:700">💾 ชุดทีมสำรอง</div>
+    ${presetsHtml()}</div>`;
+}
+function presetsHtml() {
+  return `<div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">` +
+    state.teamPresets.map((p, i) => {
+      if (!p) return `<div class="preset-row"><span style="color:var(--muted)">ช่อง ${i + 1}: ว่าง</span>
+        <div class="pr-actions"><button class="claim-btn" data-savepreset="${i}">บันทึกทีมปัจจุบัน</button></div></div>`;
+      const sprites = p.uids.slice(0, 6).map(uid => { const ind = indByUid(uid); return ind ? spriteImg(ind.id, ind.shiny, 'preset-mini') : ''; }).join('');
+      return `<div class="preset-row"><span class="pr-name"><b>${p.name}</b> ${sprites}</span>
+        <div class="pr-actions">
+          <button class="claim-btn" data-loadpreset="${i}">โหลด</button>
+          <button class="claim-btn done" data-savepreset="${i}">บันทึกทับ</button>
+          <button class="claim-btn done" data-delpreset="${i}">ลบ</button>
+        </div></div>`;
+    }).join('') + `</div>`;
+}
+function savePreset(slot) {
+  if (!state.party.length) { toast('❌ ต้องมีตัวในทีมก่อนถึงจะบันทึกได้', 'bad'); return; }
+  const cur = state.teamPresets[slot];
+  const name = (prompt('ตั้งชื่อชุดทีม:', cur ? cur.name : `ชุดที่ ${slot + 1}`) || '').trim().slice(0, 16);
+  if (!name) return;
+  state.teamPresets[slot] = { name, uids: [...state.party] };
+  save(); toast(`💾 บันทึกชุดทีม "${name}" แล้ว`, 'good'); renderMenu();
+}
+function loadPreset(slot) {
+  const p = state.teamPresets[slot]; if (!p) return;
+  const validUids = p.uids.filter(uid => state.caught.some(c => c.uid === uid));
+  if (!validUids.length) { toast('❌ ตัวในชุดนี้ไม่อยู่ในคลังแล้วทั้งหมด', 'bad'); return; }
+  state.party = validUids;
+  state.buddyUid = validUids[0];
+  save(); toast(`👥 โหลดชุดทีม "${p.name}" แล้ว (${validUids.length}/${p.uids.length} ตัว)`, 'good');
+  renderCurrentView();
+}
+function deletePreset(slot) {
+  const p = state.teamPresets[slot]; if (!p) return;
+  if (!confirmAction(`ลบชุดทีม "${p.name}"?`)) return;
+  state.teamPresets[slot] = null;
+  save(); renderMenu();
 }
 
 // ================================================================

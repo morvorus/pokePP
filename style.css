@@ -533,6 +533,11 @@ main { flex: 1; padding: 12px; }
 .party-mini.lead { border-color: var(--accent); }
 .party-mini img { width: 36px; height: 36px; object-fit: contain; image-rendering: pixelated; }
 .party-mini .pm-lv { position: absolute; bottom: -2px; right: 2px; font-size: 8px; font-weight: 800; background: rgba(0,0,0,.7); padding: 0 3px; border-radius: 5px; }
+.preset-mini { width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; vertical-align: middle; }
+.preset-row { display: flex; justify-content: space-between; align-items: center; gap: 6px; background: var(--card); border-radius: 10px; padding: 8px 10px; font-size: 12px; }
+.preset-row .pr-name { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.preset-row .pr-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.preset-row .pr-actions button { padding: 5px 10px; font-size: 11px; }
 
 /* profile / stats */
 .profile-card { background: linear-gradient(135deg,var(--accent2),#2a4a8a); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
