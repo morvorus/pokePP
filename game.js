@@ -2733,20 +2733,32 @@ function resetGame() {
 }
 
 // ================================================================
-//  OFFLINE REWARDS + DAILY LOGIN STREAK
+//  OFFLINE REWARDS + DAILY LOGIN CALENDAR (วนทุก 7 วัน เห็นล่วงหน้าได้ว่าแต่ละวันได้อะไร)
 // ================================================================
+const LOGIN_CALENDAR = [
+  { day: 1, coins: 80,  ball: ['poke', 3] },
+  { day: 2, coins: 120, ball: ['poke', 5] },
+  { day: 3, coins: 180, ball: ['great', 2] },
+  { day: 4, coins: 240, ball: ['great', 3] },
+  { day: 5, coins: 320, ball: ['ultra', 1] },
+  { day: 6, coins: 420, ball: ['ultra', 2] },
+  { day: 7, coins: 800, ball: ['ultra', 3], lockbox: 1 },   // วันที่ 7 ของรอบ — รางวัลใหญ่ ก่อนวนกลับวันที่ 1
+];
+function loginCycleDay(streak) { return ((Math.max(1, streak) - 1) % 7) + 1; }   // 1-7 วนทุกสัปดาห์ (ไม่รีเซ็ต streak สะสมจริง)
 function applyDailyLogin() {
   const today = todayStr();
   if (state.lastLogin === today) return;
   const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   state.streak = (state.lastLogin === y) ? (state.streak || 0) + 1 : 1;
   state.lastLogin = today;
-  const coins = 40 + state.streak * 20;
-  const ballN = Math.min(2 + state.streak, 12);
-  state.coins += coins; state.balls.poke += ballN;
-  if (state.streak % 5 === 0) { state.balls.ultra = (state.balls.ultra || 0) + 1; }
+  const cd = LOGIN_CALENDAR[loginCycleDay(state.streak) - 1];
+  state.coins += cd.coins;
+  state.balls[cd.ball[0]] = (state.balls[cd.ball[0]] || 0) + cd.ball[1];
+  if (cd.lockbox) state.lockboxes = (state.lockboxes || 0) + cd.lockbox;
   save();
-  setTimeout(() => toast(`📅 ล็อกอินวันที่ ${state.streak} ติดต่อกัน! +${coins}🪙 +${ballN}🔴${state.streak % 5 === 0 ? ' +Ultra🟡' : ''}`, 'good'), 600);
+  const ballTxt = `${cd.ball[1]}${BALLS[cd.ball[0]].emoji}`;
+  const lockboxTxt = cd.lockbox ? ` +${cd.lockbox}🎁` : '';
+  setTimeout(() => toast(`📅 ล็อกอินวันที่ ${state.streak} ติดต่อกัน (วันที่ ${loginCycleDay(state.streak)}/7)! +${cd.coins}🪙 +${ballTxt}${lockboxTxt}`, 'good'), 600);
 }
 function applyOfflineRewards() {
   const now = Date.now();
@@ -2828,6 +2840,21 @@ function avgIv() {
   if (!state.caught.length) return 0;
   return Math.round(state.caught.reduce((s, c) => s + ivPercent(c), 0) / state.caught.length);
 }
+function loginCalendarHtml() {
+  const todayCycle = loginCycleDay(state.streak || 1);
+  return `<div style="display:flex;gap:4px;margin:4px 0 2px">` +
+    LOGIN_CALENDAR.map(cd => {
+      const isToday = cd.day === todayCycle, isPast = cd.day < todayCycle, isBig = cd.day === 7;
+      const bg = isToday ? 'var(--accent)' : isPast ? 'rgba(71,209,108,.15)' : 'var(--card)';
+      const fg = isToday ? '#3a2c00' : 'var(--muted)';
+      return `<div style="flex:1;min-width:0;text-align:center;padding:4px 1px;border-radius:8px;background:${bg};
+        border:1px solid ${isBig ? 'rgba(255,203,5,.5)' : 'rgba(255,255,255,.08)'}">
+        <div style="font-size:8px;font-weight:800;color:${fg}">วัน${cd.day}</div>
+        <div style="height:20px;display:flex;align-items:center;justify-content:center">${isPast ? '<span style="font-size:13px">✅</span>' : itemIcon('🎁', isBig ? null : BALLS[cd.ball[0]].img, 'price-ico')}</div>
+        <div style="font-size:8px;color:${fg}">${cd.coins}🪙</div>
+      </div>`;
+    }).join('') + `</div>`;
+}
 function renderProfile() {
   const b = getBuddy();
   const tl = trainerLevel();
@@ -2845,6 +2872,8 @@ function renderProfile() {
       <div><div class="profile-lv">👤 เทรนเนอร์ Lv.${tl}</div>
         <div class="profile-sub">Trainer XP ${state.trainerXp || 0} / ${nextXp} · 🔥 streak ${state.streak || 0} วัน</div></div>
     </div>
+    <div style="margin-top:8px;font-size:12px;font-weight:700">📅 ปฏิทินล็อกอิน (วนทุก 7 วัน)</div>
+    ${loginCalendarHtml()}
     <div class="stat-grid">
       <div class="stat-tile"><div class="st-num">${speciesOwnedCount()}/${MONSTERS.length}</div><div class="st-lbl">📖 เดกซ์ (${dexPct}%)</div></div>
       <div class="stat-tile"><div class="st-num">${state.totalCaught}</div><div class="st-lbl">🎯 จับรวม</div></div>
