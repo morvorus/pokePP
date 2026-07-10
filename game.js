@@ -1948,6 +1948,7 @@ function openIndividualModal(uid) {
       <span class="pill rarity-${ind.shiny ? 'shiny' : ind.tier}" style="color:#fff">${ind.shiny ? 'Shiny' : TIER_LABEL[ind.tier]}</span>
       <span class="pill">IV ${ivPercent(ind)}%</span>
       <span class="pill" title="มิตรภาพ ${ind.friend || 0}/${FRIEND_MAX}">${'❤️'.repeat(Math.ceil((ind.friend || 0) / 20)) || '🤍'} ${ind.friend || 0}</span>
+      ${abilityFor(ind.id) ? `<span class="pill" title="${abilityFor(ind.id).desc}">🧬 ${abilityFor(ind.id).name}</span>` : ''}
     </div>
     <div class="tags" style="justify-content:center;margin-bottom:12px">
       ${typeBadges(m.types)}</div>
@@ -2843,20 +2844,62 @@ function stageBadges(stages) {   // แสดง badge สเตตัสที�
   return Object.keys(stages).filter(k => stages[k]).map(k =>
     `<span class="badge" style="font-size:9px;padding:1px 5px;background:${stages[k] > 0 ? 'rgba(71,209,108,.3)' : 'rgba(255,93,108,.3)'}">${STAT_LABEL[k]}${stages[k] > 0 ? '+' : ''}${stages[k]}</span>`).join(' ');
 }
-function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move, held) {
+// ===== Ability ติดตัว — คัดจากธาตุหลักของสายพันธุ์ (types[0]) ใช้ Ability จริงจากเกม พร้อมกลไกจริงแบบย่อ =====
+const TYPE_ABILITY = {
+  fire:     { name: 'Blaze',        desc: 'ท่าธาตุไฟแรงขึ้น ×1.5 เมื่อ HP≤1/3', boostType: 'fire' },
+  water:    { name: 'Torrent',      desc: 'ท่าธาตุน้ำแรงขึ้น ×1.5 เมื่อ HP≤1/3', boostType: 'water' },
+  grass:    { name: 'Overgrow',     desc: 'ท่าธาตุพืชแรงขึ้น ×1.5 เมื่อ HP≤1/3', boostType: 'grass' },
+  bug:      { name: 'Swarm',        desc: 'ท่าธาตุแมลงแรงขึ้น ×1.5 เมื่อ HP≤1/3', boostType: 'bug' },
+  electric: { name: 'Static',       desc: '30% ทำให้ศัตรูที่โจมตีตัวนี้ติดอัมพาต', onHitStatus: 'para', onHitChance: 0.3 },
+  poison:   { name: 'Poison Point', desc: '30% ทำให้ศัตรูที่โจมตีตัวนี้ติดพิษ', onHitStatus: 'poison', onHitChance: 0.3 },
+  flying:   { name: 'Levitate',     desc: 'ต้านท่าธาตุดินสมบูรณ์ (โดนดาเมจ 0)', immuneType: 'ground' },
+  rock:     { name: 'Sturdy',       desc: 'รอดท่าสังหารครั้งแรกถ้า HP เต็ม (ไม่ต้องใช้ไอเทม)' },
+  dragon:   { name: 'Multiscale',   desc: 'ดาเมจที่ได้รับ -50% ตอน HP เต็ม' },
+  dark:     { name: 'Intimidate',   desc: 'ตอนลงสนาม ลด ATK ศัตรู 1 ระดับ' },
+  ghost:    { name: 'Insomnia',     desc: 'ต้านสถานะหลับสมบูรณ์' },
+  psychic:  { name: 'Regenerator',  desc: 'ฟื้น HP 1/3 เมื่อสลับตัวออก' },
+};
+function abilityFor(id) { const m = MON_BY_ID[id]; return TYPE_ABILITY[m.types[0]] || null; }
+// Intimidate: เช็คตัวที่เพิ่งลงสนามฝั่งไหน แล้วลด ATK ฝั่งตรงข้าม 1 ระดับถ้ามีความสามารถนี้
+function applyIntimidate(holderSide, b) {
+  const holderId = holderSide === 'player' ? b.team[b.activeIdx].ind.id : b.foeMon.id;
+  const ab = abilityFor(holderId);
+  if (!ab || ab.name !== 'Intimidate') return '';
+  const targetStages = holderSide === 'player' ? b.foe.stages : b.team[b.activeIdx].stages;
+  const targetName = holderSide === 'player' ? (b.foeDisplayName || b.foeMon.name) : activeMonView(b.team[b.activeIdx]).name;
+  const before = targetStages.atk;
+  targetStages.atk = clamp(before - 1, -6, 6);
+  if (targetStages.atk === before) return '';
+  return ` · 😤 Intimidate! ATK ${targetName} ⬇️`;
+}
+// Regenerator: ฟื้น HP 1/3 ให้ตัวที่มีความสามารถนี้เมื่อสลับตัวออก
+function applyRegenerator(member) {
+  const ab = abilityFor(member.ind.id);
+  if (!ab || ab.name !== 'Regenerator' || member.hp <= 0) return '';
+  const heal = Math.max(1, Math.floor(member.maxHp / 3));
+  const before = member.hp;
+  member.hp = Math.min(member.maxHp, member.hp + heal);
+  if (member.hp === before) return '';
+  return ` · 🌿 Regenerator! ${MON_BY_ID[member.ind.id].name} ฟื้น ${member.hp - before}`;
+}
+function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move, held, opts) {
+  opts = opts || {};
   const physical = atkStats.atk >= atkStats.spatk;
   const A = physical ? atkStats.atk : atkStats.spatk;
   const D = physical ? defStats.def : defStats.spdef;
   const moveType = move ? move.type : atkMon.types[0];
-  const power = move ? move.pow : 55;
-  const eff = typeEffect(moveType, defMon.types);
+  let power = move ? move.pow : 55;
+  let eff = typeEffect(moveType, defMon.types);
+  if (opts.defAbility && opts.defAbility.immuneType === moveType) eff = 0;   // Levitate ฯลฯ
   const stab = atkMon.types.includes(moveType) ? 1.5 : 1;
+  if (opts.atkAbility && opts.atkAbility.boostType === moveType && opts.atkHpRatio != null && opts.atkHpRatio <= 1 / 3) power *= 1.5;   // Blaze/Torrent/Overgrow/Swarm
   const weather = weatherBoosted(moveType);
   const crit = Math.random() < (held === 'scope-lens' ? 4 / 16 : 1 / 16);   // คริติคอล 6.25% (Scope Lens ×4 ~25%)
   let dmg = (((2 * atkLevel / 5 + 2) * power * A / Math.max(1, D)) / 50 + 2);
   dmg = dmg * stab * eff * (0.85 + Math.random() * 0.15) * (crit ? 1.5 : 1) * (weather ? 1.2 : 1);
   if (held === 'life-orb') dmg *= 1.3;                      // Life Orb
   if (held === 'expert-belt' && eff > 1) dmg *= 1.2;        // Expert Belt (ธาตุได้เปรียบ)
+  if (opts.defAbility && opts.defAbility.name === 'Multiscale' && opts.defHpRatio != null && opts.defHpRatio >= 1) dmg *= 0.5;
   return { dmg: Math.max(1, Math.floor(dmg)), eff, crit, weather };
 }
 // ใส่ผล Held Item ที่ปรับสเตตัส (ตอนสร้างทีมสู้)
@@ -2943,6 +2986,7 @@ function startBattle(isBoss, bossData) {
     usedMega: false, usedDynamax: false,
     msg: isBoss ? `👑 บอส ${foeMon.name} ท้าดวล!` : `เจอ ${foeMon.name} ป่า — เลือกท่าโจมตี!`,
   };
+  battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
   renderBattle();
   $('#battleModal').classList.remove('hidden');
 }
@@ -2964,6 +3008,8 @@ function renderBattle() {
   const foeTypes = b.foeTypes || b.foeMon.types;
   const foeSpriteId = b.foeSpriteId || b.foeMon.id;
   const foeName = b.foeDisplayName || b.foeMon.name;
+  const foeAbility = abilityFor(b.foeMon.id), myAbility = abilityFor(active.ind.id);
+  const abilityBadge = ab => ab ? `<span class="badge" style="background:#2c3a55" title="${ab.desc}">🧬 ${ab.name}</span>` : '';
   const curWeather = WEATHERS[getWeather(state.region)];
   const moves = getMoves(active.ind.id);
   const moveBtns = moves.map((mv, i) => {
@@ -2985,13 +3031,13 @@ function renderBattle() {
       <div class="bt-side foe">
         ${b.mode === 'trainer' ? `<div style="font-size:11px;color:#ffb3bb;font-weight:700">${b.gym.emoji} ${b.gym.name} · เหลือศัตรู ${b.foeQueue.length - b.foeIdx}/${b.foeQueue.length}</div>` : ''}
         ${b.mode === 'tower' ? `<div style="font-size:11px;color:#ffd76b;font-weight:700">🗼 ชั้น ${b.floorNow}${b.special ? ' · บอส!' : ''} · สูงสุด ${state.tower.bestFloor || 0}</div>` : ''}
-        <div class="bt-head"><span>${b.isBoss ? '👑 ' : ''}${foeName} Lv.${b.foeLevel} ${statusBadge(b.foe.status)} ${foeSpecialBadge}${b.foeHeld ? ` <span class="badge" style="background:#3a3a55" title="${HELD_ITEMS[b.foeHeld].desc}">${HELD_ITEMS[b.foeHeld].emoji} ${HELD_ITEMS[b.foeHeld].name}</span>` : ''} ${foeTypes.map(t => `<span class="badge t-${t}" style="font-size:9px;padding:1px 6px">${t}</span>`).join('')}</span>${spriteImg(foeSpriteId, false)}</div>
+        <div class="bt-head"><span>${b.isBoss ? '👑 ' : ''}${foeName} Lv.${b.foeLevel} ${statusBadge(b.foe.status)} ${foeSpecialBadge}${b.foeHeld ? ` <span class="badge" style="background:#3a3a55" title="${HELD_ITEMS[b.foeHeld].desc}">${HELD_ITEMS[b.foeHeld].emoji} ${HELD_ITEMS[b.foeHeld].name}</span>` : ''} ${abilityBadge(foeAbility)} ${foeTypes.map(t => `<span class="badge t-${t}" style="font-size:9px;padding:1px 6px">${t}</span>`).join('')}</span>${spriteImg(foeSpriteId, false)}</div>
         <div class="bt-hpbar"><div class="${hpCls(b.foeHp, b.foeMaxHp)}" style="width:${foePct}%"></div></div>
         <div class="hp-txt" style="text-align:left">HP ${Math.ceil(b.foeHp)}/${b.foeMaxHp}</div>
         <div style="text-align:left;margin-top:2px">${stageBadges(b.foe.stages)}</div>
       </div>
       <div class="bt-side me">
-        <div class="bt-head">${spriteImg(view.spriteId, view.special ? false : active.ind.shiny)}<span>${view.name} Lv.${active.ind.level} ${genderIcon(active.ind.gender)} ${statusBadge(active.status)} ${specialBadge}</span></div>
+        <div class="bt-head">${spriteImg(view.spriteId, view.special ? false : active.ind.shiny)}<span>${view.name} Lv.${active.ind.level} ${genderIcon(active.ind.gender)} ${statusBadge(active.status)} ${specialBadge} ${abilityBadge(myAbility)}</span></div>
         <div class="bt-hpbar"><div class="${hpCls(active.hp, active.maxHp)}" style="width:${myPct}%"></div></div>
         <div class="hp-txt" style="text-align:right">HP ${Math.ceil(active.hp)}/${active.maxHp}</div>
         <div style="text-align:right;margin-top:2px">${stageBadges(active.stages)}</div>
@@ -3103,10 +3149,11 @@ function revertDynamax(active, b) {
   active.dynamax = null;
   if (b) b.msg += ` · ${MON_BY_ID[active.ind.id].name} คืนร่างจากไดนาแม็กซ์`;
 }
-function tryInflict(move, target, targetTypes, name) {
+function tryInflict(move, target, targetTypes, name, targetAbility) {
   if (target.status) return '';
   const ts = TYPE_STATUS[move.type]; if (!ts) return '';
   if ((STATUS_IMMUNE[ts.s] || []).some(t => targetTypes.includes(t))) return '';
+  if (targetAbility && targetAbility.name === 'Insomnia' && ts.s === 'sleep') return '';
   if (Math.random() < ts.c) {
     target.status = ts.s;
     if (ts.s === 'sleep') target.sleepT = rand(1, 3);
@@ -3142,6 +3189,7 @@ function foeTurn(b) {
   const foeNameBefore = b.foeDisplayName || b.foeMon.name;
   if (b.mode === 'trainer' && trainerTrySwitch(b, view.types)) {
     b.msg += ` · ${b.gym.emoji} เรียก ${foeNameBefore} กลับ! ส่ง ${b.foeMon.name} Lv.${b.foeLevel} ลงแทน!`;
+    b.msg += applyIntimidate('foe', b);
     return;
   }
   const gate = canAct(b.foe);
@@ -3155,14 +3203,23 @@ function foeTurn(b) {
     b.msg += ` · ${foeName} ใช้ ${mv.name}! แต่พลาดเป้า... 💨`;
     return;
   }
-  const atkRes = calcDamage({ types: foeTypesForAtk }, statsWithStages(b.foeStats, b.foe.stages), b.foeLevel, { types: view.types }, statsWithStages(active.stats, active.stages), mv, b.foeHeld);
+  const atkAbility = abilityFor(b.foeMon.id), defAbility = abilityFor(active.ind.id);
+  const wasFull = active.hp === active.maxHp;
+  const atkRes = calcDamage({ types: foeTypesForAtk }, statsWithStages(b.foeStats, b.foe.stages), b.foeLevel, { types: view.types }, statsWithStages(active.stats, active.stages), mv, b.foeHeld,
+    { atkAbility, defAbility, atkHpRatio: b.foeHp / b.foeMaxHp, defHpRatio: active.hp / active.maxHp });
   let dmg = atkRes.dmg;
   if (b.foe.status === 'burn') dmg = Math.floor(dmg * 0.6);
-  const wasFull = active.hp === active.maxHp;
+  let sturdyMsg = '';
+  if (defAbility && defAbility.name === 'Sturdy' && wasFull && dmg >= active.hp) { dmg = active.hp - 1; sturdyMsg = ` · 🗿 ${view.name} ทนอยู่ด้วย Sturdy!`; }
   active.hp = Math.max(0, active.hp - dmg);
-  b.msg += ` · ${foeName} ใช้ ${mv.name}! ${atkRes.crit ? '🎯คริติคอล! ' : ''}${atkRes.weather ? '🌦️ ' : ''}-${dmg}`;
-  b.msg += tryInflict(mv, active, view.types, view.name);
+  b.msg += ` · ${foeName} ใช้ ${mv.name}! ${atkRes.crit ? '🎯คริติคอล! ' : ''}${atkRes.weather ? '🌦️ ' : ''}-${dmg}${sturdyMsg}`;
+  b.msg += tryInflict(mv, active, view.types, view.name, defAbility);
   b.msg += applyStatFx(mv, b.foe.stages, active.stages, foeName, view.name);
+  if (defAbility && defAbility.onHitStatus && !active.status && !b.foe.status && Math.random() < defAbility.onHitChance
+      && !(STATUS_IMMUNE[defAbility.onHitStatus] || []).some(t => foeTypesForAtk.includes(t))) {
+    b.foe.status = defAbility.onHitStatus; if (b.foe.status === 'sleep') b.foe.sleepT = rand(1, 3);
+    b.msg += ` · ${STATUS[defAbility.onHitStatus].emoji} ${defAbility.name}! ${foeName} ติด${STATUS[defAbility.onHitStatus].name}!`;
+  }
   if (active.hp <= 0 && active.ind.held === 'focus-sash' && !active.sashUsed && wasFull) {
     active.hp = 1; active.sashUsed = true;
     b.msg += ` · 🎗️ ${aMon.name} ยึด Focus Sash รอดมาได้!`;
@@ -3195,7 +3252,7 @@ function faintActive(b, aMon) {
       b.msg += ` · 🗼 แพ้ที่ชั้น ${lostFloor}! หอคอยรีเซ็ตกลับชั้น 1 (สถิติสูงสุด ${state.tower.bestFloor || 0})`;
       save();
     } else { b.msg += ' · แพ้! ลองใหม่'; }
-  } else { b.activeIdx = next; b.msg += ` ส่ง ${MON_BY_ID[b.team[next].ind.id].name} ลงสนาม!`; }
+  } else { b.activeIdx = next; b.msg += ` ส่ง ${MON_BY_ID[b.team[next].ind.id].name} ลงสนาม!${applyIntimidate('player', b)}`; }
 }
 // นับถอยหลังไดนาแม็กซ์ — เรียกทุกครั้งที่ผู้เล่นขยับ (ไม่ว่าผลจะเป็นอย่างไร กันเทิร์นหลุดตอน KO ทันที)
 function tickDynamax(active, b) {
@@ -3298,17 +3355,27 @@ function battleAttack(moveIdx) {
       return false;
     }
     if (pPrio > 0) state._usedPriority = true;
-    const atk = calcDamage({ types: view.types }, statsWithStages(active.stats, active.stages), active.ind.level, { types: foeTypesForDef }, statsWithStages(b.foeStats, b.foe.stages), mv, active.ind.held);
+    const atkAbility = abilityFor(active.ind.id), defAbility = abilityFor(b.foeMon.id);
+    const foeWasFull = b.foeHp === b.foeMaxHp;
+    const atk = calcDamage({ types: view.types }, statsWithStages(active.stats, active.stages), active.ind.level, { types: foeTypesForDef }, statsWithStages(b.foeStats, b.foe.stages), mv, active.ind.held,
+      { atkAbility, defAbility, atkHpRatio: active.hp / active.maxHp, defHpRatio: b.foeHp / b.foeMaxHp });
     if (atk.crit) state._critHit = true;
     if (atk.weather) state._weatherHit = true;
     let dmg = atk.dmg;
     if (active.status === 'burn') dmg = Math.floor(dmg * 0.6);   // ไหม้ลดพลังโจมตี
     if (wasDynamaxed) dmg = Math.floor(dmg * DYNAMAX_DMG_MULT);   // โบนัสดาเมจไดนาแม็กซ์
     const koMode = b.mode !== 'wild';
+    let sturdyMsg = '';
+    if (defAbility && defAbility.name === 'Sturdy' && foeWasFull && dmg >= b.foeHp && b.mode !== 'wild') { dmg = b.foeHp - 1; sturdyMsg = ` · 🗿 ${foeNameForMsg} ทนอยู่ด้วย Sturdy!`; }
     b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - dmg);
-    b.msg += `${view.name} ใช้ ${mv.name}! ${atk.crit ? '🎯 คริติคอล! ' : ''}${atk.weather ? '🌦️ อากาศช่วย! ' : ''}-${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
-    b.msg += tryInflict(mv, b.foe, foeTypesForDef, foeNameForMsg);
+    b.msg += `${view.name} ใช้ ${mv.name}! ${atk.crit ? '🎯 คริติคอล! ' : ''}${atk.weather ? '🌦️ อากาศช่วย! ' : ''}-${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}${sturdyMsg}`;
+    b.msg += tryInflict(mv, b.foe, foeTypesForDef, foeNameForMsg, defAbility);
     b.msg += applyStatFx(mv, active.stages, b.foe.stages, view.name, foeNameForMsg);
+    if (defAbility && defAbility.onHitStatus && !b.foe.status && !active.status && Math.random() < defAbility.onHitChance
+        && !(STATUS_IMMUNE[defAbility.onHitStatus] || []).some(t => view.types.includes(t))) {
+      active.status = defAbility.onHitStatus; if (active.status === 'sleep') active.sleepT = rand(1, 3);
+      b.msg += ` · ${STATUS[defAbility.onHitStatus].emoji} ${defAbility.name}! ${view.name} ติด${STATUS[defAbility.onHitStatus].name}!`;
+    }
     if (active.ind.held === 'kings-rock' && Math.random() < 0.1) { b.foe.flinched = true; b.msg += ` · 👑 ${foeNameForMsg} สะดุ้ง!`; }
     if (b.foeHeld === 'rocky-helmet') {   // Rocky Helmet: ศัตรูสะท้อนดาเมจกลับ
       const recoil = Math.max(1, Math.floor(active.maxHp / 6));
@@ -3371,9 +3438,11 @@ function battleSwitch(idx) {
   const b = battleState; if (!b || b.over || battleBusy || idx === b.activeIdx) return;
   const t = b.team[idx];
   if (!t || t.hp <= 0) { toast('ตัวนี้หมดแรงแล้ว', 'bad'); return; }
-  b.team[b.activeIdx].stages = freshStages();   // สลับตัวออก = สเตตัสที่เปลี่ยนไว้รีเซ็ต แบบเกมจริง
+  const outgoing = b.team[b.activeIdx];
+  const regenMsg = applyRegenerator(outgoing);   // Regenerator: ฟื้น HP ให้ตัวที่ออกก่อนรีเซ็ตสเตตัส
+  outgoing.stages = freshStages();   // สลับตัวออก = สเตตัสที่เปลี่ยนไว้รีเซ็ต แบบเกมจริง
   b.activeIdx = idx;
-  const stage1 = `สลับมา ${MON_BY_ID[t.ind.id].name}!`;
+  const stage1 = `สลับมา ${MON_BY_ID[t.ind.id].name}!${regenMsg}${applyIntimidate('player', b)}`;
   revealTurns(b, stage1, () => {                       // สลับตัวเสียเทิร์น ศัตรูโจมตีก่อน
     b.msg = '';
     foeTurn(b);
@@ -3414,7 +3483,7 @@ function onFoeDown() {
     b.foeIdx++;
     if (b.foeIdx < b.foeQueue.length) {
       loadFoe(b, b.foeQueue[b.foeIdx]);
-      b.msg = `${downed} ล้ม! ${b.gym.emoji} ${b.gym.name} ส่ง ${b.foeMon.name} Lv.${b.foeLevel} ลงต่อ! (เหลือ ${b.foeQueue.length - b.foeIdx})`;
+      b.msg = `${downed} ล้ม! ${b.gym.emoji} ${b.gym.name} ส่ง ${b.foeMon.name} Lv.${b.foeLevel} ลงต่อ! (เหลือ ${b.foeQueue.length - b.foeIdx})${applyIntimidate('foe', b)}`;
       return;   // ยังไม่จบ สู้ตัวต่อไป
     }
     // ชนะยิม
@@ -3528,6 +3597,7 @@ function startTrainerBattle(gymId) {
     usedMega: false, usedDynamax: false,
     msg: `${g.emoji} ${g.name} — ศัตรู ${g.count} ตัว! เลือกท่าโจมตี`,
   };
+  battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
   renderBattle();
   $('#battleModal').classList.remove('hidden');
 }
@@ -3584,7 +3654,7 @@ function applyTowerFoeToBattle(b, def, floor) {
   if (def.held) applyFoeHeld(fStats, def.held);
   b.foeMon = def.mon; b.foeLevel = def.lvl; b.foeStats = fStats; b.foeMaxHp = fMaxHp; b.foeHp = fMaxHp; b.foeHeld = def.held || null;
   b.foeTypes = types; b.foeSpriteId = spriteId; b.foeDisplayName = name; b.special = def.special;
-  b.floorNow = floor; b.foe = { status: null, sleepT: 0 };
+  b.floorNow = floor; b.foe = { status: null, sleepT: 0, stages: freshStages() };
 }
 function startTowerBattle() {
   if (battleState && battleState.mode === 'tower' && !battleState.over) {
@@ -3601,6 +3671,7 @@ function startTowerBattle() {
   };
   applyTowerFoeToBattle(battleState, def, floor);
   battleState.msg = `🗼 ชั้น ${floor}${def.isBossFloor ? ' (บอส!)' : ''} — ${battleState.foeDisplayName} Lv.${battleState.foeLevel} ท้าดวล!`;
+  battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
   renderBattle();
   $('#battleModal').classList.remove('hidden');
 }
@@ -3609,11 +3680,14 @@ function towerContinueClimb() {
   if (!b || b.mode !== 'tower' || !b.towerCleared) return;
   const floor = state.tower.floor;
   const def = towerFoeDef(floor);
+  const prevActiveIdx = b.activeIdx;
   applyTowerFoeToBattle(b, def, floor);
   b.over = false; b.towerCleared = false; b.lost = false;
   b.activeIdx = b.team.findIndex(t => t.hp > 0);
   b.usedMega = false; b.usedDynamax = false;   // ขึ้นชั้นใหม่ = ใช้เมก้า/ไดนาแม็กซ์ได้อีกครั้ง
   b.msg = `🗼 ชั้น ${floor}${def.isBossFloor ? ' (บอส!)' : ''} — ${b.foeDisplayName} Lv.${b.foeLevel} ท้าดวล!`;
+  b.msg += applyIntimidate('foe', b);   // ศัตรูใหม่ทุกชั้นเสมอ
+  if (b.activeIdx !== prevActiveIdx) b.msg += applyIntimidate('player', b);   // สลับตัวจริงเท่านั้นถึงเรียก Intimidate ฝั่งเรา
   renderBattle();
 }
 
