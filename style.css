@@ -516,6 +516,7 @@ main { flex: 1; padding: 12px; }
 .move-btn { padding: 12px 8px; border: none; border-radius: 10px; color: #fff; font-weight: 800; font-size: 13px; cursor: pointer; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
 .move-btn:active { transform: scale(.96); }
 .move-btn b { font-size: 11px; opacity: .9; }
+.move-btn .mv-acc { display: block; font-size: 9px; font-weight: 600; opacity: .75; margin-top: 2px; }
 .moveset { margin: 10px 0; padding: 10px; background: rgba(0,0,0,.2); border-radius: 10px; text-align: center; }
 .moveset .ms-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
 

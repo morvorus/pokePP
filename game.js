@@ -373,24 +373,24 @@ function typeEffect(atkType, defTypes) {
 
 // พูลท่าโจมตีต่อธาตุ (หลายท่าต่อธาตุ — สุ่มเลือกแบบ deterministic ต่อสปีชีส์ เพื่อให้แต่ละตัวมีมูฟต่างกัน ไม่ใช่ท่าเดียวซ้ำทั้งธาตุ)
 const TYPE_MOVES = {
-  normal: [{ name: 'Body Slam', pow: 60 }, { name: 'Hyper Voice', pow: 90 }, { name: 'Double-Edge', pow: 100 }, { name: 'Extreme Speed', pow: 80 }, { name: 'Giga Impact', pow: 110 }, { name: 'Slam', pow: 65 }],
-  fire: [{ name: 'Flamethrower', pow: 90 }, { name: 'Fire Blast', pow: 100 }, { name: 'Flame Charge', pow: 70 }, { name: 'Fire Punch', pow: 75 }, { name: 'Overheat', pow: 110 }, { name: 'Flare Blitz', pow: 100 }],
-  water: [{ name: 'Surf', pow: 90 }, { name: 'Hydro Pump', pow: 100 }, { name: 'Scald', pow: 80 }, { name: 'Aqua Tail', pow: 75 }, { name: 'Waterfall', pow: 80 }, { name: 'Origin Pulse', pow: 110 }],
-  electric: [{ name: 'Thunderbolt', pow: 90 }, { name: 'Thunder', pow: 100 }, { name: 'Wild Charge', pow: 90 }, { name: 'Discharge', pow: 80 }, { name: 'Volt Tackle', pow: 100 }, { name: 'Spark', pow: 65 }],
-  grass: [{ name: 'Energy Ball', pow: 85 }, { name: 'Solar Beam', pow: 100 }, { name: 'Giga Drain', pow: 75 }, { name: 'Leaf Blade', pow: 90 }, { name: 'Petal Blizzard', pow: 90 }, { name: 'Power Whip', pow: 100 }],
-  ice: [{ name: 'Ice Beam', pow: 90 }, { name: 'Blizzard', pow: 100 }, { name: 'Ice Punch', pow: 75 }, { name: 'Icicle Crash', pow: 85 }, { name: 'Ice Shard', pow: 40 }, { name: 'Avalanche', pow: 80 }],
-  fighting: [{ name: 'Close Combat', pow: 100 }, { name: 'Focus Blast', pow: 100 }, { name: 'Brick Break', pow: 75 }, { name: 'Cross Chop', pow: 90 }, { name: 'Dynamic Punch', pow: 100 }, { name: 'Superpower', pow: 100 }],
-  poison: [{ name: 'Sludge Bomb', pow: 90 }, { name: 'Gunk Shot', pow: 100 }, { name: 'Poison Jab', pow: 75 }, { name: 'Sludge Wave', pow: 85 }, { name: 'Cross Poison', pow: 65 }, { name: 'Toxic Spikes', pow: 50 }],
-  ground: [{ name: 'Earthquake', pow: 100 }, { name: 'Earth Power', pow: 90 }, { name: 'Bulldoze', pow: 60 }, { name: 'Dig', pow: 80 }, { name: 'Mud Bomb', pow: 65 }, { name: "Fissure", pow: 95 }],
-  flying: [{ name: 'Air Slash', pow: 75 }, { name: 'Hurricane', pow: 100 }, { name: 'Brave Bird', pow: 120 }, { name: 'Aerial Ace', pow: 60 }, { name: 'Sky Attack', pow: 105 }, { name: 'Wing Attack', pow: 60 }],
-  psychic: [{ name: 'Psychic', pow: 90 }, { name: 'Psyshock', pow: 80 }, { name: 'Zen Headbutt', pow: 80 }, { name: 'Future Sight', pow: 100 }, { name: 'Psycho Cut', pow: 70 }, { name: 'Confusion', pow: 50 }],
-  bug: [{ name: 'Bug Buzz', pow: 90 }, { name: 'X-Scissor', pow: 80 }, { name: 'Megahorn', pow: 120 }, { name: 'Signal Beam', pow: 75 }, { name: 'Pin Missile', pow: 65 }, { name: 'Leech Life', pow: 80 }],
-  rock: [{ name: 'Rock Slide', pow: 75 }, { name: 'Stone Edge', pow: 100 }, { name: 'Rock Tomb', pow: 60 }, { name: 'Power Gem', pow: 80 }, { name: 'Rock Blast', pow: 65 }, { name: 'Ancient Power', pow: 60 }],
-  ghost: [{ name: 'Shadow Ball', pow: 80 }, { name: 'Shadow Claw', pow: 70 }, { name: 'Phantom Force', pow: 90 }, { name: 'Shadow Punch', pow: 60 }, { name: 'Astonish', pow: 55 }, { name: 'Hex', pow: 65 }],
-  dragon: [{ name: 'Dragon Pulse', pow: 85 }, { name: 'Dragon Claw', pow: 80 }, { name: 'Outrage', pow: 120 }, { name: 'Draco Meteor', pow: 110 }, { name: 'Dragon Breath', pow: 60 }, { name: 'Dual Chop', pow: 70 }],
-  dark: [{ name: 'Dark Pulse', pow: 80 }, { name: 'Crunch', pow: 80 }, { name: 'Foul Play', pow: 95 }, { name: 'Night Slash', pow: 70 }, { name: 'Sucker Punch', pow: 70 }, { name: 'Payback', pow: 60 }],
-  steel: [{ name: 'Iron Head', pow: 80 }, { name: 'Flash Cannon', pow: 90 }, { name: 'Meteor Mash', pow: 90 }, { name: 'Steel Wing', pow: 65 }, { name: 'Iron Tail', pow: 75 }, { name: 'Gyro Ball', pow: 80 }],
-  fairy: [{ name: 'Moonblast', pow: 95 }, { name: 'Dazzling Gleam', pow: 80 }, { name: 'Play Rough', pow: 90 }, { name: 'Draining Kiss', pow: 60 }, { name: 'Fairy Wind', pow: 40 }, { name: 'Misty Terrain', pow: 50 }],
+  normal: [{ name: 'Body Slam', pow: 60, acc: 100 }, { name: 'Hyper Voice', pow: 90, acc: 100 }, { name: 'Double-Edge', pow: 100, acc: 100 }, { name: 'Extreme Speed', pow: 80, acc: 100 }, { name: 'Giga Impact', pow: 110, acc: 90 }, { name: 'Slam', pow: 65, acc: 75 }],
+  fire: [{ name: 'Flamethrower', pow: 90, acc: 100 }, { name: 'Fire Blast', pow: 100, acc: 85 }, { name: 'Flame Charge', pow: 70, acc: 100 }, { name: 'Fire Punch', pow: 75, acc: 100 }, { name: 'Overheat', pow: 110, acc: 90 }, { name: 'Flare Blitz', pow: 100, acc: 100 }],
+  water: [{ name: 'Surf', pow: 90, acc: 100 }, { name: 'Hydro Pump', pow: 100, acc: 80 }, { name: 'Scald', pow: 80, acc: 100 }, { name: 'Aqua Tail', pow: 75, acc: 90 }, { name: 'Waterfall', pow: 80, acc: 100 }, { name: 'Origin Pulse', pow: 110, acc: 100 }],
+  electric: [{ name: 'Thunderbolt', pow: 90, acc: 100 }, { name: 'Thunder', pow: 100, acc: 70 }, { name: 'Wild Charge', pow: 90, acc: 100 }, { name: 'Discharge', pow: 80, acc: 100 }, { name: 'Volt Tackle', pow: 100, acc: 100 }, { name: 'Spark', pow: 65, acc: 100 }],
+  grass: [{ name: 'Energy Ball', pow: 85, acc: 100 }, { name: 'Solar Beam', pow: 100, acc: 100 }, { name: 'Giga Drain', pow: 75, acc: 100 }, { name: 'Leaf Blade', pow: 90, acc: 100 }, { name: 'Petal Blizzard', pow: 90, acc: 100 }, { name: 'Power Whip', pow: 100, acc: 85 }],
+  ice: [{ name: 'Ice Beam', pow: 90, acc: 100 }, { name: 'Blizzard', pow: 100, acc: 70 }, { name: 'Ice Punch', pow: 75, acc: 100 }, { name: 'Icicle Crash', pow: 85, acc: 90 }, { name: 'Ice Shard', pow: 40, acc: 100 }, { name: 'Avalanche', pow: 80, acc: 100 }],
+  fighting: [{ name: 'Close Combat', pow: 100, acc: 100 }, { name: 'Focus Blast', pow: 100, acc: 70 }, { name: 'Brick Break', pow: 75, acc: 100 }, { name: 'Cross Chop', pow: 90, acc: 80 }, { name: 'Dynamic Punch', pow: 100, acc: 50 }, { name: 'Superpower', pow: 100, acc: 100 }],
+  poison: [{ name: 'Sludge Bomb', pow: 90, acc: 100 }, { name: 'Gunk Shot', pow: 100, acc: 80 }, { name: 'Poison Jab', pow: 75, acc: 100 }, { name: 'Sludge Wave', pow: 85, acc: 100 }, { name: 'Cross Poison', pow: 65, acc: 100 }, { name: 'Poison Fang', pow: 50, acc: 100 }],
+  ground: [{ name: 'Earthquake', pow: 100, acc: 100 }, { name: 'Earth Power', pow: 90, acc: 100 }, { name: 'Bulldoze', pow: 60, acc: 100 }, { name: 'Dig', pow: 80, acc: 100 }, { name: 'Mud Bomb', pow: 65, acc: 85 }, { name: 'Drill Run', pow: 80, acc: 95 }],
+  flying: [{ name: 'Air Slash', pow: 75, acc: 95 }, { name: 'Hurricane', pow: 100, acc: 70 }, { name: 'Brave Bird', pow: 120, acc: 100 }, { name: 'Aerial Ace', pow: 60, acc: 100 }, { name: 'Sky Attack', pow: 105, acc: 90 }, { name: 'Wing Attack', pow: 60, acc: 100 }],
+  psychic: [{ name: 'Psychic', pow: 90, acc: 100 }, { name: 'Psyshock', pow: 80, acc: 100 }, { name: 'Zen Headbutt', pow: 80, acc: 90 }, { name: 'Future Sight', pow: 100, acc: 100 }, { name: 'Psycho Cut', pow: 70, acc: 100 }, { name: 'Confusion', pow: 50, acc: 100 }],
+  bug: [{ name: 'Bug Buzz', pow: 90, acc: 100 }, { name: 'X-Scissor', pow: 80, acc: 100 }, { name: 'Megahorn', pow: 120, acc: 85 }, { name: 'Signal Beam', pow: 75, acc: 100 }, { name: 'Pin Missile', pow: 65, acc: 95 }, { name: 'Leech Life', pow: 80, acc: 100 }],
+  rock: [{ name: 'Rock Slide', pow: 75, acc: 90 }, { name: 'Stone Edge', pow: 100, acc: 80 }, { name: 'Rock Tomb', pow: 60, acc: 95 }, { name: 'Power Gem', pow: 80, acc: 100 }, { name: 'Rock Blast', pow: 65, acc: 90 }, { name: 'Ancient Power', pow: 60, acc: 100 }],
+  ghost: [{ name: 'Shadow Ball', pow: 80, acc: 100 }, { name: 'Shadow Claw', pow: 70, acc: 100 }, { name: 'Phantom Force', pow: 90, acc: 100 }, { name: 'Shadow Punch', pow: 60, acc: 100 }, { name: 'Astonish', pow: 55, acc: 100 }, { name: 'Hex', pow: 65, acc: 100 }],
+  dragon: [{ name: 'Dragon Pulse', pow: 85, acc: 100 }, { name: 'Dragon Claw', pow: 80, acc: 100 }, { name: 'Outrage', pow: 120, acc: 100 }, { name: 'Draco Meteor', pow: 110, acc: 90 }, { name: 'Dragon Breath', pow: 60, acc: 100 }, { name: 'Dual Chop', pow: 70, acc: 90 }],
+  dark: [{ name: 'Dark Pulse', pow: 80, acc: 100 }, { name: 'Crunch', pow: 80, acc: 100 }, { name: 'Foul Play', pow: 95, acc: 100 }, { name: 'Night Slash', pow: 70, acc: 100 }, { name: 'Sucker Punch', pow: 70, acc: 100 }, { name: 'Payback', pow: 60, acc: 100 }],
+  steel: [{ name: 'Iron Head', pow: 80, acc: 100 }, { name: 'Flash Cannon', pow: 90, acc: 100 }, { name: 'Meteor Mash', pow: 90, acc: 90 }, { name: 'Steel Wing', pow: 65, acc: 90 }, { name: 'Iron Tail', pow: 75, acc: 75 }, { name: 'Gyro Ball', pow: 80, acc: 100 }],
+  fairy: [{ name: 'Moonblast', pow: 95, acc: 100 }, { name: 'Dazzling Gleam', pow: 80, acc: 100 }, { name: 'Play Rough', pow: 90, acc: 90 }, { name: 'Draining Kiss', pow: 60, acc: 100 }, { name: 'Fairy Wind', pow: 40, acc: 100 }, { name: 'Disarming Voice', pow: 40, acc: 100 }],
 };
 function hashIdx(seedStr, len) {   // hash คงที่ (ไม่สุ่มใหม่ทุกครั้ง) เพื่อให้ moveset ของแต่ละตัวเดิมเสมอ
   let h = 0;
@@ -406,13 +406,14 @@ function getMoves(id) {
     const base = hashIdx(`${id}-${t}`, pool.length);
     for (let i = 0; i < count; i++) {
       const mv = pool[(base + i) % pool.length];
-      moves.push({ type: t, name: mv.name, pow: mv.pow });
+      moves.push({ type: t, name: mv.name, pow: mv.pow, acc: mv.acc });
     }
   });
-  moves.push({ type: 'normal', name: 'Quick Attack', pow: 40 });   // ท่าติดตัว
+  moves.push({ type: 'normal', name: 'Quick Attack', pow: 40, acc: 100 });   // ท่าติดตัว
   const seen = new Set();
   return moves.filter(mv => { if (seen.has(mv.name)) return false; seen.add(mv.name); return true; }).slice(0, 4);
 }
+function rollHit(move) { return Math.random() * 100 < (move.acc == null ? 100 : move.acc); }   // เช็คว่าท่านี้แม่นเป้าไหม
 
 // รายการความสำเร็จ (Achievements)
 const ACHIEVEMENTS = [
@@ -1767,7 +1768,7 @@ function openIndividualModal(uid) {
     <div style="text-align:left">${ivRows}</div>
     <div class="moveset">
       <div class="ms-title">⚔️ ท่าโจมตี</div>
-      ${getMoves(ind.id).map(mv => `<span class="pill t-${mv.type}" style="color:#fff">${mv.name} <b>${mv.pow}</b></span>`).join('')}
+      ${getMoves(ind.id).map(mv => `<span class="pill t-${mv.type}" style="color:#fff">${mv.name} <b>${mv.pow}</b> <small style="opacity:.75">🎯${mv.acc}%</small></span>`).join('')}
     </div>
     <div class="moveset" id="heldSection">${heldSectionHtml(ind)}</div>
     ${(megaFormsFor(ind.id) || gmaxFormFor(ind.id)) ? `<div class="moveset" id="megaSection">${megaSectionHtml(ind)}</div>` : ''}
@@ -2496,11 +2497,12 @@ function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move, held) {
   const power = move ? move.pow : 55;
   const eff = typeEffect(moveType, defMon.types);
   const stab = atkMon.types.includes(moveType) ? 1.5 : 1;
+  const crit = Math.random() < 1 / 16;   // คริติคอล 6.25% เหมือนเกมจริง
   let dmg = (((2 * atkLevel / 5 + 2) * power * A / Math.max(1, D)) / 50 + 2);
-  dmg = dmg * stab * eff * (0.85 + Math.random() * 0.15);
+  dmg = dmg * stab * eff * (0.85 + Math.random() * 0.15) * (crit ? 1.5 : 1);
   if (held === 'life-orb') dmg *= 1.3;                      // Life Orb
   if (held === 'expert-belt' && eff > 1) dmg *= 1.2;        // Expert Belt (ธาตุได้เปรียบ)
-  return { dmg: Math.max(1, Math.floor(dmg)), eff };
+  return { dmg: Math.max(1, Math.floor(dmg)), eff, crit };
 }
 // ใส่ผล Held Item ที่ปรับสเตตัส (ตอนสร้างทีมสู้)
 function statsWithHeld(ind) {
@@ -2519,7 +2521,7 @@ function buildBattleTeam(members) {
 function foeChooseMove(foeMon, defTypes) {
   const moves = getMoves(foeMon.id);
   let best = moves[0], score = -1;
-  moves.forEach(mv => { const e = typeEffect(mv.type, defTypes) * (mv.pow / 100); if (e > score) { score = e; best = mv; } });
+  moves.forEach(mv => { const e = typeEffect(mv.type, defTypes) * (mv.pow / 100) * ((mv.acc || 100) / 100); if (e > score) { score = e; best = mv; } });
   return best;
 }
 function startBattle(isBoss, bossData) {
@@ -2572,7 +2574,7 @@ function renderBattle() {
   const moveBtns = moves.map((mv, i) => {
     const e = typeEffect(mv.type, foeTypes);
     const tag = e > 1 ? '↑' : e < 1 ? '↓' : '';
-    return `<button class="move-btn t-${mv.type}" data-mv="${i}">${mv.name} <b>${mv.pow}</b>${tag}</button>`;
+    return `<button class="move-btn t-${mv.type}" data-mv="${i}">${mv.name} <b>${mv.pow}</b>${tag}<span class="mv-acc">🎯${mv.acc}%</span></button>`;
   }).join('');
 
   const canMega = !b.usedMega && !active.mega && !!(megaFormsFor(active.ind.id) || []).find(f => f.key === active.ind.megaKey);
@@ -2717,11 +2719,16 @@ function foeTurn(b) {
   if (gate.note) b.msg += ` · ${foeName} ${gate.note}`;
   if (!gate.can) return;
   const mv = foeChooseMove(b.foeMon, view.types);
-  let dmg = calcDamage({ types: foeTypesForAtk }, b.foeStats, b.foeLevel, { types: view.types }, active.stats, mv).dmg;
+  if (!rollHit(mv)) {                     // ท่าศัตรูพลาดเป้า
+    b.msg += ` · ${foeName} ใช้ ${mv.name}! แต่พลาดเป้า... 💨`;
+    return;
+  }
+  const atkRes = calcDamage({ types: foeTypesForAtk }, b.foeStats, b.foeLevel, { types: view.types }, active.stats, mv);
+  let dmg = atkRes.dmg;
   if (b.foe.status === 'burn') dmg = Math.floor(dmg * 0.6);
   const wasFull = active.hp === active.maxHp;
   active.hp = Math.max(0, active.hp - dmg);
-  b.msg += ` · ${foeName} ใช้ ${mv.name}! -${dmg}`;
+  b.msg += ` · ${foeName} ใช้ ${mv.name}! ${atkRes.crit ? '🎯คริติคอล! ' : ''}-${dmg}`;
   b.msg += tryInflict(mv, active, view.types, view.name);
   if (active.hp <= 0 && active.ind.held === 'focus-sash' && !active.sashUsed && wasFull) {
     active.hp = 1; active.sashUsed = true;
@@ -2789,13 +2796,19 @@ function battleAttack(moveIdx) {
   }
   const foeTypesForDef = b.foeTypes || b.foeMon.types;
   const foeNameForMsg = b.foeDisplayName || b.foeMon.name;
+  if (!rollHit(mv)) {                     // ท่าพลาดเป้า — เสียเทิร์นเปล่า
+    b.msg += `${view.name} ใช้ ${mv.name}! แต่พลาดเป้า... 💨`;
+    foeTurn(b); endRound(b);
+    if (b.mode === 'wild' && currentSpawn) renderSpawn();
+    save(); renderBattle(); return;
+  }
   let atk = calcDamage({ types: view.types }, active.stats, active.ind.level, { types: foeTypesForDef }, b.foeStats, mv, active.ind.held);
   let dmg = atk.dmg;
   if (active.status === 'burn') dmg = Math.floor(dmg * 0.6);   // ไหม้ลดพลังโจมตี
   if (wasDynamaxed) dmg = Math.floor(dmg * DYNAMAX_DMG_MULT);   // โบนัสดาเมจไดนาแม็กซ์
   const koMode = b.mode !== 'wild';
   b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - dmg);
-  b.msg += `${view.name} ใช้ ${mv.name}! -${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
+  b.msg += `${view.name} ใช้ ${mv.name}! ${atk.crit ? '🎯 คริติคอล! ' : ''}-${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}`;
   b.msg += tryInflict(mv, b.foe, foeTypesForDef, foeNameForMsg);
   if (b.mode === 'wild' && currentSpawn) currentSpawn.hp = b.foeHp;
 
