@@ -668,6 +668,8 @@ function newSave() {
     battlePoints: 0,     // BP จากชนะยิม/บอส ใช้แลกของใน BP Shop
     bpBought: {},        // {itemId: count} จำนวนที่แลกไปแล้ว (ใช้กันของ limited)
     tower: { floor: 1, bestFloor: 0 },   // หอคอยไต่ระดับ — แพ้แล้วรีเซ็ตกลับชั้น 1, สถิติสูงสุดเก็บถาวร
+    gymReadyAt: 0,         // คูลดาวน์ท้ายิม (กันสแปมกด)
+    bossReadyAt: 0,        // คูลดาวน์ท้าบอส
     shopQty: {},          // {ballKey: qty} จำนวนบอลที่เลือกซื้อล่าสุดในร้าน (ต่อชนิด)
     selBall: 'poke',
     region: 'plains',
@@ -3779,7 +3781,10 @@ function endBattle() {
   if (currentView === 'menu') renderMenu();
   renderTopbar();
 }
+const GYM_CD = 60000, BOSS_CD = 60000;   // คูลดาวน์ท้ายิม/บอส กันสแปมกด (เสริมจากรางวัลลดลงตอนชนะซ้ำ)
 function startBossBattle(regionId) {
+  const left = (state.bossReadyAt || 0) - Date.now();
+  if (left > 0) { toast(`⏳ รอท้าบอสพร้อมอีก ${Math.ceil(left / 1000)} วิ`, 'bad'); return; }
   const r = REGION_BY_ID[regionId];
   if (r.unlock && !state.unlocked[regionId]) { toast('🔒 ปลดล็อกเขตนี้ก่อน', 'bad'); return; }
   // เลือกบอส = ตัวระดับสูงสุดที่มีในเขต
@@ -3789,6 +3794,7 @@ function startBossBattle(regionId) {
     if (p && p.length) bossMon = p.reduce((a, c) => c._bst > a._bst ? c : a, p[0]);
   }
   if (!bossMon) { toast('เขตนี้ยังไม่มีบอส', 'bad'); return; }
+  state.bossReadyAt = Date.now() + BOSS_CD;
   const level = r.lvl[1] + 6;
   startBattle(true, { mon: bossMon, level, region: r });
 }
@@ -3821,12 +3827,15 @@ function loadFoe(b, def) {
   b.foe = { status: null, sleepT: 0, stages: freshStages() };   // ศัตรูตัวใหม่ = สถานะ/สเตตัสเคลียร์
 }
 function startTrainerBattle(gymId) {
+  const left = (state.gymReadyAt || 0) - Date.now();
+  if (left > 0) { toast(`⏳ รอท้ายิมพร้อมอีก ${Math.ceil(left / 1000)} วิ`, 'bad'); return; }
   const g = GYMS.find(x => x.id === gymId); if (!g) return;
   const idx = GYMS.indexOf(g);
   const prevBeaten = idx === 0 || state.gymsBeaten[GYMS[idx - 1].id];
   if (!prevBeaten) { toast('🔒 ต้องชนะยิมก่อนหน้าก่อน', 'bad'); return; }
   const members = partyMembers();
   if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
+  state.gymReadyAt = Date.now() + GYM_CD;
   // สร้างทีมศัตรูจากธาตุยิม + เอนไปทางระดับหายากตาม tierBias (ยิมสูง = ศัตรูแรงจริง ไม่ใช่สุ่มมั่วๆ)
   const typePool = g.type ? MONSTERS.filter(m => m.types.includes(g.type)) : MONSTERS.filter(m => m._tier === 'superrare' || m._tier === 'legendary');
   const tierPool = (g.tierBias && g.tierBias.length) ? typePool.filter(m => g.tierBias.includes(m._tier)) : typePool;
