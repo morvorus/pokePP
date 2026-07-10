@@ -2523,9 +2523,14 @@ function renderMenu() {
       </div>
     </div>
     <div class="set-row">
+      <div class="sr-label">❓ วิธีเล่น<div class="sr-sub">เปิดดูสรุปวิธีเล่นอีกครั้ง (มีอัปเดตระบบใหม่ๆ เพิ่มเรื่อยๆ)</div></div>
+      <button class="set-btn" id="btnHelp">เปิดดู</button>
+    </div>
+    <div class="set-row">
       <div class="sr-label">🗑️ รีเซ็ตเกม<div class="sr-sub">ลบข้อมูลทั้งหมด เริ่มใหม่</div></div>
       <button class="set-btn danger" id="btnReset">รีเซ็ต</button>
     </div>`;
+  $('#btnHelp').onclick = showTutorial;
 
   $('#tSound').onclick = () => { st.sound = !st.sound; save(); renderMenu(); };
   $('#tMusic').onclick = () => { st.music = !st.music; save(); st.music ? startMusic() : stopMusic(); renderMenu(); };
@@ -2981,7 +2986,9 @@ function showTutorial() {
     <div class="tut-step"><span class="ts-ico">🔴</span><div>เลือก <b>บอล</b> แล้วกด <b>ปาบอล</b> — บอลดีกว่าโอกาสจับสูงกว่า</div></div>
     <div class="tut-step"><span class="ts-ico">⚔️</span><div>ตั้ง <b>Buddy</b> จากคลัง แล้วกด <b>สู้</b> เพื่อทำ HP โปเกมอนป่าลด → จับง่ายขึ้น</div></div>
     <div class="tut-step"><span class="ts-ico">🍓</span><div>โยน <b>เบอร์รี่</b> ก่อนปา เพิ่มโอกาสจับ</div></div>
-    <div class="tut-step"><span class="ts-ico">🏆</span><div>ท้า <b>บอสประจำเขต</b> · ทำ <b>เควส/ความสำเร็จ</b> รับรางวัล</div></div>
+    <div class="tut-step"><span class="ts-ico">🏆</span><div>ท้า <b>บอสประจำเขต</b> / <b>ยิม</b> / <b>หอคอยไต่ระดับ</b> · ทำ <b>เควส/ความสำเร็จ</b> รับรางวัล</div></div>
+    <div class="tut-step"><span class="ts-ico">💎</span><div>ซื้อ <b>กำไลเมก้า/ไดนาแม็กซ์</b> ในร้านค้า แล้วซื้อหิน/พลังงานแนบให้ตัวที่ชอบ เปลี่ยนร่างกลางศึกได้</div></div>
+    <div class="tut-step"><span class="ts-ico">🎀</span><div>ในเมนู ⚙️ ยังมี <b>คอนเทสต์ / ไร่เบอร์รี่ / พ่อค้าเร่ / คู่แข่งประจำตัว / คู่มือต่อสู้</b> ให้สำรวจเพิ่มเติม</div></div>
     <div class="tut-step"><span class="ts-ico">💾</span><div>อย่าลืม <b>Export เซฟ</b> ในเมนู ⚙️ เก็บไว้กันข้อมูลหาย</div></div>
     <div class="modal-actions"><button class="btn-primary" id="tutOk">เริ่มเล่นเลย!</button></div></div>`;
   openModal();
