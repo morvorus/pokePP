@@ -3033,6 +3033,14 @@ const MOVE_STAT_FX = {
   'Moonblast':     { stat: 'spatk', delta: -1, target: 'foe',  chance: 0.3 },
   'Shadow Ball':   { stat: 'spdef', delta: -1, target: 'foe',  chance: 0.2 },
   'Psychic':       { stat: 'spdef', delta: -1, target: 'foe',  chance: 0.1 },
+  'Energy Ball':   { stat: 'spdef', delta: -1, target: 'foe',  chance: 0.1 },
+  'Focus Blast':   { stat: 'spdef', delta: -1, target: 'foe',  chance: 0.1 },
+  'Earth Power':   { stat: 'spdef', delta: -1, target: 'foe',  chance: 0.1 },
+  'Bug Buzz':      { stat: 'spdef', delta: -1, target: 'foe',  chance: 0.1 },
+  'Flash Cannon':  { stat: 'spdef', delta: -1, target: 'foe',  chance: 0.1 },
+  'Ancient Power': { stat: 'atk',   delta: 1,  target: 'self', chance: 0.1 },   // เกมจริงบวกทุกสเตตัส แต่ระบบนี้รองรับทีละสเตตัส เลยเลือก ATK แทน
+  'Meteor Mash':   { stat: 'atk',   delta: 1,  target: 'self', chance: 0.2 },
+  'Steel Wing':    { stat: 'def',   delta: 1,  target: 'self', chance: 0.1 },
 };
 function applyStatFx(mv, casterStages, targetStages, casterName, targetName, casterAbility, targetAbility) {
   const fx = MOVE_STAT_FX[mv.name]; if (!fx) return '';
