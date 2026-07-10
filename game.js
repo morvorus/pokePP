@@ -699,13 +699,22 @@ function newSave() {
     createdAt: Date.now(),
   };
 }
-// รวม save เก่า/นอก กับ newSave() — merge แบบ deep เฉพาะ settings กันคีย์ใหม่ที่ save เก่าไม่มีกลายเป็น undefined
+// merge แบบ deep ทุก object ที่ซ้อนกัน (ไม่ใช่แค่ settings) — กันเซฟเก่าที่มี object บางฟิลด์แต่ field ย่อยไม่ครบ
+// (เช่น tower เก่ามีแค่ {floor} ไม่มี bestFloor) ทำให้โค้ดที่ access ลึกๆ พังแบบ Cannot read properties of undefined
+// อาเรย์ไม่ deep-merge (แทนที่ทั้งก้อนด้วยของเซฟเก่าตรงๆ เพราะ merge รายสมาชิกไม่มีความหมาย)
+function deepMergeDefaults(fresh, obj) {
+  const out = Array.isArray(fresh) ? fresh.slice() : Object.assign({}, fresh);
+  for (const k in obj) {
+    const freshVal = fresh[k], objVal = obj[k];
+    const bothPlainObjects = objVal && typeof objVal === 'object' && !Array.isArray(objVal)
+      && freshVal && typeof freshVal === 'object' && !Array.isArray(freshVal);
+    if (bothPlainObjects) out[k] = deepMergeDefaults(freshVal, objVal);
+    else if (objVal !== undefined) out[k] = objVal;
+  }
+  return out;
+}
 function mergeSave(obj) {
-  const fresh = newSave();
-  const defaultSettings = fresh.settings;   // จับค่า default ไว้ก่อน เพราะ Object.assign ด้านล่างจะรีแอสไซน์ fresh.settings ทิ้ง
-  const merged = Object.assign(fresh, obj || {});
-  merged.settings = Object.assign({}, defaultSettings, (obj && obj.settings) || {});
-  return merged;
+  return deepMergeDefaults(newSave(), obj || {});
 }
 function load() {
   try {
