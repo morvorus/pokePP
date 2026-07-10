@@ -961,7 +961,7 @@ function doEvolve(ind, toId) {
   const fromName = MON_BY_ID[ind.id].name;
   ind.id = toId; state.seen[toId] = true;
   state._evolved = true;
-  checkAchievements();
+  checkAchievements(); bumpQuest('evolvePokemon');
   save(); renderTopbar();
   const toName = MON_BY_ID[toId].name;
   toast(`✨ <b>${fromName}</b> วิวัฒนาการเป็น <b>${toName}</b>!`, 'good');
@@ -1237,7 +1237,7 @@ function enterContest(uid, catId) {
   const name = ind.nick || MON_BY_ID[ind.id].name;
   toast(`${cat.emoji} ${name} ได้ ${rankLabel}! คะแนน ${myScore} (คู่แข่ง ${rivals.join('/')}) +${coins}🪙${extra}`, rank === 1 ? 'good' : '');
   logMsg(`${cat.emoji} คอนเทสต์ ${cat.name}: ${name} ได้ ${rankLabel} (${myScore} คะแนน)${extra}`, rank === 1 ? 'big' : '');
-  checkAchievements();
+  checkAchievements(); bumpQuest('contestEnter');
   save(); renderTopbar(); renderContest();
 }
 function renderContest() {
@@ -1509,6 +1509,7 @@ function onCatchSuccess(ballKey) {
   addStreak(tier);            // สตรีคจับต่อเนื่อง
   addFriendship(2);           // มิตรภาพหัวหน้าทีม
   updateQuestProgress(mon, tier);
+  if (currentSpawn && currentSpawn.fishing) bumpQuest('fishCatch');
   checkEggHatch();
   checkRegionUnlocks();
   checkAchievements();
@@ -2127,15 +2128,26 @@ function checkEggHatch() {
 // ================================================================
 //  QUESTS
 // ================================================================
+// พูลแบบเควส — สุ่มเลือก 3 จากทั้งหมดทุกวัน ให้แต่ละวันไม่ซ้ำแนวเดิมตลอด (เดิมตายตัวแค่ 3 แบบ)
+const QUEST_DEFS = [
+  { type: 'catchAny', gen: () => { const n = rand(4, 8); return { target: n, name: `จับโปเกมอน ${n} ตัว`, rewardCoins: 60 + n * 10, rewardBall: ['poke', 3] }; } },
+  { type: 'catchType', gen: () => { const t = pick(ALL_TYPES), n = rand(2, 4); return { typeName: t, target: n, name: `จับธาตุ ${t} ${n} ตัว`, rewardCoins: 90 + n * 15, rewardBall: ['great', 2] }; } },
+  { type: 'catchRare', gen: () => { const n = rand(1, 3); return { target: n, name: `จับ Rare ขึ้นไป ${n} ตัว`, rewardCoins: 200, rewardBall: ['ultra', 1] }; } },
+  { type: 'winBattle', gen: () => { const n = rand(2, 4); return { target: n, name: `ชนะบอส/ยิม/หอคอย ${n} ครั้ง`, rewardCoins: 150 + n * 30, rewardBall: ['great', 3] }; } },
+  { type: 'fishCatch', gen: () => { const n = rand(2, 5); return { target: n, name: `ตกปลาได้โปเกมอน ${n} ตัว`, rewardCoins: 100 + n * 20, rewardBall: ['net', 2] }; } },
+  { type: 'contestEnter', gen: () => { const n = rand(1, 2); return { target: n, name: `ส่งเข้าประกวดคอนเทสต์ ${n} ครั้ง`, rewardCoins: 120, rewardBall: ['premier', 2] }; } },
+  { type: 'evolvePokemon', gen: () => { const n = 1; return { target: n, name: `วิวัฒนาการโปเกมอน ${n} ตัว`, rewardCoins: 250, rewardBall: ['ultra', 1] }; } },
+];
+function pickN(arr, n) {   // สุ่มหยิบ n ตัวไม่ซ้ำจาก arr
+  const pool = [...arr], out = [];
+  while (out.length < n && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  return out;
+}
 function makeQuests() {
-  const q = [];
-  const n1 = rand(4, 8);
-  q.push({ key: 'q1', type: 'catchAny', target: n1, progress: 0, name: `จับโปเกมอน ${n1} ตัว`, rewardCoins: 60 + n1 * 10, rewardBall: ['poke', 3], claimed: false });
-  const t = pick(ALL_TYPES), n2 = rand(2, 4);
-  q.push({ key: 'q2', type: 'catchType', typeName: t, target: n2, progress: 0, name: `จับธาตุ ${t} ${n2} ตัว`, rewardCoins: 90 + n2 * 15, rewardBall: ['great', 2], claimed: false });
-  const n3 = rand(1, 3);
-  q.push({ key: 'q3', type: 'catchRare', target: n3, progress: 0, name: `จับ Rare ขึ้นไป ${n3} ตัว`, rewardCoins: 200, rewardBall: ['ultra', 1], claimed: false });
-  return q;
+  return pickN(QUEST_DEFS, 3).map((def, i) => {
+    const g = def.gen();
+    return { key: 'q' + (i + 1), type: def.type, progress: 0, claimed: false, ...g };
+  });
 }
 function ensureDailyQuests() {
   if (state.questDate !== todayStr() || !state.quests.length) {
@@ -2150,6 +2162,14 @@ function updateQuestProgress(mon, tier) {
       || (q.type === 'catchType' && mon.types.includes(q.typeName))
       || (q.type === 'catchRare' && ['rare', 'superrare', 'legendary'].includes(tier));
     if (hit) { q.progress++; ch = true; }
+  }
+  if (ch) save();
+}
+function bumpQuest(type) {   // เพิ่มความคืบหน้าเควสประเภทที่ไม่เกี่ยวกับการจับ (ชนะ/ตกปลา/คอนเทสต์/วิวัฒนาการ)
+  let ch = false;
+  for (const q of state.quests) {
+    if (q.claimed || q.progress >= q.target) continue;
+    if (q.type === type) { q.progress++; ch = true; }
   }
   if (ch) save();
 }
@@ -3157,7 +3177,7 @@ function onFoeDown() {
     b.over = true; b.towerCleared = true;
     b.msg = `🏆 ผ่านชั้น ${floor}${b.special ? ' (บอส!)' : ''}! +${coins}🪙 +${bp}🎖️BP${itemMsg ? ' +' + itemMsg : ''}`;
     logMsg(`🗼 ผ่านหอคอยชั้น ${floor}! +${coins}🪙`, 'big');
-    playSfx('rare'); checkAchievements(); save(); renderTopbar();
+    playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
     return;
   }
   if (b.mode === 'trainer') {
@@ -3181,7 +3201,7 @@ function onFoeDown() {
     gainTrainerXp(150);
     b.msg = `🏆 ชนะ ${g.emoji} ${g.name}! +${g.reward}🪙 +${bp}🎖️BP${itemMsg ? ' +' + itemMsg : ''}${first ? ' +🎁กล่องสุ่ม (ชนะครั้งแรก!)' : ''}`;
     logMsg(`🏆 พิชิต <b>${g.name}</b>! +${g.reward}🪙 +${bp}BP ${itemMsg}`, 'big');
-    playSfx('rare'); checkAchievements(); save(); renderTopbar();
+    playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
     return;
   }
   b.over = true;
@@ -3195,7 +3215,7 @@ function onFoeDown() {
     gainXpTo(active.ind, Math.round(b.foeLevel * 2.5)); gainTrainerXp(80);
     b.msg = `🏆 ชนะบอส ${b.foeMon.name}! ได้ 🏅 เหรียญตรา + ${reward}🪙 + ${bp}🎖️BP + Ultra Ball ×2`;
     logMsg(`🏆 ชนะบอสเขต <b>${b.bossData.region.name}</b>! +${reward}🪙 +${bp}BP`, 'big');
-    playSfx('rare'); checkAchievements(); save(); renderTopbar();
+    playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
   } else {
     const xp = Math.round(b.foeLevel * 2);
     gainXpTo(active.ind, xp); gainTrainerXp(8);
