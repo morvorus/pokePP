@@ -2415,6 +2415,7 @@ function renderMenu() {
   $('#profileBox').querySelectorAll('[data-loadpreset]').forEach(el => el.onclick = () => loadPreset(+el.dataset.loadpreset));
   $('#profileBox').querySelectorAll('[data-delpreset]').forEach(el => el.onclick = () => deletePreset(+el.dataset.delpreset));
   renderHallOfFame();
+  renderBattleGuide();
   renderMerchant();
   renderRival();
   renderCloudUI();
@@ -2883,6 +2884,34 @@ function indRow(ind, sub) {
   return `<div class="ind-row" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}
     <div class="ir-main"><div class="ir-name">${ind.shiny ? '✨' : ''}${ind.nick || m.name}</div>
     <div class="ir-sub">${sub}</div></div></div>`;
+}
+// คู่มือต่อสู้ — สรุปตารางธาตุแพ้ทาง + Ability ทั้งหมด ให้ผู้เล่นดูอ้างอิงได้ในเกม (ไม่ต้องเจอเองทีละตัว)
+function renderBattleGuide() {
+  const box = $('#battleGuideBox'); if (!box) return;
+  const typeRows = ALL_TYPES.map(t => {
+    const row = TYPE_CHART[t] || {};
+    const strong = Object.keys(row).filter(k => row[k] === 2);
+    const weak = Object.keys(row).filter(k => row[k] === 0.5);
+    const immune = Object.keys(row).filter(k => row[k] === 0);
+    return `<div class="preset-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+      <span class="badge t-${t}" style="font-size:11px;padding:2px 8px">${t}</span>
+      <div style="font-size:11px;color:var(--muted);line-height:1.6">
+        ${strong.length ? `<div>⬆️ ได้เปรียบ: ${strong.join(', ')}</div>` : ''}
+        ${weak.length ? `<div>⬇️ เสียเปรียบ: ${weak.join(', ')}</div>` : ''}
+        ${immune.length ? `<div>🚫 ไม่มีผล: ${immune.join(', ')}</div>` : ''}
+        ${!strong.length && !weak.length && !immune.length ? '<div>ไม่มีธาตุที่ได้เปรียบ/เสียเปรียบเป็นพิเศษ</div>' : ''}
+      </div></div>`;
+  }).join('');
+  const abilityRows = Object.keys(TYPE_ABILITY).sort().map(t => {
+    const ab = TYPE_ABILITY[t];
+    return `<div class="preset-row"><span class="pr-name"><span class="badge t-${t}" style="font-size:10px;padding:1px 6px">${t}</span> <b>${ab.name}</b></span>
+      <span style="font-size:11px;color:var(--muted);text-align:right;max-width:55%">${ab.desc}</span></div>`;
+  }).join('');
+  box.innerHTML = `
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px">🔺 ตารางธาตุแพ้ทาง (มองจากฝ่ายโจมตี)</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">${typeRows}</div>
+    <div style="font-size:12px;font-weight:700;margin-bottom:6px">🧬 Ability ตามธาตุหลักของสายพันธุ์ (ครบ 18/18 ธาตุ)</div>
+    <div style="display:flex;flex-direction:column;gap:6px">${abilityRows}</div>`;
 }
 function renderHallOfFame() {
   const box = $('#hallOfFameBox'); if (!box) return;
