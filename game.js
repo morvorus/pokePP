@@ -665,7 +665,7 @@ function newSave() {
     quests: [], questDate: '',
     achievements: {},    // {achId:true} รับรางวัลแล้ว
     settings: { sound: true, music: false, spawnSpeed: 'normal',
-      rareAlerts: true, eventAlerts: true, mascotDeco: true, reduceMotion: false, confirmRelease: true },
+      rareAlerts: true, eventAlerts: true, mascotDeco: true, reduceMotion: false, confirmRelease: true, fastBattle: false },
     trainerXp: 0,
     streak: 0, lastLogin: '',
     lastSeen: Date.now(), playSec: 0,
@@ -2313,6 +2313,10 @@ function renderMenu() {
       <div class="toggle${st.confirmRelease ? ' on' : ''}" id="tConfirmRelease"></div>
     </div>
     <div class="set-row">
+      <div class="sr-label">⚡ โหมดต่อสู้เร็ว<div class="sr-sub">ข้ามการหน่วงเวลาแสดงผลทีละฝ่ายในการต่อสู้ (สู้เร็วขึ้นตอนบดตัวที่เคยชนะแล้ว)</div></div>
+      <div class="toggle${st.fastBattle ? ' on' : ''}" id="tFastBattle"></div>
+    </div>
+    <div class="set-row">
       <div class="sr-label">⏱️ ความเร็วการปรากฏ<div class="sr-sub">ปรับเวลารอโปเกมอนใหม่</div></div>
       <select class="set-select" id="selSpeed">
         <option value="fast"${st.spawnSpeed === 'fast' ? ' selected' : ''}>เร็ว</option>
@@ -2345,6 +2349,7 @@ function renderMenu() {
   $('#tMascotDeco').onclick = () => { st.mascotDeco = !st.mascotDeco; save(); renderMenu(); renderRegionBanner(); };
   $('#tReduceMotion').onclick = () => { st.reduceMotion = !st.reduceMotion; save(); applyReduceMotion(); renderMenu(); };
   $('#tConfirmRelease').onclick = () => { st.confirmRelease = !st.confirmRelease; save(); renderMenu(); };
+  $('#tFastBattle').onclick = () => { st.fastBattle = !st.fastBattle; save(); renderMenu(); };
   $('#selSpeed').onchange = e => { st.spawnSpeed = e.target.value; save(); toast('⏱️ ปรับความเร็วแล้ว', 'good'); };
   $('#btnExport').onclick = () => { $('#saveIO').value = exportSave(); toast('📤 สร้างโค้ดเซฟแล้ว — คัดลอกเก็บไว้', 'good'); };
   $('#btnCopy').onclick = () => {
@@ -3151,6 +3156,7 @@ function endRound(b) {
 // ===== เทิร์นต่อเทิร์น: แสดงผลฝ่ายที่ไปก่อนให้เห็นก่อน แล้วค่อยแสดงฝ่ายที่สองหลังหน่วงเวลา (แทนที่จะโชว์รวดเดียวทั้งสองฝ่าย) =====
 let battleBusy = false;   // ล็อกปุ่มระหว่างรอแสดงผลสเตจถัดไป กันกดซ้อนขณะรออนิเมชัน
 const TURN_REVEAL_MS = 750;
+const TURN_REVEAL_MS_FAST = 60;   // โหมดต่อสู้เร็ว — แทบไม่หน่วงเลย แต่ยังกันกดซ้อนได้
 function revealTurns(b, stage1Msg, finishFn) {
   battleBusy = true;
   b.msg = stage1Msg;
@@ -3159,7 +3165,7 @@ function revealTurns(b, stage1Msg, finishFn) {
     if (battleState !== b) { battleBusy = false; return; }   // ปิด/ออกจากการต่อสู้ไปแล้วระหว่างรอ กันชนกัน
     battleBusy = false;
     finishFn();
-  }, TURN_REVEAL_MS);
+  }, (state.settings && state.settings.fastBattle) ? TURN_REVEAL_MS_FAST : TURN_REVEAL_MS);
 }
 function battleAttack(moveIdx) {
   const b = battleState; if (!b || b.over || battleBusy) return;
