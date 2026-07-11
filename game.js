@@ -2630,6 +2630,7 @@ function renderMenu() {
   $('#profileBox').querySelectorAll('[data-loadpreset]').forEach(el => el.onclick = () => loadPreset(+el.dataset.loadpreset));
   $('#profileBox').querySelectorAll('[data-delpreset]').forEach(el => el.onclick = () => deletePreset(+el.dataset.delpreset));
   renderHallOfFame();
+  renderShinyDex();
   renderBattleGuide();
   renderMerchant();
   renderRival();
@@ -3219,6 +3220,24 @@ function renderBattleGuide() {
     <div style="font-size:12px;font-weight:700;margin-bottom:6px">🧬 Ability ตามธาตุหลักของสายพันธุ์ (ครบ 18/18 ธาตุ)</div>
     <div style="display:flex;flex-direction:column;gap:6px">${abilityRows}</div>`;
 }
+function renderShinyDex() {
+  const box = $('#shinyDexBox'); if (!box) return;
+  const shinies = state.caught.filter(c => c.shiny);
+  const speciesSet = new Set(shinies.map(c => c.id));
+  const uniqueIds = [...speciesSet].sort((a, b) => a - b);
+  const total = MONSTERS.length;
+  const pct = Math.round(speciesSet.size / total * 100);
+  box.innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-tile"><div class="st-num">✨ ${speciesSet.size}/${total}</div><div class="st-lbl">ชนิด Shiny (${pct}%)</div></div>
+      <div class="stat-tile"><div class="st-num">${shinies.length}</div><div class="st-lbl">ตัว Shiny รวม</div></div>
+    </div>
+    ${uniqueIds.length
+      ? `<div class="sr-sub" style="margin:8px 0 4px">Shiny ที่คุณมี (${uniqueIds.length} ชนิด):</div>
+         <div class="shiny-grid">${uniqueIds.map(id => `<div class="shiny-cell" title="${MON_BY_ID[id].name}${speciesShinyCount(id) > 1 ? ' ×' + speciesShinyCount(id) : ''}">${spriteImg(id, true, 'roster-mini')}${speciesShinyCount(id) > 1 ? `<span class="shiny-cnt">${speciesShinyCount(id)}</span>` : ''}</div>`).join('')}</div>`
+      : '<div class="sr-sub" style="margin-top:8px">ยังไม่มี Shiny — ออกล่าหาตัวแวววาว! (คอมโบจับตัวเดิมช่วยเพิ่มโอกาส) ✨</div>'}`;
+}
+function speciesShinyCount(id) { return state.caught.filter(c => c.id === id && c.shiny).length; }
 function renderHallOfFame() {
   const box = $('#hallOfFameBox'); if (!box) return;
   if (!state.caught.length) { box.innerHTML = `<div class="sr-sub">ยังไม่มีตัวในคลัง — จับสักตัวก่อนเพื่อเริ่มห้องโชว์!</div>`; return; }

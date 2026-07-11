@@ -603,6 +603,12 @@ main { flex: 1; padding: 12px; }
 .vs-start:active { transform: scale(.97); }
 @keyframes vsPulse { 0%,100% { box-shadow: 0 4px 14px rgba(226,59,78,.45); } 50% { box-shadow: 0 4px 22px rgba(226,59,78,.85); } }
 .reduce-motion .vs-start { animation: none; }
+/* ===== Shiny showcase ===== */
+.shiny-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; margin-top: 4px; }
+.shiny-cell { position: relative; aspect-ratio: 1; border-radius: 10px; background: radial-gradient(circle at 50% 40%, rgba(255,215,107,.22), rgba(0,0,0,.25)); border: 1px solid rgba(255,215,107,.35); display: flex; align-items: center; justify-content: center; }
+.shiny-cell img { width: 38px; height: 38px; object-fit: contain; image-rendering: pixelated; }
+.shiny-cell .shiny-cnt { position: absolute; bottom: -2px; right: 2px; font-size: 9px; font-weight: 800; background: rgba(0,0,0,.75); color: #ffd76b; padding: 0 4px; border-radius: 6px; }
+
 /* ===== Trade ===== */
 .trade-card { background: rgba(0,0,0,.2); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
 .trade-h { font-size: 12px; font-weight: 800; margin-bottom: 6px; color: #c9a3ff; }
