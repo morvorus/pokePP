@@ -1629,6 +1629,14 @@ function fleeSpawn() {
   logMsg(`💨 <b>${currentSpawn.mon.name}</b> หนีไปแล้ว...`, 'bad');
   clearSpawn(); scheduleSpawn();
 }
+// ตั้งตัวจับเวลาหนีใหม่ (ใช้หลังปาบอลพลาดแต่ยังไม่หนี — เผื่อเวลาขั้นต่ำถ้า deadline ผ่านไปแล้วตอนปาจังหวะสุดท้าย)
+function armDespawn() {
+  clearTimeout(despawnTimer);
+  if (!currentSpawn) return;
+  if (currentSpawn.deadline - Date.now() < 3000) currentSpawn.deadline = Date.now() + 3000;
+  despawnTimer = setTimeout(fleeSpawn, Math.max(0, currentSpawn.deadline - Date.now()));
+  startCountdown();
+}
 function clearSpawn() {
   currentSpawn = null;
   clearInterval(countdownTimer); clearTimeout(despawnTimer);
@@ -1816,6 +1824,8 @@ function throwBall(k) {
   if (have <= 0) { toast('❌ บอลหมด', 'bad'); return; }
   state.selBall = k;
   throwing = true;
+  // แช่แข็งตัวจับเวลาระหว่างแอนิเมชันปาบอล กันสปอว์นหนีกลางคัน (ปาจังหวะสุดท้ายแล้วเสียบอลฟรี)
+  clearTimeout(despawnTimer); clearInterval(countdownTimer);
   const prevThrows = currentSpawn.throws;   // จำนวนก่อนขว้างครั้งนี้ (ใช้เช็ค Quick Ball)
   state.balls[k]--;
   currentSpawn.throws++;
@@ -1840,6 +1850,7 @@ function throwBall(k) {
     ball.classList.remove('shake'); ball.classList.add('hidden');
     if (sprite) sprite.style.opacity = '';
     throwing = false;
+    if (!currentSpawn) return;             // กันเคสสปอว์นหายไปแล้ว (เช่น เปลี่ยนเขต) — บอลถูกหักไปแล้วแต่ไม่ crash
     if (success) onCatchSuccess(k);
     else { playSfx('fail'); onCatchFail(k); }
   }, 1750);
@@ -1900,6 +1911,8 @@ function onCatchFail(ballKey) {
   if (Math.random() < fledChance) {
     toast(`💨 ${currentSpawn.mon.name} หนีไปแล้ว!`, 'bad');
     clearSpawn(); scheduleSpawn();
+  } else {
+    armDespawn();   // ยังไม่หนี — ตั้งเวลาหนีใหม่ (กันสปอว์นค้างถาวรเพราะ timer ถูกแช่แข็งตอนปา)
   }
 }
 
