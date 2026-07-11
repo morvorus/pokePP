@@ -483,6 +483,13 @@ const ACHIEVEMENTS = [
   { id: 'rival10', ico: '🥇', name: 'จอมยุทธ์คู่แข่ง', desc: 'ชนะคู่แข่งประจำตัวรวม 10 ครั้ง', reward: 1500, goal: s => ((s.rival && s.rival.wins) || 0) >= 10, prog: s => [(s.rival && s.rival.wins) || 0, 10] },
   { id: 'firstmerchant', ico: '🧳', name: 'นักช้อปเร่ร่อน', desc: 'ซื้อของจากพ่อค้าเร่ครั้งแรก', reward: 150, goal: s => !!s._merchantBought, prog: s => [s._merchantBought ? 1 : 0, 1] },
   { id: 'firstharvest', ico: '🌾', name: 'ชาวไร่มือใหม่', desc: 'เก็บเกี่ยวไร่เบอร์รี่ครั้งแรก', reward: 150, goal: s => !!s._farmHarvested, prog: s => [s._farmHarvested ? 1 : 0, 1] },
+  { id: 'firstroute', ico: '🧭', name: 'นักเดินทางสายสู้', desc: 'ชนะเทรนเนอร์ประจำเส้นทางครั้งแรก', reward: 150, goal: s => (s.routeWins || 0) >= 1, prog: s => [s.routeWins || 0, 1] },
+  { id: 'route20', ico: '🛤️', name: 'เจ้าถนน', desc: 'ชนะเทรนเนอร์เส้นทางรวม 20 ครั้ง', reward: 800, goal: s => (s.routeWins || 0) >= 20, prog: s => [s.routeWins || 0, 20] },
+  { id: 'firstghost', ico: '👤', name: 'ดวลออนไลน์', desc: 'ชนะทีมผู้เล่นคนอื่น (Ghost) ครั้งแรก', reward: 300, goal: s => (s.ghostWins || 0) >= 1, prog: s => [s.ghostWins || 0, 1] },
+  { id: 'ghost15', ico: '⚔️', name: 'นักล่าผู้เล่น', desc: 'ชนะ Ghost Battle รวม 15 ครั้ง', reward: 1500, goal: s => (s.ghostWins || 0) >= 15, prog: s => [s.ghostWins || 0, 15] },
+  { id: 'combo10', ico: '🔥', name: 'ล่าต่อเนื่อง', desc: 'ทำคอมโบจับตัวเดิมถึง ×10', reward: 300, goal: s => (s.bestCombo || 0) >= 10, prog: s => [s.bestCombo || 0, 10] },
+  { id: 'combo30', ico: '💥', name: 'เจ้าแห่งคอมโบ', desc: 'ทำคอมโบจับตัวเดิมถึง ×30', reward: 1200, goal: s => (s.bestCombo || 0) >= 30, prog: s => [s.bestCombo || 0, 30] },
+  { id: 'firsttrade', ico: '🔄', name: 'มิตรภาพแลกเปลี่ยน', desc: 'เทรดโปเกมอนกับผู้เล่นอื่นสำเร็จครั้งแรก', reward: 300, goal: s => !!s._traded, prog: s => [s._traded ? 1 : 0, 1] },
 ];
 
 // รางวัลจบเดกซ์ (กดรับเองเมื่อถึงเกณฑ์)
@@ -1192,6 +1199,7 @@ function updateCatchCombo(monId, wasShiny) {
   if (c && c.id === monId) c.count++;
   else state.catchCombo = { id: monId, count: 1 };
   const cc = state.catchCombo;
+  if (cc.count > (state.bestCombo || 0)) state.bestCombo = cc.count;   // สถิติคอมโบสูงสุด (ใช้กับความสำเร็จ)
   if (cc.count === 5 || cc.count === 10 || cc.count === 20 || cc.count === 30) {
     toast(`🔥 คอมโบ ${MON_BY_ID[monId].name} ×${cc.count}! โอกาส Shiny เพิ่มขึ้น`, 'good');
   }
@@ -4152,6 +4160,7 @@ function onFoeDown() {
       const bp = 4 + Math.floor(trainerLevel() / 3);
       state.coins += g.reward;
       state.battlePoints = (state.battlePoints || 0) + bp;
+      state.routeWins = (state.routeWins || 0) + 1;
       const itemMsg = grantItemRewards(g.items);
       gainTrainerXp(40);
       b.victory = { trainerKey: foeTrainerName(b), emoji: g.emoji, title: g.name, coins: g.reward, bp, xp: 40, items: itemMsg, bonus: 'เทรนเนอร์เส้นทาง' };
@@ -4774,6 +4783,7 @@ async function tradeConfirm() {
   // สำเร็จ: เอาตัวเราออก + รับตัวเขาเข้า
   state.caught = state.caught.filter(c => c.uid !== uid);
   const got = receiveTradedMon(_tradeFound.offer_mon);
+  state._traded = true; checkAchievements();
   save();
   toast(`🎉 แลกสำเร็จ! ได้ ${MON_BY_ID[got.id].name} มา`, 'good');
   logMsg(`🔄 แลกสำเร็จ! ได้ <b>${MON_BY_ID[got.id].name}</b> จาก ${escapeHtml(_tradeFound.from_name || 'เทรนเนอร์')}`, 'big');
@@ -4811,12 +4821,13 @@ async function checkIncomingTrades() {
   for (const r of res.rows) {
     if (r.return_mon) {
       const got = receiveTradedMon(r.return_mon);
+      state._traded = true;
       toast(`🎁 ได้ ${MON_BY_ID[got.id].name} จากการเทรดที่สำเร็จ!`, 'good');
       logMsg(`🔄 เทรดสำเร็จ! ได้ <b>${MON_BY_ID[got.id].name}</b> ตอบแทนจาก ${escapeHtml(r.from_name || 'เพื่อน')}`, 'big');
     }
     await Cloud.markTradeCollected(r.id);
   }
-  save();
+  checkAchievements(); save();
 }
 async function cloudSyncNow() {
   if (!Cloud.loggedIn()) return;
