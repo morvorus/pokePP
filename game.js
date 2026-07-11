@@ -649,6 +649,7 @@ function trainerImg(name, cls) {
 function foeTrainerName(b) {
   if (!b) return null;
   if (b.isRival) return TRAINER_SPRITES.rival;
+  if (b.gym && b.gym.sprite) return b.gym.sprite;   // เทรนเนอร์เส้นทางมีสไปรต์เฉพาะตัว
   if (b.mode === 'trainer' && b.gym) return TRAINER_SPRITES[b.gym.id] || 'blackbelt';
   if (b.isBoss && b.bossData && b.bossData.region) return bossTrainerFor(b.bossData.region.id);
   return null;
@@ -1214,6 +1215,77 @@ function doSpawn() {
   // ชั้น shiny: overlay สุ่มแยกอิสระ (ซ้อนตัวที่สุ่มได้)
   const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier();
   beginSpawn(mon, shiny, false);
+  maybeSpawnRouteTrainer();
+}
+// ===== เทรนเนอร์ประจำเส้นทาง — สุ่มเจอระหว่างเดินป่า (โผล่เป็นแบนเนอร์ที่หน้าล่า) =====
+const ROUTE_TRAINERS = [
+  { name: 'เด็กหนุ่ม', sprite: 'youngster', emoji: '🧒', count: 2, mult: 0.9 },
+  { name: 'สาวน้อย', sprite: 'lass', emoji: '👧', count: 2, mult: 0.9 },
+  { name: 'นักเดินเขา', sprite: 'hiker', emoji: '🧗', count: 2, mult: 1.0 },
+  { name: 'จอมพลัง', sprite: 'blackbelt', emoji: '🥋', count: 2, mult: 1.05 },
+  { name: 'นักว่ายน้ำ', sprite: 'swimmer-gen4', emoji: '🏊', count: 2, mult: 1.0 },
+  { name: 'นักวิทยาศาสตร์', sprite: 'scientist', emoji: '🔬', count: 3, mult: 1.0 },
+  { name: 'จอมพลังจิต', sprite: 'psychic', emoji: '🔮', count: 2, mult: 1.1 },
+  { name: 'ทหารผ่านศึก', sprite: 'veteran', emoji: '🎖️', count: 3, mult: 1.2 },
+];
+let currentRouteTrainer = null;   // { cls, deadline } — ชั่วคราว ไม่เซฟลงเครื่อง
+const ROUTE_TRAINER_CHANCE = 0.12;
+const ROUTE_TRAINER_MS = 60000;
+function maybeSpawnRouteTrainer() {
+  if (currentRouteTrainer) return;
+  if (!partyMembers().length) return;
+  if (state.safari && state.safari.left > 0) return;
+  if (Math.random() > ROUTE_TRAINER_CHANCE) return;
+  const cls = pick(ROUTE_TRAINERS);
+  currentRouteTrainer = { cls, deadline: Date.now() + ROUTE_TRAINER_MS };
+  renderRouteTrainer();
+  playSfx();
+  logMsg(`${cls.emoji} <b>${cls.name}</b> อยากท้าดวล!`, '');
+}
+function renderRouteTrainer() {
+  const el = $('#routeTrainer'); if (!el) return;
+  if (!currentRouteTrainer || currentRouteTrainer.deadline < Date.now()) {
+    currentRouteTrainer = null; el.classList.add('hidden'); el.innerHTML = ''; return;
+  }
+  const cls = currentRouteTrainer.cls;
+  el.classList.remove('hidden');
+  el.innerHTML = `
+    <div class="rt-portrait">${trainerImg(cls.sprite, 'rt-tr')}<span class="rt-emoji">${cls.emoji}</span></div>
+    <div class="rt-info"><div class="rt-name">${cls.emoji} ${cls.name} ท้าดวล!</div><div class="rt-sub">ทีม ${cls.count} ตัว · ชนะได้เหรียญ + XP</div></div>
+    <div class="rt-btns"><button class="rt-fight" id="rtFight">สู้!</button><button class="rt-skip" id="rtSkip">ข้าม</button></div>`;
+  $('#rtFight').onclick = startRouteTrainerBattle;
+  $('#rtSkip').onclick = () => { currentRouteTrainer = null; renderRouteTrainer(); };
+}
+function startRouteTrainerBattle() {
+  if (!currentRouteTrainer) return;
+  const members = partyMembers();
+  if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
+  const cls = currentRouteTrainer.cls;
+  const r = region();
+  const baseLvl = clamp(Math.round((r.lvl[0] + r.lvl[1]) / 2), 3, 100);
+  const pool = (r._pool && r._pool.length) ? r._pool : MONSTERS;
+  const queue = [];
+  for (let i = 0; i < cls.count; i++) {
+    const isAce = i === cls.count - 1;
+    const mon = pick(pool);
+    const lv = clamp(baseLvl + rand(-2, 2) + (isAce ? 3 : 0), 2, 100);
+    queue.push(makeFoeDef(mon, lv, cls.mult * (isAce ? 1.1 : 1), isAce));
+  }
+  const team = buildBattleTeam(members);
+  const reward = 120 + baseLvl * 6;
+  const routeGym = { id: 'route', name: cls.name, emoji: cls.emoji, sprite: cls.sprite, reward, items: Math.random() < 0.4 ? [['great', 1]] : [] };
+  battleState = {
+    mode: 'trainer', isBoss: false, isRoute: true, gym: routeGym, foeQueue: queue, foeIdx: 0,
+    foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp, foeHeld: queue[0].held || null,
+    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
+    usedMega: false, usedDynamax: false,
+    showIntro: !(state.settings && state.settings.fastBattle),
+    msg: `${cls.emoji} ${cls.name} ท้าดวล! ทีม ${cls.count} ตัว!`,
+  };
+  currentRouteTrainer = null; renderRouteTrainer();
+  battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
+  renderBattle();
+  $('#battleModal').classList.remove('hidden');
 }
 // สร้าง spawn จริง (ใช้ร่วมกันทั้งเดินป่าปกติและตกปลา)
 function beginSpawn(mon, shiny, fromFishing) {
@@ -3950,6 +4022,19 @@ function onFoeDown() {
       return;   // ยังไม่จบ สู้ตัวต่อไป
     }
     b.over = true;
+    if (b.isRoute) {   // ชนะเทรนเนอร์เส้นทาง — รางวัลย่อม ไม่แตะ state ยิม/คู่แข่ง
+      const g = b.gym;
+      const bp = 4 + Math.floor(trainerLevel() / 3);
+      state.coins += g.reward;
+      state.battlePoints = (state.battlePoints || 0) + bp;
+      const itemMsg = grantItemRewards(g.items);
+      gainTrainerXp(40);
+      b.victory = { trainerKey: foeTrainerName(b), emoji: g.emoji, title: g.name, coins: g.reward, bp, xp: 40, items: itemMsg, bonus: 'เทรนเนอร์เส้นทาง' };
+      b.msg = `${g.emoji} ชนะ ${g.name}! +${g.reward}🪙 +${bp}🎖️BP${itemMsg ? ' +' + itemMsg : ''}`;
+      logMsg(`${g.emoji} ชนะ <b>${g.name}</b>! +${g.reward}🪙`, '');
+      playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
+      return;
+    }
     if (b.isRival) {   // ชนะคู่แข่ง (แยกจากยิม ไม่แตะ state.gymsBeaten)
       state.rival = state.rival || { readyAt: 0, wins: 0, losses: 0 };
       state.rival.wins = (state.rival.wins || 0) + 1;
@@ -4266,6 +4351,7 @@ function renderCurrentView() {
   else if (currentView === 'shop') renderShop();
   else if (currentView === 'quest') renderQuests();
   else if (currentView === 'menu') renderMenu();
+  else if (currentView === 'home') renderRouteTrainer();
 }
 
 // ================================================================
