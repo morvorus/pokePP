@@ -132,6 +132,20 @@ const Cloud = {
       return { ok: true, rows };
     } catch (e) { return { error: String(e) }; }
   },
+  // ท้าเพื่อนเจาะจงด้วยชื่อ (friend code = ชื่อที่แสดงบนกระดาน)
+  async ghostByName(name) {
+    if (!this.enabled) return { error: 'cloud ปิดอยู่' };
+    try {
+      const { data, error } = await this.client
+        .from('leaderboard').select('user_id, name, team, dex, tower')
+        .eq('name', name).not('team', 'is', null)
+        .order('updated_at', { ascending: false }).limit(1).maybeSingle();
+      if (error) return { error: error.message };
+      if (!data || !Array.isArray(data.team) || !data.team.length) return { ok: true, ghost: null };
+      if (this.user && data.user_id === this.user.id) return { ok: true, ghost: null, own: true };
+      return { ok: true, ghost: data };
+    } catch (e) { return { error: String(e) }; }
+  },
   // ดึงอันดับสูงสุดตามคอลัมน์ (dex/playtime/tower/caught)
   async topScores(column, limit) {
     if (!this.enabled) return { error: 'cloud ปิดอยู่' };

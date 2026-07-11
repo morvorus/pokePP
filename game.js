@@ -4612,12 +4612,29 @@ function renderGhostArena() {
   const box = $('#ghostBox'); if (!box) return;
   if (!(window.Cloud && Cloud.enabled)) { box.innerHTML = `<div class="sr-sub">ต้องตั้งค่าคลาวด์ก่อนถึงจะสู้ออนไลน์ได้</div>`; return; }
   if (!Cloud.loggedIn()) { box.innerHTML = `<div class="sr-sub">เข้าสู่ระบบก่อน (ส่วน "☁️ บัญชี / เซฟคลาวด์") แล้ว 📤 ส่งสถิติที่กระดานเพื่อลงทะเบียนทีม</div>`; return; }
+  const myName = state.playerName || '(ยังไม่ตั้งชื่อ — ตั้งที่กระดานอันดับ)';
   box.innerHTML = `
     <div class="sr-sub" style="margin-bottom:6px">สู้กับทีมของผู้เล่นคนอื่นแบบ AI · ชนะได้เหรียญ + BP<br>(อย่าลืม 📤 ส่งสถิติที่กระดาน เพื่อให้ทีมคุณโผล่ให้คนอื่นสู้ด้วย)</div>
-    <button class="set-btn" id="ghostRefresh" style="width:100%;margin-bottom:8px">🔄 หาคู่ต่อสู้</button>
+    <div class="trade-card" style="margin-bottom:8px">
+      <div class="trade-h">🎯 ท้าเพื่อนเจาะจง (ใส่ชื่อเพื่อน)</div>
+      <div class="sr-sub" style="margin-bottom:5px">ชื่อของคุณ: <b class="trade-code">${escapeHtml(myName)}</b> — บอกเพื่อนเพื่อให้เขาท้าคุณ</div>
+      <div style="display:flex;gap:6px"><input class="save-io" id="ghostFriendName" maxlength="24" placeholder="ชื่อเพื่อน" style="min-height:auto;padding:9px;flex:1;font-family:inherit;font-size:13px"><button class="set-btn" id="ghostFriendBtn">ท้า!</button></div>
+    </div>
+    <button class="set-btn" id="ghostRefresh" style="width:100%;margin-bottom:8px">🔄 หาคู่สุ่ม</button>
     <div id="ghostList"></div>`;
   $('#ghostRefresh').onclick = ghostRefresh;
+  $('#ghostFriendBtn').onclick = ghostChallengeFriend;
   if (_ghostCache) renderGhostList(_ghostCache);
+}
+async function ghostChallengeFriend() {
+  const name = ($('#ghostFriendName').value || '').trim();
+  if (!name) { toast('กรอกชื่อเพื่อนก่อน', 'bad'); return; }
+  toast('⏳ กำลังหาเพื่อน...', '');
+  const res = await Cloud.ghostByName(name);
+  if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  if (res.own) { toast('นี่คือชื่อของคุณเอง', 'bad'); return; }
+  if (!res.ghost) { toast('ไม่พบเพื่อนชื่อนี้ (ต้องส่งสถิติ+ทีมที่กระดานก่อน)', 'bad'); return; }
+  startGhostBattle(res.ghost);
 }
 async function ghostRefresh() {
   const list = $('#ghostList'); if (list) list.innerHTML = `<div class="sr-sub">⏳ กำลังค้นหา...</div>`;
