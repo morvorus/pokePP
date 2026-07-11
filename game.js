@@ -2628,6 +2628,7 @@ function renderMenu() {
   renderCloudUI();
   renderLeaderboard();
   renderGhostArena();
+  renderTrade();
   renderIdle();
   renderTower();
   renderGyms();
@@ -4488,6 +4489,7 @@ async function initCloud() {
     const cloud = await Cloud.pull();
     if (cloud && cloud.data) applyCloudSave(cloud.data, true);
     else await Cloud.push(state);   // บัญชีใหม่ → ดันเซฟปัจจุบันขึ้น
+    checkIncomingTrades();          // รับตัวที่เพื่อนส่งกลับจากเทรด
   }
   Cloud.onAuth(() => renderCloudUI());
   renderCloudUI();
@@ -4510,6 +4512,7 @@ async function cloudSignIn() {
   const cloud = await Cloud.pull();
   if (cloud && cloud.data) applyCloudSave(cloud.data, false);
   else { await Cloud.push(state); toast('✅ เข้าสู่ระบบ (ดันเซฟปัจจุบันขึ้นคลาวด์)', 'good'); }
+  checkIncomingTrades();
   renderCloudUI();
 }
 async function cloudSignUp() {
@@ -4657,6 +4660,146 @@ function startGhostBattle(ghost) {
   battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
   renderBattle();
   $('#battleModal').classList.remove('hidden');
+}
+// ================================================================
+//  TRADE — เทรดโปเกมอนระหว่างผู้เล่นจริงผ่านโค้ด (คลาวด์)
+// ================================================================
+function tradeMonSnapshot(ind) { const s = Object.assign({}, ind); delete s.uid; return s; }
+function receiveTradedMon(snap) {   // เพิ่มตัวที่ได้จากเทรดเข้าคลัง (uid ใหม่ กันชนกัน)
+  const ind = Object.assign({}, snap, { uid: genUid(), ts: Date.now() });
+  state.caught.push(ind);
+  state.seen[ind.id] = true;
+  return ind;
+}
+function genTradeCode() {
+  const cs = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';   // ตัดตัวที่สับสน (0/O, 1/I/L)
+  let s = ''; for (let i = 0; i < 6; i++) s += cs[Math.floor(Math.random() * cs.length)];
+  return s;
+}
+function monLabel(m) {
+  const mon = MON_BY_ID[m.id]; if (!mon) return '???';
+  return `${m.shiny ? '✨' : ''}${mon.name} Lv.${m.level} · IV ${m.iv ? ivPercent(m) : '?'}%`;
+}
+let _tradeFound = null;   // ผลการค้นหาโค้ดล่าสุด
+function renderTrade() {
+  const box = $('#tradeBox'); if (!box) return;
+  if (!(window.Cloud && Cloud.enabled)) { box.innerHTML = `<div class="sr-sub">ต้องตั้งค่าคลาวด์ก่อนถึงจะเทรดได้</div>`; return; }
+  if (!Cloud.loggedIn()) { box.innerHTML = `<div class="sr-sub">เข้าสู่ระบบก่อน (ส่วน "☁️ บัญชี / เซฟคลาวด์") เพื่อเทรดกับเพื่อน</div>`; return; }
+  const pool = state.caught.filter(c => !state.party.includes(c.uid) && !c.lock).sort((a, b) => ivPercent(b) - ivPercent(a));
+  const opts = pool.map(c => `<option value="${c.uid}">${monLabel(c)}</option>`).join('');
+  box.innerHTML = `
+    <div class="sr-sub" style="margin-bottom:8px">เทรดตัวจริงกับเพื่อนผ่านโค้ด · ตัวในทีม/ตัวที่ล็อกจะไม่ถูกเทรด</div>
+    <div class="trade-card">
+      <div class="trade-h">📤 สร้างข้อเสนอ (ส่งโค้ดให้เพื่อน)</div>
+      ${pool.length ? `<select class="set-select trade-sel" id="tradeGiveSel" style="width:100%">${opts}</select>
+      <button class="set-btn" id="tradeCreate" style="width:100%;margin-top:6px;background:var(--good);color:#062611">สร้างโค้ดเทรด</button>` : `<div class="sr-sub">ไม่มีตัวที่เทรดได้ (ทุกตัวอยู่ในทีมหรือถูกล็อก)</div>`}
+    </div>
+    <div class="trade-card">
+      <div class="trade-h">📥 รับเทรด (กรอกโค้ดจากเพื่อน)</div>
+      <div style="display:flex;gap:6px"><input class="save-io trade-code-in" id="tradeCodeIn" maxlength="6" placeholder="รหัส 6 ตัว" style="min-height:auto;padding:9px;flex:1;text-transform:uppercase;font-family:monospace;letter-spacing:2px"><button class="set-btn" id="tradeFind">ค้นหา</button></div>
+      <div id="tradeFoundBox"></div>
+    </div>
+    <div class="trade-card"><div class="trade-h">📋 ข้อเสนอที่เปิดอยู่ของคุณ</div><div id="tradeOpenList"><div class="sr-sub">⏳ ...</div></div></div>`;
+  const cBtn = $('#tradeCreate'); if (cBtn) cBtn.onclick = tradeCreate;
+  $('#tradeFind').onclick = tradeFind;
+  renderTradeFound();
+  loadMyOpenTrades();
+}
+async function tradeCreate() {
+  const uid = $('#tradeGiveSel') && $('#tradeGiveSel').value;
+  const ind = uid && indByUid(uid);
+  if (!ind) { toast('เลือกตัวที่จะเทรดก่อน', 'bad'); return; }
+  if (state.party.includes(uid)) { toast('เอาออกจากทีมก่อนถึงจะเทรดได้', 'bad'); return; }
+  const code = genTradeCode();
+  toast('⏳ กำลังสร้างข้อเสนอ...', '');
+  const res = await Cloud.createTrade(code, state.playerName, tradeMonSnapshot(ind));
+  if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  // นำตัวออกจากคลัง (ฝากไว้บนคลาวด์จนกว่าจะมีคนแลก/ยกเลิก)
+  state.caught = state.caught.filter(c => c.uid !== uid);
+  save();
+  toast(`✅ สร้างโค้ดแล้ว: ${code} — ส่งให้เพื่อนกรอกเพื่อแลก`, 'good');
+  logMsg(`🔄 สร้างข้อเสนอเทรด <b>${MON_BY_ID[ind.id].name}</b> · โค้ด <b>${code}</b>`, 'big');
+  renderTrade(); renderCurrentView();
+}
+async function tradeFind() {
+  const code = ($('#tradeCodeIn').value || '').trim().toUpperCase();
+  if (code.length !== 6) { toast('กรอกรหัส 6 ตัว', 'bad'); return; }
+  toast('⏳ กำลังค้นหา...', '');
+  const res = await Cloud.findTrade(code);
+  if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  if (res.own) { toast('นี่คือโค้ดของคุณเอง', 'bad'); _tradeFound = null; renderTradeFound(); return; }
+  if (!res.trade) { toast('ไม่พบข้อเสนอนี้ (อาจถูกแลก/ยกเลิกแล้ว)', 'bad'); _tradeFound = null; renderTradeFound(); return; }
+  _tradeFound = res.trade;
+  renderTradeFound();
+}
+function renderTradeFound() {
+  const box = $('#tradeFoundBox'); if (!box) return;
+  if (!_tradeFound) { box.innerHTML = ''; return; }
+  const t = _tradeFound;
+  const pool = state.caught.filter(c => !state.party.includes(c.uid) && !c.lock).sort((a, b) => ivPercent(b) - ivPercent(a));
+  const opts = pool.map(c => `<option value="${c.uid}">${monLabel(c)}</option>`).join('');
+  box.innerHTML = `<div class="trade-offer">
+    <div class="trade-offer-mon">${spriteImg(t.offer_mon.id, t.offer_mon.shiny, 'roster-mini')}<div><b>${escapeHtml(t.from_name || 'เทรนเนอร์')}</b> เสนอ<br>${monLabel(t.offer_mon)}</div></div>
+    ${pool.length ? `<div class="sr-sub" style="margin:6px 0 3px">เลือกตัวที่จะให้ตอบแทน:</div>
+    <select class="set-select" id="tradeReturnSel" style="width:100%">${opts}</select>
+    <button class="set-btn" id="tradeConfirm" style="width:100%;margin-top:6px;background:var(--good);color:#062611">✅ ยืนยันแลก</button>` : `<div class="sr-sub">คุณไม่มีตัวที่จะให้ตอบแทน (ทุกตัวอยู่ในทีม/ล็อก)</div>`}
+  </div>`;
+  const cf = $('#tradeConfirm'); if (cf) cf.onclick = tradeConfirm;
+}
+async function tradeConfirm() {
+  if (!_tradeFound) return;
+  const uid = $('#tradeReturnSel') && $('#tradeReturnSel').value;
+  const ind = uid && indByUid(uid);
+  if (!ind) { toast('เลือกตัวที่จะให้ตอบแทน', 'bad'); return; }
+  toast('⏳ กำลังแลก...', '');
+  const res = await Cloud.completeTrade(_tradeFound.id, tradeMonSnapshot(ind));
+  if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  // สำเร็จ: เอาตัวเราออก + รับตัวเขาเข้า
+  state.caught = state.caught.filter(c => c.uid !== uid);
+  const got = receiveTradedMon(_tradeFound.offer_mon);
+  save();
+  toast(`🎉 แลกสำเร็จ! ได้ ${MON_BY_ID[got.id].name} มา`, 'good');
+  logMsg(`🔄 แลกสำเร็จ! ได้ <b>${MON_BY_ID[got.id].name}</b> จาก ${escapeHtml(_tradeFound.from_name || 'เทรนเนอร์')}`, 'big');
+  _tradeFound = null;
+  renderTrade(); renderCurrentView();
+}
+async function loadMyOpenTrades() {
+  const list = $('#tradeOpenList'); if (!list) return;
+  const res = await Cloud.myOpenTrades();
+  if (!$('#tradeOpenList')) return;
+  if (res.error) { $('#tradeOpenList').innerHTML = `<div class="sr-sub">⚠️ ยังใช้ไม่ได้ — ต้องสร้างตาราง trades ใน Supabase ก่อน (ดู CLOUD_SETUP.md)<br><span style="opacity:.6">${escapeHtml(res.error)}</span></div>`; return; }
+  if (!res.rows.length) { $('#tradeOpenList').innerHTML = `<div class="sr-sub">ยังไม่มีข้อเสนอที่เปิดอยู่</div>`; return; }
+  $('#tradeOpenList').innerHTML = res.rows.map(r => `<div class="trade-open-row">
+    <span>${spriteImg(r.offer_mon.id, r.offer_mon.shiny, 'roster-mini')}</span>
+    <span class="trade-open-info"><b>${monLabel(r.offer_mon)}</b><br>โค้ด <b class="trade-code">${r.code}</b></span>
+    <button class="rt-skip" data-cancel="${r.id}">ยกเลิก</button></div>`).join('');
+  $('#tradeOpenList').querySelectorAll('[data-cancel]').forEach(el => el.onclick = () => tradeCancel(el.dataset.cancel, res.rows.find(x => x.id === el.dataset.cancel)));
+}
+async function tradeCancel(id, row) {
+  toast('⏳ กำลังยกเลิก...', '');
+  const res = await Cloud.cancelTrade(id);
+  if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  // คืนตัวกลับคลัง
+  if (res.trade && res.trade.offer_mon) receiveTradedMon(res.trade.offer_mon);
+  else if (row && row.offer_mon) receiveTradedMon(row.offer_mon);
+  save();
+  toast('↩️ ยกเลิกแล้ว คืนตัวกลับคลัง', 'good');
+  renderTrade(); renderCurrentView();
+}
+// เรียกตอนโหลดเกม/ล็อกอิน — รับตัวที่เพื่อนส่งกลับจากเทรดที่แลกสำเร็จ
+async function checkIncomingTrades() {
+  if (!(window.Cloud && Cloud.loggedIn())) return;
+  const res = await Cloud.myIncomingTrades();
+  if (res.error || !res.rows || !res.rows.length) return;
+  for (const r of res.rows) {
+    if (r.return_mon) {
+      const got = receiveTradedMon(r.return_mon);
+      toast(`🎁 ได้ ${MON_BY_ID[got.id].name} จากการเทรดที่สำเร็จ!`, 'good');
+      logMsg(`🔄 เทรดสำเร็จ! ได้ <b>${MON_BY_ID[got.id].name}</b> ตอบแทนจาก ${escapeHtml(r.from_name || 'เพื่อน')}`, 'big');
+    }
+    await Cloud.markTradeCollected(r.id);
+  }
+  save();
 }
 async function cloudSyncNow() {
   if (!Cloud.loggedIn()) return;

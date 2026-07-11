@@ -145,6 +145,76 @@ const Cloud = {
     } catch (e) { return { error: String(e) }; }
   },
 
+  // ===== เทรดโปเกมอนระหว่างผู้เล่น (ต้องสร้างตาราง public.trades — ดู CLOUD_SETUP.md) =====
+  async createTrade(code, fromName, offerMon) {
+    if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };
+    try {
+      const { error } = await this.client.from('trades').insert({
+        code, from_user: this.user.id, from_name: (fromName || 'เทรนเนอร์').slice(0, 24),
+        offer_mon: offerMon, status: 'open',
+      });
+      if (error) return { error: error.message };
+      return { ok: true, code };
+    } catch (e) { return { error: String(e) }; }
+  },
+  async findTrade(code) {
+    if (!this.enabled) return { error: 'cloud ปิดอยู่' };
+    try {
+      const { data, error } = await this.client.from('trades')
+        .select('id, code, from_user, from_name, offer_mon, status').eq('code', code).eq('status', 'open').maybeSingle();
+      if (error) return { error: error.message };
+      if (!data) return { ok: true, trade: null };
+      if (data.from_user === this.user.id) return { ok: true, trade: null, own: true };
+      return { ok: true, trade: data };
+    } catch (e) { return { error: String(e) }; }
+  },
+  async completeTrade(id, returnMon) {
+    if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };
+    try {
+      const { data, error } = await this.client.from('trades')
+        .update({ to_user: this.user.id, return_mon: returnMon, status: 'completed' })
+        .eq('id', id).eq('status', 'open').select().maybeSingle();
+      if (error) return { error: error.message };
+      if (!data) return { error: 'เทรดนี้ถูกรับไปแล้วหรือไม่พบ' };
+      return { ok: true, trade: data };
+    } catch (e) { return { error: String(e) }; }
+  },
+  async myOpenTrades() {
+    if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };
+    try {
+      const { data, error } = await this.client.from('trades')
+        .select('id, code, offer_mon, created_at').eq('from_user', this.user.id).eq('status', 'open').order('created_at', { ascending: false });
+      if (error) return { error: error.message };
+      return { ok: true, rows: data || [] };
+    } catch (e) { return { error: String(e) }; }
+  },
+  async myIncomingTrades() {   // เทรดที่คนอื่นแลกแล้ว รอเรารับตัวที่เขาส่งกลับ
+    if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };
+    try {
+      const { data, error } = await this.client.from('trades')
+        .select('id, return_mon, from_name, to_user').eq('from_user', this.user.id).eq('status', 'completed').eq('from_collected', false);
+      if (error) return { error: error.message };
+      return { ok: true, rows: data || [] };
+    } catch (e) { return { error: String(e) }; }
+  },
+  async markTradeCollected(id) {
+    if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };
+    try {
+      const { error } = await this.client.from('trades').update({ from_collected: true }).eq('id', id);
+      if (error) return { error: error.message };
+      return { ok: true };
+    } catch (e) { return { error: String(e) }; }
+  },
+  async cancelTrade(id) {
+    if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };
+    try {
+      const { data, error } = await this.client.from('trades').delete().eq('id', id).eq('from_user', this.user.id).eq('status', 'open').select().maybeSingle();
+      if (error) return { error: error.message };
+      if (!data) return { error: 'ยกเลิกไม่ได้ (อาจถูกรับไปแล้ว)' };
+      return { ok: true, trade: data };
+    } catch (e) { return { error: String(e) }; }
+  },
+
   email() { return this.user ? this.user.email : null; },
   loggedIn() { return this.enabled && !!this.user; },
 };

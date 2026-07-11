@@ -603,6 +603,17 @@ main { flex: 1; padding: 12px; }
 .vs-start:active { transform: scale(.97); }
 @keyframes vsPulse { 0%,100% { box-shadow: 0 4px 14px rgba(226,59,78,.45); } 50% { box-shadow: 0 4px 22px rgba(226,59,78,.85); } }
 .reduce-motion .vs-start { animation: none; }
+/* ===== Trade ===== */
+.trade-card { background: rgba(0,0,0,.2); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; }
+.trade-h { font-size: 12px; font-weight: 800; margin-bottom: 6px; color: #c9a3ff; }
+.trade-offer { margin-top: 8px; background: rgba(142,91,255,.12); border: 1px solid rgba(142,91,255,.3); border-radius: 10px; padding: 8px 10px; }
+.trade-offer-mon { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.trade-offer-mon img { width: 40px; height: 40px; image-rendering: pixelated; object-fit: contain; }
+.trade-open-row { display: flex; align-items: center; gap: 8px; padding: 6px 4px; font-size: 12px; border-top: 1px solid rgba(255,255,255,.06); }
+.trade-open-row img { width: 32px; height: 32px; image-rendering: pixelated; object-fit: contain; }
+.trade-open-info { flex: 1; min-width: 0; line-height: 1.4; }
+.trade-code { color: #ffd76b; font-family: monospace; letter-spacing: 1px; font-size: 14px; }
+
 /* ===== Ghost battle ===== */
 .ghost-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgba(0,0,0,.2); border-radius: 10px; margin-bottom: 6px; }
 .ghost-info { flex: 1; min-width: 0; }

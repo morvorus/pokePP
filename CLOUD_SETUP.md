@@ -42,6 +42,28 @@ alter table public.leaderboard enable row level security;
 create policy "lb public read"  on public.leaderboard for select using (true);
 create policy "lb own insert" on public.leaderboard for insert with check (auth.uid() = user_id);
 create policy "lb own update" on public.leaderboard for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ===== (ตัวเลือก) ตารางเทรดโปเกมอนระหว่างผู้เล่น =====
+create table public.trades (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  from_user uuid not null references auth.users(id) on delete cascade,
+  from_name text,
+  to_user uuid references auth.users(id),
+  offer_mon jsonb not null,     -- ตัวที่ผู้สร้างเสนอ
+  return_mon jsonb,             -- ตัวที่ผู้รับส่งกลับ
+  status text default 'open',   -- open | completed
+  from_collected boolean default false,
+  created_at timestamptz default now()
+);
+alter table public.trades enable row level security;
+-- อ่านได้: รายการ open (ค้นด้วยโค้ด) หรือของที่เกี่ยวกับตัวเอง
+create policy "trade read"   on public.trades for select using (status = 'open' or auth.uid() = from_user or auth.uid() = to_user);
+create policy "trade insert" on public.trades for insert with check (auth.uid() = from_user);
+-- อัปเดต: เจ้าของ หรือผู้เล่นที่กำลังรับเทรด open อยู่
+create policy "trade update" on public.trades for update using (status = 'open' or auth.uid() = from_user or auth.uid() = to_user) with check (true);
+-- ลบ: เจ้าของยกเลิกข้อเสนอ open ของตัวเอง
+create policy "trade delete" on public.trades for delete using (auth.uid() = from_user);
 ```
 
 ## 3. (แนะนำ) ปิดยืนยันอีเมล เพื่อล็อกอินง่ายขึ้น
