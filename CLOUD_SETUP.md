@@ -42,6 +42,7 @@ alter table public.leaderboard enable row level security;
 create policy "lb public read"  on public.leaderboard for select using (true);
 create policy "lb own insert" on public.leaderboard for insert with check (auth.uid() = user_id);
 create policy "lb own update" on public.leaderboard for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "lb own delete" on public.leaderboard for delete using (auth.uid() = user_id);
 
 -- ===== (ตัวเลือก) ตารางเทรดโปเกมอนระหว่างผู้เล่น =====
 create table public.trades (

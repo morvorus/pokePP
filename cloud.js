@@ -105,11 +105,12 @@ const Cloud = {
   async submitScore(score) {
     if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };
     try {
+      const cap = (v, max) => Math.max(0, Math.min(max, v | 0));   // กันค่าเว่อร์ชั้นที่สอง
       const row = {
         user_id: this.user.id,
         name: (score.name || 'เทรนเนอร์').slice(0, 24),
-        dex: score.dex | 0, playtime: score.playtime | 0,
-        tower: score.tower | 0, caught: score.caught | 0,
+        dex: cap(score.dex, 2000), playtime: cap(score.playtime, 5259600),
+        tower: cap(score.tower, 999), caught: cap(score.caught, 9999999),
         updated_at: new Date().toISOString(),
       };
       if (score.team) row.team = score.team;   // สแนปช็อตทีมสำหรับ Ghost Battle (ถ้ามีคอลัมน์ team)
@@ -144,6 +145,16 @@ const Cloud = {
       if (!data || !Array.isArray(data.team) || !data.team.length) return { ok: true, ghost: null };
       if (this.user && data.user_id === this.user.id) return { ok: true, ghost: null, own: true };
       return { ok: true, ghost: data };
+    } catch (e) { return { error: String(e) }; }
+  },
+  // ลบสถิติของตัวเองออกจากกระดาน (ต้องมี delete policy)
+  async deleteMyScore() {
+    if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };
+    try {
+      const { data, error } = await this.client.from('leaderboard').delete().eq('user_id', this.user.id).select();
+      if (error) return { error: error.message };
+      if (!data || !data.length) return { error: 'ลบไม่สำเร็จ — ยังไม่ได้เพิ่ม delete policy (ดู CLOUD_SETUP.md)' };
+      return { ok: true };
     } catch (e) { return { error: String(e) }; }
   },
   // ดึงอันดับสูงสุดตามคอลัมน์ (dex/playtime/tower/caught)

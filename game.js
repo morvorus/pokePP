@@ -4549,12 +4549,13 @@ const LB_TABS = [
   { key: 'playtime', label: '⏱️ เวลาเล่น', fmt: v => `${Math.floor(v / 60)}ชม ${v % 60}น` },
 ];
 function myLbScore() {
+  // จำกัดค่าให้อยู่ในกรอบที่เป็นไปได้จริง กันการแก้เซฟส่งค่าเว่อร์ (กันโกงเบื้องต้นฝั่ง client)
   return {
     name: state.playerName || 'เทรนเนอร์',
-    dex: speciesOwnedCount(),
-    tower: (state.tower && state.tower.bestFloor) || 0,
-    caught: state.totalCaught || 0,
-    playtime: Math.floor((state.playSec || 0) / 60),
+    dex: clamp(speciesOwnedCount(), 0, MONSTERS.length),
+    tower: clamp((state.tower && state.tower.bestFloor) || 0, 0, 999),
+    caught: clamp(state.totalCaught || 0, 0, 9999999),
+    playtime: clamp(Math.floor((state.playSec || 0) / 60), 0, 5259600),
     team: myTeamSnapshot(),
   };
 }
@@ -4579,12 +4580,22 @@ function renderLeaderboard() {
       <input class="save-io lb-name" id="lbName" maxlength="24" placeholder="ชื่อที่แสดงบนกระดาน" value="${(state.playerName || '').replace(/"/g, '&quot;')}" style="min-height:auto;padding:9px;font-family:inherit;font-size:13px;flex:1">
       <button class="set-btn" id="lbSubmit" style="flex:0 0 auto;background:var(--good);color:#062611">📤 ส่งสถิติ</button>
     </div>
-    <div class="sr-sub" style="margin:4px 0 8px">สถิติของคุณ: 📖 ${me.dex}/${MONSTERS.length} · 🗼 ชั้น ${me.tower} · 🎯 ${me.caught} · ⏱️ ${Math.floor(me.playtime / 60)}ชม</div>
+    <div class="sr-sub" style="margin:4px 0 8px">สถิติของคุณ: 📖 ${me.dex}/${MONSTERS.length} · 🗼 ชั้น ${me.tower} · 🎯 ${me.caught} · ⏱️ ${Math.floor(me.playtime / 60)}ชม
+      <a href="#" id="lbDelete" style="color:#ff8a95;margin-left:6px">ลบสถิติของฉัน</a></div>
     <div class="lb-tabs">${tabs}</div>
     <div id="lbList" class="lb-list"><div class="sr-sub">⏳ กำลังโหลด...</div></div>`;
   $('#lbSubmit').onclick = lbSubmit;
+  $('#lbDelete').onclick = (e) => { e.preventDefault(); lbDelete(); };
   box.querySelectorAll('[data-lbtab]').forEach(el => el.onclick = () => { _lbTab = el.dataset.lbtab; renderLeaderboard(); });
   lbLoadList();
+}
+async function lbDelete() {
+  if (!confirm('ลบสถิติของคุณออกจากกระดานจัดอันดับ? (ทีมสำหรับ Ghost Battle จะหายไปด้วย)')) return;
+  toast('⏳ กำลังลบ...', '');
+  const res = await Cloud.deleteMyScore();
+  if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  toast('🗑️ ลบสถิติออกจากกระดานแล้ว', 'good');
+  renderLeaderboard();
 }
 async function lbLoadList() {
   const list = $('#lbList'); if (!list) return;
