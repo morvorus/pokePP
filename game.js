@@ -426,6 +426,9 @@ function getMoves(id) {
   const seen = new Set();
   return moves.filter(mv => { if (seen.has(mv.name)) return false; seen.add(mv.name); return true; }).slice(0, 4);
 }
+// PP ต่อท่า — ท่าแรงยิ่งใช้ได้น้อยครั้ง (ต้องวางแผน ไม่สแปมท่าแรงรัวๆ)
+function movePP(pow) { return pow >= 110 ? 5 : pow >= 90 ? 8 : pow >= 70 ? 12 : 20; }
+const STRUGGLE_MOVE = { type: 'normal', name: 'ดิ้นรน', pow: 50, acc: 100, priority: 0, struggle: true };
 function rollHit(move, atkHeld, defHeld, defAbility) {   // เช็คว่าท่านี้แม่นเป้าไหม (คิดไอเทม Wide Lens/Bright Powder + Sand Veil ด้วยถ้ามี)
   let acc = move.acc == null ? 100 : move.acc;
   if (atkHeld === 'wide-lens') acc += 10;
@@ -3371,7 +3374,8 @@ function applyFoeHeld(stats, held) {
 function buildBattleTeam(members) {
   return members.map(ind => {
     const s = statsWithHeld(ind);
-    return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, sitrusUsed: false, status: null, sleepT: 0, mega: null, dynamax: null, stages: freshStages() };
+    const ppMax = getMoves(ind.id).map(mv => movePP(mv.pow));
+    return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, sitrusUsed: false, status: null, sleepT: 0, mega: null, dynamax: null, stages: freshStages(), pp: ppMax.slice(), ppMax };
   });
 }
 function checkSitrus(active, b) {   // Sitrus Berry: ฟื้น HP 25% อัตโนมัติครั้งเดียวเมื่อ HP ต่ำกว่าครึ่ง
@@ -3538,13 +3542,24 @@ function renderBattle() {
   const abilityBadge = ab => ab ? `<span class="badge" style="background:#2c3a55" title="${ab.desc}">🧬 ${ab.name}</span>` : '';
   const curWeather = WEATHERS[getWeather(state.region)];
   const moves = getMoves(active.ind.id);
-  const moveBtns = moves.map((mv, i) => {
-    const e = typeEffect(mv.type, foeTypes);
-    const tag = e > 1 ? '↑' : e < 1 ? '↓' : '';
-    const prio = mv.priority > 0 ? ' ⚡' : '';
-    const wBoost = weatherBoosted(mv.type) ? ` ${curWeather.emoji}` : '';
-    return `<button class="move-btn t-${mv.type}" data-mv="${i}" title="${mv.priority > 0 ? 'ท่า Priority — โจมตีก่อนเสมอ' : ''}">${mv.name}${prio} <b>${mv.pow}</b>${tag}${wBoost}<span class="mv-acc">🎯${mv.acc}%</span></button>`;
-  }).join('');
+  if (!active.pp) { active.ppMax = moves.map(mv => movePP(mv.pow)); active.pp = active.ppMax.slice(); }   // เผื่อเซฟเก่า/สลับตัวที่ยังไม่มี pp
+  const outOfPP = active.pp.every((p, i) => i >= moves.length || p <= 0);
+  let moveBtns;
+  if (outOfPP) {
+    moveBtns = `<button class="move-btn t-normal struggle-btn" data-mv="-1" title="ท่าทั้งหมด PP หมด — ดิ้นรนโจมตีพร้อมบาดเจ็บตัวเอง">ดิ้นรน (Struggle) <b>50</b> <span class="mv-acc">↩️ บาดเจ็บตัวเอง</span></button>`;
+  } else {
+    moveBtns = moves.map((mv, i) => {
+      const e = typeEffect(mv.type, foeTypes);
+      const tag = e > 1 ? '↑' : e < 1 ? '↓' : '';
+      const prio = mv.priority > 0 ? ' ⚡' : '';
+      const wBoost = weatherBoosted(mv.type) ? ` ${curWeather.emoji}` : '';
+      const pp = active.pp[i] == null ? movePP(mv.pow) : active.pp[i];
+      const ppMax = active.ppMax[i] == null ? movePP(mv.pow) : active.ppMax[i];
+      const noPP = pp <= 0;
+      const ppCls = noPP ? ' pp-empty' : (pp <= ppMax * 0.25 ? ' pp-low' : '');
+      return `<button class="move-btn t-${mv.type}${ppCls}" data-mv="${i}" ${noPP ? 'disabled' : ''} title="${mv.priority > 0 ? 'ท่า Priority — โจมตีก่อนเสมอ' : ''}">${mv.name}${prio} <b>${mv.pow}</b>${tag}${wBoost}<span class="mv-acc">🎯${mv.acc}% · PP ${pp}/${ppMax}</span></button>`;
+    }).join('');
+  }
 
   const canMega = state.hasMegaRing && !b.usedMega && !active.mega && !!(megaFormsFor(active.ind.id) || []).find(f => f.key === active.ind.megaKey);
   const canDynamax = state.hasDynamaxBand && !b.usedDynamax && !active.dynamax && (state.maxEnergy || 0) > 0;
@@ -3885,7 +3900,8 @@ function battleAttack(moveIdx) {
   const active = b.team[b.activeIdx];
   const mon = MON_BY_ID[active.ind.id];
   const view = activeMonView(active);
-  const mv = getMoves(active.ind.id)[moveIdx] || getMoves(active.ind.id)[0];
+  const isStruggle = moveIdx === -1;
+  const mv = isStruggle ? STRUGGLE_MOVE : (getMoves(active.ind.id)[moveIdx] || getMoves(active.ind.id)[0]);
   b.msg = '';
   const gate = canAct(active);
   if (gate.note) b.msg += `${mon.name} ${gate.note} · `;
@@ -3912,6 +3928,7 @@ function battleAttack(moveIdx) {
   if (quickClawSave) { foeFirst = false; b.msg += `🍀 Quick Claw! ${view.name} แซงคิวโจมตีก่อน! · `; state._quickClawSaved = true; }
 
   function playerHalf() {   // คืนค่า true ถ้าเทิร์นจบทันที (KO/ป่าอ่อนแรงสุดขีด) ไม่ต้องรอศัตรูตอบโต้
+    if (!isStruggle && active.pp && moveIdx >= 0) active.pp[moveIdx] = Math.max(0, (active.pp[moveIdx] || 0) - 1);   // ใช้ PP เมื่อออกท่า (ไม่ว่าจะโดนหรือพลาด)
     if (!rollHit(mv, active.ind.held, b.foeHeld, abilityFor(b.foeMon.id))) {
       b.msg += `${view.name} ใช้ ${mv.name}! แต่พลาดเป้า... 💨`;
       return false;
@@ -3932,6 +3949,13 @@ function battleAttack(moveIdx) {
     b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - dmg);
     b._fx = Object.assign(b._fx || {}, { foe: { dmg, crit: atk.crit, eff: atk.eff } });
     b.msg += `${view.name} ใช้ ${mv.name}! ${atk.crit ? '🎯 คริติคอล! ' : ''}${atk.weather ? '🌦️ อากาศช่วย! ' : ''}-${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}${sturdyMsg}`;
+    if (isStruggle) {   // ดิ้นรน: บาดเจ็บตัวเอง 1/4 HP
+      const recoil = Math.max(1, Math.floor(active.maxHp / 4));
+      active.hp = Math.max(0, active.hp - recoil);
+      b._fx = Object.assign(b._fx || {}, { me: { dmg: recoil, crit: false, eff: 1 } });
+      b.msg += ` · ↩️ ดิ้นรนบาดเจ็บ -${recoil}`;
+      if (active.hp <= 0) { faintActive(b, mon); if (b.over) return true; }
+    }
     b.msg += tryInflict(mv, b.foe, foeTypesForDef, foeNameForMsg, defAbility, atkAbility);
     b.msg += applyStatFx(mv, active.stages, b.foe.stages, view.name, foeNameForMsg, atkAbility, defAbility);
     if (defAbility && defAbility.onHitStatus && !b.foe.status && !active.status && Math.random() < defAbility.onHitChance
