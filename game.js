@@ -1109,7 +1109,7 @@ function currentWorldEvent() {
   return RANDOM_EVENTS.find(e => e.id === we.id) || null;
 }
 // ===== อีเวนต์ประจำสัปดาห์ — หมุนอัตโนมัติแบบ deterministic ตามเลขสัปดาห์ ทุกคนเห็นตรงกัน =====
-const WEEKLY_SHINY_MULT = 1.5, WEEKLY_COIN_MULT = 1.2, WEEKLY_LEG_MULT = 1.4;   // โบนัสถาวรตลอดสัปดาห์ (อ่อนกว่าอีเวนต์สุ่มเพราะอยู่นานทั้งสัปดาห์)
+const WEEKLY_SHINY_MULT = 1, WEEKLY_COIN_MULT = 1.2, WEEKLY_LEG_MULT = 1.4;   // อีเวนต์สัปดาห์ให้โบนัสเหรียญ/เลเจนดารี — ไม่ดันโอกาส Shiny (คง Shiny ให้หายากคุ้มการหา)
 function isoWeekNumber(d) {
   const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
   const day = date.getUTCDay() || 7;
@@ -1133,7 +1133,7 @@ function checkWeeklyEvent() {   // แจ้งเตือนครั้งแ
   if (state.weeklyEventSeen === key) return;
   state.weeklyEventSeen = key;
   const wk = weeklyEvent();
-  logMsg(`📅 อีเวนต์ประจำสัปดาห์: ${wk.emoji} <b>${wk.name}</b> — ${wk.desc} (Shiny ×${WEEKLY_SHINY_MULT} · เหรียญ ×${WEEKLY_COIN_MULT} ทั้งสัปดาห์)`, 'big');
+  logMsg(`📅 อีเวนต์ประจำสัปดาห์: ${wk.emoji} <b>${wk.name}</b> — ${wk.desc} (เหรียญ ×${WEEKLY_COIN_MULT} · เจอเลเจนดารี ×${WEEKLY_LEG_MULT} · ธาตุ ${wk.types.length ? wk.types.join('/') : 'ทุกธาตุ'} ออกบ่อยขึ้น ทั้งสัปดาห์)`, 'big');
   save();
 }
 function tryTriggerRandomEvent() {
@@ -1189,11 +1189,12 @@ function comboShinyBoost(monId) {
   const c = state.catchCombo;
   if (!c || c.id !== monId || !c.count) return 1;
   const n = c.count;
-  if (n >= 30) return 15;
-  if (n >= 20) return 8;
-  if (n >= 10) return 4;
-  if (n >= 5) return 2.5;
-  return 1 + n * 0.2;
+  // ปรับให้ Shiny ยังหายากคุ้มการหา — คอมโบเป็นรางวัลของคนตั้งใจล่าตัวเดิมจริงๆ (ต้อง 30 ตัวถึงได้ ×5)
+  if (n >= 30) return 5;
+  if (n >= 20) return 3.5;
+  if (n >= 10) return 2.2;
+  if (n >= 5) return 1.5;
+  return 1 + n * 0.08;
 }
 function shinyMultiplier() {
   let m = 1;
@@ -1626,7 +1627,7 @@ function renderRegionBanner() {
   const ev = isEventActive() ? ' · <b style="color:var(--accent)">✨อีเวนต์สุดสัปดาห์ x2</b>' : '';
   const safari = (state.safari && state.safari.left > 0) ? ` · <b style="color:#ffd76b">🎫 Safari เหลือ ${state.safari.left}</b>` : '';
   const wk = weeklyEvent();
-  const wkChip = ` · <b style="color:#c9a3ff" title="${wk.desc} · Shiny ×${WEEKLY_SHINY_MULT} · เหรียญ ×${WEEKLY_COIN_MULT} ทั้งสัปดาห์ (เหลือ ${weeklyEventDaysLeft()} วัน)">📅 ${wk.emoji} ${wk.name}</b>`;
+  const wkChip = ` · <b style="color:#c9a3ff" title="${wk.desc} · เหรียญ ×${WEEKLY_COIN_MULT} · เลเจนดารี ×${WEEKLY_LEG_MULT} ทั้งสัปดาห์ (เหลือ ${weeklyEventDaysLeft()} วัน)">📅 ${wk.emoji} ${wk.name}</b>`;
   $('#rbLvl').innerHTML = `${timeIco} · ${w.emoji}${w.name}${wkChip}${ev}${safari}`;
   const card = $('#spawnCard');
   card.style.background = regionBgCss(r);
