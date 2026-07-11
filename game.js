@@ -2539,6 +2539,45 @@ function ensureDailyQuests() {
   if (state.questDate !== todayStr() || !state.quests.length) {
     state.quests = makeQuests(); state.questDate = todayStr(); save();
   }
+  ensureWeeklyQuest();
+}
+// เควสพิเศษประจำสัปดาห์ — ผูกธีมกับอีเวนต์ประจำสัปดาห์ รางวัลใหญ่กว่าเควสรายวัน
+function makeWeeklyQuest() {
+  const wk = weeklyEvent();
+  let q;
+  if (wk.types && wk.types.length) {
+    const t = pick(wk.types), n = rand(8, 15);
+    q = { type: 'catchType', typeName: t, target: n, name: `จับธาตุ ${t} ${n} ตัว` };
+  } else {
+    const n = rand(5, 10);
+    q = { type: 'catchRare', target: n, name: `จับ Rare ขึ้นไป ${n} ตัว` };
+  }
+  return Object.assign(q, { key: 'weekly', progress: 0, claimed: false, event: `${wk.emoji} ${wk.name}`,
+    rewardCoins: 800, rewardBall: ['ultra', 3], rewardLockbox: 1 });
+}
+function ensureWeeklyQuest() {
+  const key = weeklyEventKey();
+  if (state.weeklyQuestKey !== key || !state.weeklyQuest) {
+    state.weeklyQuest = makeWeeklyQuest(); state.weeklyQuestKey = key; save();
+  }
+}
+function advanceWeeklyQuest(mon, tier, bumpType) {
+  const wq = state.weeklyQuest; if (!wq || wq.claimed || wq.progress >= wq.target) return false;
+  let hit = false;
+  if (mon) hit = wq.type === 'catchAny' || (wq.type === 'catchType' && mon.types.includes(wq.typeName)) || (wq.type === 'catchRare' && ['rare', 'superrare', 'legendary'].includes(tier));
+  else if (bumpType) hit = wq.type === bumpType;
+  if (hit) { wq.progress++; return true; }
+  return false;
+}
+function claimWeeklyQuest() {
+  const q = state.weeklyQuest;
+  if (!q || q.claimed || q.progress < q.target) return;
+  q.claimed = true; state.coins += q.rewardCoins;
+  const [bk, bn] = q.rewardBall; state.balls[bk] = (state.balls[bk] || 0) + bn;
+  if (q.rewardLockbox) state.lockboxes = (state.lockboxes || 0) + q.rewardLockbox;
+  save(); renderTopbar(); renderQuests(); renderBallBar();
+  toast(`🎁 รับรางวัลอีเวนต์: +${q.rewardCoins}🪙 +${bn}${BALLS[bk].emoji}${q.rewardLockbox ? ' +🎁' : ''}`, 'good');
+  playSfx('rare');
 }
 function updateQuestProgress(mon, tier) {
   let ch = false;
@@ -2549,6 +2588,7 @@ function updateQuestProgress(mon, tier) {
       || (q.type === 'catchRare' && ['rare', 'superrare', 'legendary'].includes(tier));
     if (hit) { q.progress++; ch = true; }
   }
+  if (advanceWeeklyQuest(mon, tier, null)) ch = true;
   if (ch) save();
 }
 function bumpQuest(type) {   // เพิ่มความคืบหน้าเควสประเภทที่ไม่เกี่ยวกับการจับ (ชนะ/ตกปลา/คอนเทสต์/วิวัฒนาการ)
@@ -2557,6 +2597,7 @@ function bumpQuest(type) {   // เพิ่มความคืบหน้า
     if (q.claimed || q.progress >= q.target) continue;
     if (q.type === type) { q.progress++; ch = true; }
   }
+  if (advanceWeeklyQuest(null, null, type)) ch = true;
   if (ch) save();
 }
 function claimQuest(key) {
@@ -2570,6 +2611,7 @@ function claimQuest(key) {
 function renderQuests() {
   ensureDailyQuests();
   $('#questReset').textContent = `รีเซ็ตทุกวัน · วันนี้ ${state.questDate}`;
+  renderWeeklyQuest();
   $('#questList').innerHTML = state.quests.map(q => {
     const done = q.progress >= q.target, pct = clamp(q.progress / q.target * 100, 0, 100);
     const [bk, bn] = q.rewardBall;
@@ -2585,6 +2627,22 @@ function renderQuests() {
   renderEggs();
   renderContest();
   renderFarm();
+}
+function renderWeeklyQuest() {
+  const box = $('#weeklyQuestBox'); if (!box) return;
+  ensureWeeklyQuest();
+  const q = state.weeklyQuest;
+  const done = q.progress >= q.target, pct = clamp(q.progress / q.target * 100, 0, 100);
+  const [bk, bn] = q.rewardBall;
+  box.innerHTML = `<div class="quest weekly-quest">
+    <div class="wq-tag">📅 เควสอีเวนต์สัปดาห์นี้ · ${q.event} · เหลือ ${weeklyEventDaysLeft()} วัน</div>
+    <div class="quest-top"><div class="quest-name">${q.name}</div>
+      <div class="quest-reward">+${q.rewardCoins}🪙 +${bn}${BALLS[bk].emoji}${q.rewardLockbox ? ' +🎁' : ''}</div></div>
+    <div class="quest-bar"><div class="quest-fill" style="width:${pct}%;background:linear-gradient(90deg,#c9a3ff,#8e5bff)"></div></div>
+    <div class="quest-foot"><span>${Math.min(q.progress, q.target)}/${q.target}</span>
+      <button class="claim-btn${q.claimed ? ' done' : ''}" id="wqClaim" ${(!done || q.claimed) ? 'disabled' : ''}>${q.claimed ? 'รับแล้ว ✓' : 'รับรางวัล'}</button>
+    </div></div>`;
+  const btn = $('#wqClaim'); if (btn) btn.onclick = claimWeeklyQuest;
 }
 function renderEggs() {
   const box = $('#eggList');

@@ -603,6 +603,10 @@ main { flex: 1; padding: 12px; }
 .vs-start:active { transform: scale(.97); }
 @keyframes vsPulse { 0%,100% { box-shadow: 0 4px 14px rgba(226,59,78,.45); } 50% { box-shadow: 0 4px 22px rgba(226,59,78,.85); } }
 .reduce-motion .vs-start { animation: none; }
+/* ===== Weekly event quest ===== */
+.weekly-quest { background: linear-gradient(135deg,rgba(142,91,255,.22),rgba(0,0,0,.2)) !important; border: 1px solid rgba(201,163,255,.4); margin-bottom: 10px; }
+.wq-tag { font-size: 11px; font-weight: 800; color: #c9a3ff; margin-bottom: 6px; }
+
 /* ===== Shiny showcase ===== */
 .shiny-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; margin-top: 4px; }
 .shiny-cell { position: relative; aspect-ratio: 1; border-radius: 10px; background: radial-gradient(circle at 50% 40%, rgba(255,215,107,.22), rgba(0,0,0,.25)); border: 1px solid rgba(255,215,107,.35); display: flex; align-items: center; justify-content: center; }
