@@ -2577,6 +2577,7 @@ function renderMenu() {
   renderRival();
   renderCloudUI();
   renderLeaderboard();
+  renderGhostArena();
   renderIdle();
   renderTower();
   renderGyms();
@@ -4074,6 +4075,19 @@ function onFoeDown() {
       return;   // ยังไม่จบ สู้ตัวต่อไป
     }
     b.over = true;
+    if (b.isGhost) {   // ชนะทีมผู้เล่นออนไลน์ (Ghost)
+      const g = b.gym;
+      const bp = 6 + Math.floor(trainerLevel() / 2);
+      state.coins += g.reward;
+      state.battlePoints = (state.battlePoints || 0) + bp;
+      state.ghostWins = (state.ghostWins || 0) + 1;
+      gainTrainerXp(60);
+      b.victory = { trainerKey: foeTrainerName(b), emoji: '👤', title: `${g.name} (ออนไลน์)`, coins: g.reward, bp, xp: 60, items: '', bonus: `ชนะทีมออนไลน์รวม ${state.ghostWins} ครั้ง` };
+      b.msg = `👤 ชนะทีม ${g.name}! +${g.reward}🪙 +${bp}🎖️BP`;
+      logMsg(`👤 ชนะ Ghost <b>${g.name}</b>! +${g.reward}🪙`, 'big');
+      playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
+      return;
+    }
     if (b.isRoute) {   // ชนะเทรนเนอร์เส้นทาง — รางวัลย่อม ไม่แตะ state ยิม/คู่แข่ง
       const g = b.gym;
       const bp = 4 + Math.floor(trainerLevel() / 3);
@@ -4471,7 +4485,12 @@ function myLbScore() {
     tower: (state.tower && state.tower.bestFloor) || 0,
     caught: state.totalCaught || 0,
     playtime: Math.floor((state.playSec || 0) / 60),
+    team: myTeamSnapshot(),
   };
+}
+// สแนปช็อตทีมปัจจุบัน (ย่อ) สำหรับให้คนอื่นสู้แบบ Ghost Battle
+function myTeamSnapshot() {
+  return partyMembers().slice(0, 6).map(ind => ({ id: ind.id, level: ind.level, shiny: !!ind.shiny }));
 }
 function renderLeaderboard() {
   const box = $('#leaderboardBox'); if (!box) return;
@@ -4521,8 +4540,65 @@ async function lbSubmit() {
   toast('⏳ กำลังส่งสถิติ...', '');
   const res = await Cloud.submitScore(myLbScore());
   if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
-  toast('✅ ส่งสถิติขึ้นกระดานแล้ว!', 'good');
+  toast('✅ ส่งสถิติ + ทีมขึ้นกระดานแล้ว!', 'good');
   renderLeaderboard();
+}
+// ================================================================
+//  GHOST BATTLE — สู้กับทีมของผู้เล่นคนอื่นแบบ AI (async PvP)
+// ================================================================
+let _ghostCache = null;
+function renderGhostArena() {
+  const box = $('#ghostBox'); if (!box) return;
+  if (!(window.Cloud && Cloud.enabled)) { box.innerHTML = `<div class="sr-sub">ต้องตั้งค่าคลาวด์ก่อนถึงจะสู้ออนไลน์ได้</div>`; return; }
+  if (!Cloud.loggedIn()) { box.innerHTML = `<div class="sr-sub">เข้าสู่ระบบก่อน (ส่วน "☁️ บัญชี / เซฟคลาวด์") แล้ว 📤 ส่งสถิติที่กระดานเพื่อลงทะเบียนทีม</div>`; return; }
+  box.innerHTML = `
+    <div class="sr-sub" style="margin-bottom:6px">สู้กับทีมของผู้เล่นคนอื่นแบบ AI · ชนะได้เหรียญ + BP<br>(อย่าลืม 📤 ส่งสถิติที่กระดาน เพื่อให้ทีมคุณโผล่ให้คนอื่นสู้ด้วย)</div>
+    <button class="set-btn" id="ghostRefresh" style="width:100%;margin-bottom:8px">🔄 หาคู่ต่อสู้</button>
+    <div id="ghostList"></div>`;
+  $('#ghostRefresh').onclick = ghostRefresh;
+  if (_ghostCache) renderGhostList(_ghostCache);
+}
+async function ghostRefresh() {
+  const list = $('#ghostList'); if (list) list.innerHTML = `<div class="sr-sub">⏳ กำลังค้นหา...</div>`;
+  const res = await Cloud.ghostList(40);
+  if (!$('#ghostList')) return;
+  if (res.error) { $('#ghostList').innerHTML = `<div class="sr-sub">⚠️ ยังใช้ไม่ได้ — ต้องมีคอลัมน์ team ในตาราง leaderboard (ดู CLOUD_SETUP.md)<br><span style="opacity:.6">${escapeHtml(res.error)}</span></div>`; return; }
+  if (!res.rows.length) { $('#ghostList').innerHTML = `<div class="sr-sub">ยังไม่มีทีมคนอื่นให้สู้ — ชวนเพื่อนมาเล่นแล้วส่งสถิติกัน!</div>`; return; }
+  _ghostCache = res.rows.sort(() => Math.random() - 0.5).slice(0, 6);
+  renderGhostList(_ghostCache);
+}
+function renderGhostList(rows) {
+  const list = $('#ghostList'); if (!list) return;
+  list.innerHTML = rows.map((r, i) => {
+    const team = (r.team || []).slice(0, 6);
+    const roster = team.map(m => `<div class="roster-cell" style="width:28px;height:28px">${spriteImg(m.id, m.shiny, 'roster-mini')}</div>`).join('');
+    const avgLv = Math.round(team.reduce((s, m) => s + (m.level || 1), 0) / Math.max(1, team.length));
+    return `<div class="ghost-row">
+      <div class="ghost-info"><div class="ghost-name">👤 ${escapeHtml(r.name || 'เทรนเนอร์')} · Lv.~${avgLv} · ${team.length} ตัว</div><div class="roster-row" style="justify-content:flex-start;margin-top:3px">${roster}</div></div>
+      <button class="rt-fight" data-ghost="${i}">สู้!</button></div>`;
+  }).join('');
+  list.querySelectorAll('[data-ghost]').forEach(el => el.onclick = () => startGhostBattle(rows[+el.dataset.ghost]));
+}
+function startGhostBattle(ghost) {
+  const members = partyMembers();
+  if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
+  const gTeam = (ghost.team || []).slice(0, 6).filter(m => MON_BY_ID[m.id]);
+  if (!gTeam.length) { toast('ทีมคู่ต่อสู้ไม่ถูกต้อง', 'bad'); return; }
+  const team = buildBattleTeam(members);
+  const queue = gTeam.map((m, i) => makeFoeDef(MON_BY_ID[m.id], clamp(m.level || 20, 1, 100), i === gTeam.length - 1 ? 1.1 : 1.0, false));
+  const nameHash = hashIdx(ghost.name || 'x', BOSS_TRAINER_POOL.length);
+  const ghostGym = { id: 'ghost', name: ghost.name || 'เทรนเนอร์', emoji: '👤', sprite: BOSS_TRAINER_POOL[nameHash], reward: 200 + queue.length * 40, items: [] };
+  battleState = {
+    mode: 'trainer', isBoss: false, isGhost: true, gym: ghostGym, foeQueue: queue, foeIdx: 0,
+    foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp, foeHeld: queue[0].held || null,
+    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
+    usedMega: false, usedDynamax: false,
+    showIntro: !(state.settings && state.settings.fastBattle),
+    msg: `👤 ${ghost.name || 'เทรนเนอร์'} (ทีมออนไลน์) ท้าดวล!`,
+  };
+  battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
+  renderBattle();
+  $('#battleModal').classList.remove('hidden');
 }
 async function cloudSyncNow() {
   if (!Cloud.loggedIn()) return;

@@ -112,9 +112,24 @@ const Cloud = {
         tower: score.tower | 0, caught: score.caught | 0,
         updated_at: new Date().toISOString(),
       };
+      if (score.team) row.team = score.team;   // สแนปช็อตทีมสำหรับ Ghost Battle (ถ้ามีคอลัมน์ team)
       const { error } = await this.client.from('leaderboard').upsert(row);
       if (error) return { error: error.message };
       return { ok: true };
+    } catch (e) { return { error: String(e) }; }
+  },
+  // ดึงทีมของผู้เล่นคนอื่นมาเป็นคู่ต่อสู้ (Ghost Battle) — สุ่มจากคนที่อัปทีมล่าสุด
+  async ghostList(limit) {
+    if (!this.enabled) return { error: 'cloud ปิดอยู่' };
+    try {
+      const { data, error } = await this.client
+        .from('leaderboard').select('user_id, name, team, dex, tower')
+        .not('team', 'is', null)
+        .order('updated_at', { ascending: false }).limit(limit || 40);
+      if (error) return { error: error.message };
+      const meId = this.user ? this.user.id : null;
+      const rows = (data || []).filter(r => r.user_id !== meId && Array.isArray(r.team) && r.team.length);
+      return { ok: true, rows };
     } catch (e) { return { error: String(e) }; }
   },
   // ดึงอันดับสูงสุดตามคอลัมน์ (dex/playtime/tower/caught)

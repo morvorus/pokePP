@@ -35,6 +35,7 @@ create table public.leaderboard (
   playtime int default 0,
   tower int default 0,
   caught int default 0,
+  team jsonb,          -- สแนปช็อตทีม สำหรับ Ghost Battle (สู้กับทีมผู้เล่นคนอื่นแบบ AI)
   updated_at timestamptz default now()
 );
 alter table public.leaderboard enable row level security;
