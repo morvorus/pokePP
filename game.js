@@ -968,10 +968,13 @@ function buyGmaxStone(key, price) {
 function renderBoostStrip() {
   const el = $('#boostStrip'); if (!el) return;
   const active = CHARM_ORDER.filter(k => boostActive(k));
-  el.innerHTML = active.map(k => {
+  let html = active.map(k => {
     const left = Math.ceil((state.activeBoosts[k] - Date.now()) / 60000);
     return `<span class="boost-chip">${CHARMS[k].emoji} ${CHARMS[k].name} ${left}น.</span>`;
   }).join('');
+  const cc = state.catchCombo;
+  if (cc && cc.count >= 2) html += `<span class="boost-chip combo-chip">🔥 คอมโบ ${MON_BY_ID[cc.id].name} ×${cc.count}</span>`;
+  el.innerHTML = html;
 }
 function activateCharm(type) {
   if ((state.charms[type] || 0) <= 0) { toast('❌ ไม่มี ' + CHARMS[type].name, 'bad'); return; }
@@ -1140,6 +1143,27 @@ function spawnBoostTypes() {
   if (we) we.types.forEach(t => set.add(t));
   return set;
 }
+// ===== Catch Combo (ล่า Shiny แบบ Let's Go) — จับตัวเดิมต่อเนื่องดันโอกาส shiny ของสายพันธุ์นั้น =====
+function updateCatchCombo(monId, wasShiny) {
+  const c = state.catchCombo;
+  if (c && c.id === monId) c.count++;
+  else state.catchCombo = { id: monId, count: 1 };
+  const cc = state.catchCombo;
+  if (cc.count === 5 || cc.count === 10 || cc.count === 20 || cc.count === 30) {
+    toast(`🔥 คอมโบ ${MON_BY_ID[monId].name} ×${cc.count}! โอกาส Shiny เพิ่มขึ้น`, 'good');
+  }
+}
+// ตัวคูณ shiny จากคอมโบ (มีผลเฉพาะสายพันธุ์ที่กำลังคอมโบอยู่)
+function comboShinyBoost(monId) {
+  const c = state.catchCombo;
+  if (!c || c.id !== monId || !c.count) return 1;
+  const n = c.count;
+  if (n >= 30) return 15;
+  if (n >= 20) return 8;
+  if (n >= 10) return 4;
+  if (n >= 5) return 2.5;
+  return 1 + n * 0.2;
+}
 function shinyMultiplier() {
   let m = 1;
   if (isEventActive()) m *= 2;         // อีเวนต์สุดสัปดาห์ shiny ×2
@@ -1212,8 +1236,8 @@ function doSpawn() {
   } else {
     mon = pickFromRegion(r, rollRarity(luck));
   }
-  // ชั้น shiny: overlay สุ่มแยกอิสระ (ซ้อนตัวที่สุ่มได้)
-  const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier();
+  // ชั้น shiny: overlay สุ่มแยกอิสระ (ซ้อนตัวที่สุ่มได้) + โบนัสคอมโบล่า shiny
+  const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier() * comboShinyBoost(mon.id);
   beginSpawn(mon, shiny, false);
   maybeSpawnRouteTrainer();
 }
@@ -1322,7 +1346,7 @@ function fish() {
     while (ti >= 0 && !FISH_POOL_BY_TIER[TIER_ORDER[ti]].length) ti--;
     const pool = ti >= 0 ? FISH_POOL_BY_TIER[TIER_ORDER[ti]] : FISH_POOL;
     const mon = pick(pool.length ? pool : MONSTERS);
-    const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier();
+    const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier() * comboShinyBoost(mon.id);
     beginSpawn(mon, shiny, true);
     toast('🎣 มีบางอย่างกินเบ็ด!', 'good');
   } else if (roll < 0.90) {
@@ -1614,9 +1638,12 @@ function renderSpawn() {
   $('#spawnTop').innerHTML =
     `<span class="lv-badge">${mon.types.map(t => TYPE_EMOJI[t] || '').join('')} Lv.${level}</span>` +
     (shiny ? '<span class="lv-badge">✨</span>' : '');
+  const cc = state.catchCombo;
+  const comboMatch = cc && cc.id === mon.id && cc.count >= 2;
   $('#spawnTags').innerHTML =
     typeBadges(mon.types) +
-    `<span class="badge rarity-${shiny ? 'shiny' : tier}">${shiny ? '✨ shiny' : TIER_EMOJI[tier] + ' ' + TIER_LABEL[tier]}</span>`;
+    `<span class="badge rarity-${shiny ? 'shiny' : tier}">${shiny ? '✨ shiny' : TIER_EMOJI[tier] + ' ' + TIER_LABEL[tier]}</span>` +
+    (comboMatch ? `<span class="badge combo-badge" title="จับต่อเนื่อง ×${cc.count} — โอกาส Shiny เพิ่มขึ้น!">🔥 คอมโบ ×${cc.count} · Shiny↑</span>` : '');
   renderWildHp();
   renderBerryBar();
   if (battleBtn) {
@@ -1763,6 +1790,7 @@ function onCatchSuccess(ballKey) {
   state.caught.push(ind);
   state.seen[mon.id] = true;
   state.totalCaught++;
+  updateCatchCombo(mon.id, shiny);
 
   const amuletMul = 1 + Math.min(state.amulets || 0, AMULET_MAX) * 0.05;   // Amulet Coin
   const eventCoinMul = currentWorldEvent() ? currentWorldEvent().coinMult : 1;
@@ -1783,7 +1811,7 @@ function onCatchSuccess(ballKey) {
   checkRegionUnlocks();
   checkAchievements();
 
-  clearSpawn(); save(); renderTopbar(); renderCurrentView(); renderBallBar();
+  clearSpawn(); save(); renderTopbar(); renderCurrentView(); renderBallBar(); renderBoostStrip();
   scheduleSpawn();
 }
 // ---------- สตรีค + มิตรภาพ ----------

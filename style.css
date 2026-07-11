@@ -598,6 +598,12 @@ main { flex: 1; padding: 12px; }
 .vs-start:active { transform: scale(.97); }
 @keyframes vsPulse { 0%,100% { box-shadow: 0 4px 14px rgba(226,59,78,.45); } 50% { box-shadow: 0 4px 22px rgba(226,59,78,.85); } }
 .reduce-motion .vs-start { animation: none; }
+/* ===== Catch combo ===== */
+.combo-badge { background: linear-gradient(90deg,#ff8a3a,#ff5d6c) !important; color: #fff !important; font-weight: 800; animation: comboPulse 1.2s ease-in-out infinite; }
+.combo-chip { background: linear-gradient(90deg,rgba(255,138,58,.35),rgba(255,93,108,.3)) !important; border: 1px solid rgba(255,138,58,.5); }
+@keyframes comboPulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+.reduce-motion .combo-badge { animation: none; }
+
 /* ===== Route trainer ribbon ===== */
 .route-ribbon { display: flex; align-items: center; gap: 10px; margin: 8px 0; padding: 8px 12px; border-radius: 14px;
   background: linear-gradient(135deg,rgba(142,91,255,.3),rgba(226,59,78,.22)); border: 1px solid rgba(255,255,255,.2);
