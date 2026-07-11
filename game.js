@@ -878,10 +878,13 @@ function toast(msg, kind) {
 function logMsg(msg, kind) {
   const box = $('#log');
   const el = document.createElement('div');
-  el.className = 'log-item ' + (kind || '');
+  el.className = 'log-item log-in ' + (kind || '');
   el.innerHTML = msg;
   box.prepend(el);
   while (box.children.length > 5) box.lastChild.remove();
+  // แจ้งเตือนกิจกรรมหายเองอัตโนมัติ (ข่าวสำคัญอยู่นานกว่าเล็กน้อย) กันสะสมรกหน้าจอ
+  const life = kind === 'big' ? 5500 : 3500;
+  el._fade = setTimeout(() => { el.classList.add('log-out'); setTimeout(() => el.remove(), 450); }, life);
 }
 function showRareAlert(mon, tier, shiny) {
   if (!state.settings.rareAlerts) return;

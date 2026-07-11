@@ -304,6 +304,11 @@ main { flex: 1; padding: 12px; }
 .log-item.good { border-color: var(--good); }
 .log-item.bad { border-color: var(--bad); }
 .log-item.big { border-color: var(--accent); }
+.log-item { transition: opacity .45s ease, transform .45s ease; }
+.log-in { animation: logIn .3s ease; }
+@keyframes logIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+.log-item.log-out { opacity: 0; transform: translateX(-12px); }
+.reduce-motion .log-in { animation: none; }
 @media (max-width: 460px) { .log { width: 62%; top: 58px; } .log-item { font-size: 10px; } }
 
 /* ===== Map ===== */
