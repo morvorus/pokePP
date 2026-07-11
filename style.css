@@ -539,6 +539,48 @@ main { flex: 1; padding: 12px; }
 .moveset { margin: 10px 0; padding: 10px; background: rgba(0,0,0,.2); border-radius: 10px; text-align: center; }
 .moveset .ms-title { font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 700; }
 
+/* ===== VS battle intro (PokeMeow-style) ===== */
+.vs-intro { text-align: center; }
+.vs-title { font-size: 18px; font-weight: 900; letter-spacing: .5px; background: linear-gradient(90deg,#ff8a95,#ffd76b,#8ef0a5); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.vs-challenge { font-size: 12px; color: #cfe; margin: 4px 0 12px; line-height: 1.5; }
+.vs-stage { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 14px; }
+.vs-corner { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border-radius: 14px; background: rgba(0,0,0,.25); }
+.vs-corner.foe { border: 1px solid rgba(255,93,108,.35); }
+.vs-corner.me  { border: 1px solid rgba(71,209,108,.35); }
+.vs-tr-wrap { position: relative; width: 88px; height: 88px; display: flex; align-items: center; justify-content: center; }
+.trainer-sprite { position: relative; z-index: 1; max-width: 88px; max-height: 88px; image-rendering: pixelated; filter: drop-shadow(0 3px 6px rgba(0,0,0,.5)); }
+.trainer-sprite.ts-hide { display: none; }
+.vs-tr-emoji { position: absolute; z-index: 0; font-size: 46px; opacity: .9; }
+.vs-tr-name { font-size: 12px; font-weight: 800; line-height: 1.2; }
+.vs-corner.foe .vs-tr-name { color: #ffb3bb; }
+.vs-corner.me  .vs-tr-name { color: #a5f0bf; }
+.vs-badge { flex: 0 0 auto; font-size: 20px; font-weight: 900; font-style: italic; color: #fff; padding: 4px 8px; border-radius: 10px; background: linear-gradient(135deg,#ff6b6b,#8e5bff); box-shadow: 0 3px 10px rgba(142,91,255,.5); }
+.roster-row { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; }
+.roster-cell { width: 34px; height: 34px; border-radius: 8px; background: rgba(0,0,0,.3); display: flex; align-items: center; justify-content: center; }
+.roster-mini { width: 30px; height: 30px; object-fit: contain; image-rendering: pixelated; }
+.vs-abilities { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 14px; text-align: left; }
+.vs-ab-col { background: rgba(0,0,0,.22); border-radius: 12px; padding: 8px 10px; }
+.vs-ab-head { font-size: 12px; font-weight: 800; margin-bottom: 6px; }
+.vs-ab-head.foe { color: #ffb3bb; }
+.vs-ab-head.me  { color: #a5f0bf; }
+.vs-ability { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 0; }
+.ab-mini { width: 26px; height: 26px; object-fit: contain; image-rendering: pixelated; flex-shrink: 0; }
+.vs-ab-name { font-weight: 700; }
+.vs-ab-dash { opacity: .5; }
+.vs-ab-skill { color: #ffd76b; font-weight: 700; }
+.vs-start { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 900; cursor: pointer; color: #fff; background: linear-gradient(180deg,#ff6b6b,#e23b4e); box-shadow: 0 4px 14px rgba(226,59,78,.45); animation: vsPulse 1.4s ease-in-out infinite; }
+.vs-start:active { transform: scale(.97); }
+@keyframes vsPulse { 0%,100% { box-shadow: 0 4px 14px rgba(226,59,78,.45); } 50% { box-shadow: 0 4px 22px rgba(226,59,78,.85); } }
+.reduce-motion .vs-start { animation: none; }
+/* trainer badge inside in-battle foe header */
+.bt-trainer { width: 44px; height: 44px; image-rendering: pixelated; object-fit: contain; vertical-align: middle; filter: drop-shadow(0 2px 4px rgba(0,0,0,.5)); }
+.bt-trainer.ts-hide { display: none; }
+.bt-foe-trainer { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #ffb3bb; font-weight: 700; margin-bottom: 4px; }
+.bt-foe-dots { display: inline-flex; gap: 3px; margin-left: auto; }
+.bt-foe-dots .fd { width: 8px; height: 8px; border-radius: 50%; background: #ff8a95; box-shadow: 0 0 4px rgba(255,138,149,.6); }
+.bt-foe-dots .fd.down { background: rgba(255,255,255,.18); box-shadow: none; }
+.bt-foe-dots .fd.cur { background: #ffd76b; box-shadow: 0 0 6px rgba(255,215,107,.8); }
+
 /* party strip on menu/home */
 .party-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .party-mini { width: 44px; height: 44px; border-radius: 10px; background: var(--card); display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; border: 1px solid rgba(255,255,255,.08); }

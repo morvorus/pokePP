@@ -624,6 +624,34 @@ function spriteImg(id, shiny, cls) {
   const first = chain[0], fb = chain.slice(1).join('|');
   return `<img class="${cls || ''}" loading="lazy" src="${first}" data-fb="${fb}" onerror="__sf(this)" alt="">`;
 }
+// ===== รูปเทรนเนอร์ (Pokémon Showdown) — ภาพเต็มตัวสำหรับหน้า VS + หัวศัตรู มี emoji สำรองถ้าโหลดไม่ได้ =====
+const TRAINER_SP_BASE = 'https://play.pokemonshowdown.com/sprites/trainers/';
+const TRAINER_SPRITES = {   // ยิม/แชมป์ — ผูกผู้นำยิมจริงตามธาตุ
+  g1: 'gardenia', g2: 'misty', g3: 'blaine', g4: 'volkner',
+  g5: 'koga', g6: 'brock', g7: 'sabrina', g8: 'clair', champ: 'cynthia',
+  rival: 'silver-gen2', player: 'red-gen1',
+};
+// สไปรต์ "บอส/ผู้ร้าย" หมุนตามเขต ให้แต่ละเขตเจอเทรนเนอร์บอสต่างหน้า
+const BOSS_TRAINER_POOL = ['giovanni', 'archie-gen6', 'maxie-gen6', 'cyrus', 'ghetsis', 'guzma', 'lusamine', 'steven', 'wallace', 'alder', 'leon', 'blue', 'lance', 'red-gen1'];
+function bossTrainerFor(regionId) {
+  let h = 0; const s = String(regionId || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return BOSS_TRAINER_POOL[h % BOSS_TRAINER_POOL.length];
+}
+// คืนภาพเทรนเนอร์เต็มตัว (ถ้าโหลดไม่ได้ ซ่อนภาพแล้วปล่อยให้ emoji ข้างๆ ทำหน้าที่แทน)
+function trainerImg(name, cls) {
+  if (!name) return '';
+  const url = TRAINER_SP_BASE + name + '.png';
+  return `<img class="trainer-sprite ${cls || ''}" src="${url}" onerror="this.classList.add('ts-hide')" alt="">`;
+}
+// หา key เทรนเนอร์ของฝั่งศัตรูจาก battleState (ยิม/คู่แข่ง/บอสเขต)
+function foeTrainerName(b) {
+  if (!b) return null;
+  if (b.isRival) return TRAINER_SPRITES.rival;
+  if (b.mode === 'trainer' && b.gym) return TRAINER_SPRITES[b.gym.id] || 'blackbelt';
+  if (b.isBoss && b.bossData && b.bossData.region) return bossTrainerFor(b.bossData.region.id);
+  return null;
+}
 function weightedTier(boost) {
   const w = TIER_WEIGHTS[boost] || TIER_WEIGHTS[0];
   const total = TIER_ORDER.reduce((s, t) => s + w[t], 0);
@@ -3293,14 +3321,66 @@ function startBattle(isBoss, bossData) {
     foeQueue: [{ mon: foeMon }], foeIdx: 0,
     team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
     usedMega: false, usedDynamax: false,
+    showIntro: isBoss && !(state.settings && state.settings.fastBattle),
     msg: isBoss ? `👑 บอส ${foeMon.name} ท้าดวล!` : `เจอ ${foeMon.name} ป่า — เลือกท่าโจมตี!`,
   };
   battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
   renderBattle();
   $('#battleModal').classList.remove('hidden');
 }
+// ===== หน้า VS ก่อนเริ่มต่อสู้ (สไตล์ PokeMeow) — โชว์เทรนเนอร์ + ทีมทั้งสองฝั่ง + ความสามารถ =====
+function rosterRow(mons, shinyOf) {
+  return mons.map((m, i) => `<div class="roster-cell" title="${MON_BY_ID[m.id].name}">${spriteImg(m.id, shinyOf ? shinyOf(i) : false, 'roster-mini')}</div>`).join('');
+}
+function abilityRows(mons, shinyOf) {
+  return mons.map((m, i) => {
+    const mon = MON_BY_ID[m.id]; const ab = abilityFor(m.id);
+    return `<div class="vs-ability" title="${ab ? ab.desc : ''}">${spriteImg(m.id, shinyOf ? shinyOf(i) : false, 'ab-mini')}
+      <span class="vs-ab-name">${mon.name}</span>${ab ? `<span class="vs-ab-dash">—</span><span class="vs-ab-skill">${ab.name}</span>` : ''}</div>`;
+  }).join('');
+}
+function renderBattleIntro(b) {
+  const foeTeam = (b.foeQueue && b.foeQueue.length) ? b.foeQueue.map(f => f.mon) : [b.foeMon];
+  const myTeam = b.team.map(t => t.ind);
+  const foeLabel = b.isRival ? `${RIVAL_NAME}` : (b.mode === 'trainer' ? `${b.gym.name}` : `บอส ${b.foeMon.name}`);
+  const foeEmoji = b.isRival ? '🔥' : (b.mode === 'trainer' ? b.gym.emoji : '👑');
+  const myLabel = `เทรนเนอร์ (คุณ)`;
+  const foeTr = foeTrainerName(b), myTr = TRAINER_SPRITES.player;
+  const myShiny = i => !!(myTeam[i] && myTeam[i].shiny);
+  $('#battleBox').innerHTML = `
+    <div class="vs-intro">
+      <div class="vs-title">⚔️ การต่อสู้กำลังจะเริ่ม!</div>
+      <div class="vs-challenge"><b>👤 ${myLabel}</b> ท้า <b>${foeEmoji} ${foeLabel}</b> ให้ต่อสู้! ⚔️</div>
+      <div class="vs-stage">
+        <div class="vs-corner foe">
+          <div class="vs-tr-wrap">${trainerImg(foeTr)}<span class="vs-tr-emoji">${foeEmoji}</span></div>
+          <div class="vs-tr-name">${foeLabel}</div>
+          <div class="roster-row">${rosterRow(foeTeam)}</div>
+        </div>
+        <div class="vs-badge">VS</div>
+        <div class="vs-corner me">
+          <div class="vs-tr-wrap">${trainerImg(myTr)}<span class="vs-tr-emoji">👤</span></div>
+          <div class="vs-tr-name">${myLabel} Lv.${trainerLevel()}</div>
+          <div class="roster-row">${rosterRow(myTeam, myShiny)}</div>
+        </div>
+      </div>
+      <div class="vs-abilities">
+        <div class="vs-ab-col">
+          <div class="vs-ab-head foe">🧬 ความสามารถของ ${foeLabel}</div>
+          ${abilityRows(foeTeam)}
+        </div>
+        <div class="vs-ab-col">
+          <div class="vs-ab-head me">🧬 ความสามารถของทีมคุณ</div>
+          ${abilityRows(myTeam, myShiny)}
+        </div>
+      </div>
+      <button class="vs-start" id="btVsStart">เริ่มต่อสู้! ⚔️</button>
+    </div>`;
+  $('#btVsStart').onclick = () => { b.showIntro = false; playSfx('rare'); renderBattle(); };
+}
 function renderBattle() {
   const b = battleState; if (!b) return;
+  if (b.showIntro) { renderBattleIntro(b); return; }
   const active = b.team[b.activeIdx];
   const mon = MON_BY_ID[active.ind.id];
   const view = activeMonView(active);
@@ -3317,6 +3397,7 @@ function renderBattle() {
   const foeTypes = b.foeTypes || b.foeMon.types;
   const foeSpriteId = b.foeSpriteId || b.foeMon.id;
   const foeName = b.foeDisplayName || b.foeMon.name;
+  const foeTr = foeTrainerName(b);
   const foeAbility = abilityFor(b.foeMon.id), myAbility = abilityFor(active.ind.id);
   const abilityBadge = ab => ab ? `<span class="badge" style="background:#2c3a55" title="${ab.desc}">🧬 ${ab.name}</span>` : '';
   const curWeather = WEATHERS[getWeather(state.region)];
@@ -3338,7 +3419,8 @@ function renderBattle() {
     ${curWeather.boost && curWeather.boost.length ? `<div style="font-size:11px;color:#9fd3ff;font-weight:700;text-align:center;margin-bottom:4px">${curWeather.emoji} ${curWeather.name} — ท่าธาตุ ${curWeather.boost.join('/')} แรงขึ้น ×1.2${curWeather.dotImmune ? ` · ธาตุอื่นโดนซัดทุกเทิร์น (ยกเว้น ${curWeather.dotImmune.join('/')})` : ''}</div>` : ''}
     <div class="battle-arena">
       <div class="bt-side foe">
-        ${b.mode === 'trainer' ? `<div style="font-size:11px;color:#ffb3bb;font-weight:700">${b.gym.emoji} ${b.gym.name} · เหลือศัตรู ${b.foeQueue.length - b.foeIdx}/${b.foeQueue.length}</div>` : ''}
+        ${b.mode === 'trainer' ? `<div class="bt-foe-trainer">${trainerImg(foeTr, 'bt-trainer')}<span>${b.gym.emoji} ${b.gym.name}</span><span class="bt-foe-dots">${b.foeQueue.map((_, i) => `<span class="fd${i < b.foeIdx ? ' down' : i === b.foeIdx ? ' cur' : ''}"></span>`).join('')}</span></div>` : ''}
+        ${b.isBoss ? `<div class="bt-foe-trainer">${trainerImg(foeTr, 'bt-trainer')}<span>👑 บอสประจำเขต</span></div>` : ''}
         ${b.mode === 'tower' ? `<div style="font-size:11px;color:#ffd76b;font-weight:700">🗼 ชั้น ${b.floorNow}${b.special ? ' · บอส!' : ''} · สูงสุด ${state.tower.bestFloor || 0}</div>` : ''}
         <div class="bt-head"><span>${b.isBoss ? '👑 ' : ''}${foeName} Lv.${b.foeLevel} ${statusBadge(b.foe.status)} ${foeSpecialBadge}${b.foeHeld ? ` <span class="badge" style="background:#3a3a55" title="${HELD_ITEMS[b.foeHeld].desc}">${HELD_ITEMS[b.foeHeld].emoji} ${HELD_ITEMS[b.foeHeld].name}</span>` : ''} ${abilityBadge(foeAbility)} ${foeTypes.map(t => `<span class="badge t-${t}" style="font-size:9px;padding:1px 6px">${t}</span>`).join('')}</span>${spriteImg(foeSpriteId, false)}</div>
         <div class="bt-hpbar"><div class="${hpCls(b.foeHp, b.foeMaxHp)}" style="width:${foePct}%"></div></div>
@@ -3941,6 +4023,7 @@ function startTrainerBattle(gymId) {
     foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp, foeHeld: queue[0].held || null,
     team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
     usedMega: false, usedDynamax: false,
+    showIntro: !(state.settings && state.settings.fastBattle),
     msg: `${g.emoji} ${g.name} — ศัตรู ${g.count} ตัว! เลือกท่าโจมตี`,
   };
   battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
@@ -3983,6 +4066,7 @@ function startRivalBattle() {
     foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp, foeHeld: queue[0].held || null,
     team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
     usedMega: false, usedDynamax: false,
+    showIntro: !(state.settings && state.settings.fastBattle),
     msg: `🔥 คู่แข่ง ${RIVAL_NAME} ท้าดวล! ทีม ${count} ตัว!`,
   };
   battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
