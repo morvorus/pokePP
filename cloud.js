@@ -5,8 +5,8 @@
    ================================================================ */
 
 // 🔧 วางค่าจาก Supabase ที่นี่ (Project Settings → API)
-const SUPABASE_URL = 'PASTE_SUPABASE_URL_HERE';
-const SUPABASE_ANON_KEY = 'PASTE_SUPABASE_ANON_KEY_HERE';
+const SUPABASE_URL = 'https://sldugzvfpcuefqfckbcn.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_9kpTxZmur4ZItJUpHVNUVw_XWPzmxHM';
 
 const Cloud = {
   enabled: false,
