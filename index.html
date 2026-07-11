@@ -125,20 +125,45 @@
       <div id="farmBox" class="quest-list"></div>
     </section>
 
-    <!-- MENU (profile + settings + achievements) -->
+    <!-- MENU (จัดหมวดหมู่: ตัวเรา / การต่อสู้ / ออนไลน์ / ไอเทม / ตั้งค่า) -->
     <section class="view" id="view-menu">
+      <div class="menu-cat">👤 ตัวเรา</div>
       <details class="menu-sec" open>
         <summary class="view-title">👤 โปรไฟล์</summary>
         <div id="profileBox"></div>
       </details>
-      <details class="menu-sec" open>
-        <summary class="view-title">🤖 Catchbot & 🎁 กล่องสุ่ม</summary>
-        <div id="idleBox"></div>
+      <details class="menu-sec">
+        <summary class="view-title">🏆 ความสำเร็จ</summary>
+        <div id="achList" class="ach-list"></div>
+      </details>
+      <details class="menu-sec">
+        <summary class="view-title">🏛️ ห้องโชว์ (Hall of Fame)</summary>
+        <div id="hallOfFameBox"></div>
+      </details>
+      <details class="menu-sec">
+        <summary class="view-title">✨ ตู้โชว์ Shiny</summary>
+        <div id="shinyDexBox"></div>
+      </details>
+
+      <div class="menu-cat">⚔️ การต่อสู้</div>
+      <details class="menu-sec">
+        <summary class="view-title">⚔️ ยิม / เดินสายสู้</summary>
+        <div id="gymBox" class="ach-list"></div>
+      </details>
+      <details class="menu-sec">
+        <summary class="view-title">🗼 หอคอยไต่ระดับ</summary>
+        <div id="towerBox"></div>
+      </details>
+      <details class="menu-sec">
+        <summary class="view-title">🔥 คู่แข่งประจำตัว</summary>
+        <div id="rivalBox" class="quest-list"></div>
       </details>
       <details class="menu-sec">
         <summary class="view-title">📖 คู่มือต่อสู้ (Battle Guide)</summary>
         <div id="battleGuideBox"></div>
       </details>
+
+      <div class="menu-cat">🌐 ออนไลน์ & เพื่อน</div>
       <details class="menu-sec">
         <summary class="view-title">☁️ บัญชี / เซฟคลาวด์</summary>
         <div id="cloudBox" class="settings-box"></div>
@@ -155,29 +180,11 @@
         <summary class="view-title">🔄 เทรดโปเกมอน (ออนไลน์)</summary>
         <div id="tradeBox"></div>
       </details>
+
+      <div class="menu-cat">🎁 ไอเทม & รางวัล</div>
       <details class="menu-sec">
-        <summary class="view-title">🏛️ ห้องโชว์ (Hall of Fame)</summary>
-        <div id="hallOfFameBox"></div>
-      </details>
-      <details class="menu-sec">
-        <summary class="view-title">✨ ตู้โชว์ Shiny</summary>
-        <div id="shinyDexBox"></div>
-      </details>
-      <details class="menu-sec">
-        <summary class="view-title">🧳 พ่อค้าเร่</summary>
-        <div id="merchantBox" class="quest-list"></div>
-      </details>
-      <details class="menu-sec">
-        <summary class="view-title">🗼 หอคอยไต่ระดับ</summary>
-        <div id="towerBox"></div>
-      </details>
-      <details class="menu-sec">
-        <summary class="view-title">🔥 คู่แข่งประจำตัว</summary>
-        <div id="rivalBox" class="quest-list"></div>
-      </details>
-      <details class="menu-sec">
-        <summary class="view-title">⚔️ ยิม / เดินสายสู้</summary>
-        <div id="gymBox" class="ach-list"></div>
+        <summary class="view-title">🤖 Catchbot & 🎁 กล่องสุ่ม</summary>
+        <div id="idleBox"></div>
       </details>
       <details class="menu-sec">
         <summary class="view-title">🎖️ BP Shop</summary>
@@ -192,11 +199,13 @@
         <div id="dexRewardBox" class="ach-list"></div>
       </details>
       <details class="menu-sec">
-        <summary class="view-title">🏆 ความสำเร็จ</summary>
-        <div id="achList" class="ach-list"></div>
+        <summary class="view-title">🧳 พ่อค้าเร่</summary>
+        <div id="merchantBox" class="quest-list"></div>
       </details>
+
+      <div class="menu-cat">⚙️ ตั้งค่า</div>
       <details class="menu-sec">
-        <summary class="view-title">⚙️ ตั้งค่า</summary>
+        <summary class="view-title">⚙️ ตั้งค่าเกม</summary>
         <div id="settingsBox" class="settings-box"></div>
       </details>
     </section>
