@@ -598,6 +598,19 @@ main { flex: 1; padding: 12px; }
 .vs-start:active { transform: scale(.97); }
 @keyframes vsPulse { 0%,100% { box-shadow: 0 4px 14px rgba(226,59,78,.45); } 50% { box-shadow: 0 4px 22px rgba(226,59,78,.85); } }
 .reduce-motion .vs-start { animation: none; }
+/* ===== Leaderboard ===== */
+.lb-name-row { display: flex; gap: 6px; align-items: stretch; }
+.lb-tabs { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+.lb-tab { padding: 6px 10px; border: none; border-radius: 999px; background: rgba(255,255,255,.08); color: var(--text); font-size: 12px; font-weight: 700; cursor: pointer; }
+.lb-tab.active { background: var(--accent); color: #062611; }
+.lb-list { display: flex; flex-direction: column; gap: 4px; }
+.lb-row { display: flex; align-items: center; gap: 10px; padding: 7px 10px; background: rgba(0,0,0,.2); border-radius: 9px; font-size: 13px; }
+.lb-row.mine { background: linear-gradient(90deg,rgba(255,203,5,.22),rgba(0,0,0,.2)); border: 1px solid rgba(255,203,5,.4); }
+.lb-medal { font-size: 15px; width: 24px; text-align: center; flex-shrink: 0; }
+.lb-rank { font-size: 12px; font-weight: 800; color: var(--muted); }
+.lb-nm { flex: 1; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-sc { font-weight: 900; color: #ffd76b; flex-shrink: 0; }
+
 /* ===== Victory summary screen ===== */
 .vic-screen { text-align: center; padding: 4px 0; }
 .vic-title { font-size: 26px; font-weight: 900; background: linear-gradient(90deg,#ffd76b,#ff8a95,#ffd76b); -webkit-background-clip: text; background-clip: text; color: transparent; animation: vicPop .5s ease; }

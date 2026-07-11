@@ -615,6 +615,7 @@ const $ = sel => document.querySelector(sel);
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const escapeHtml = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const todayStr = () => new Date().toISOString().slice(0, 10);
 let _uidc = 0;
 const genUid = () => Date.now().toString(36) + (_uidc++).toString(36) + Math.floor(Math.random() * 1e4).toString(36);
@@ -769,7 +770,11 @@ let _cloudTimer = null;
 function cloudSyncDebounced() {
   if (!(window.Cloud && Cloud.loggedIn())) return;
   clearTimeout(_cloudTimer);
-  _cloudTimer = setTimeout(() => { Cloud.push(state).then(() => updateCloudStatus()).catch(() => {}); }, 4000);
+  _cloudTimer = setTimeout(() => {
+    Cloud.push(state).then(() => updateCloudStatus()).catch(() => {});
+    // อัปเดตกระดานจัดอันดับอัตโนมัติถ้าตั้งชื่อไว้แล้ว (เงียบๆ ล้มเหลวไม่เป็นไร เช่นยังไม่มีตาราง)
+    if (state.playerName && typeof myLbScore === 'function') Cloud.submitScore(myLbScore()).catch(() => {});
+  }, 4000);
 }
 
 // ================================================================
@@ -2468,6 +2473,7 @@ function renderMenu() {
   renderMerchant();
   renderRival();
   renderCloudUI();
+  renderLeaderboard();
   renderIdle();
   renderTower();
   renderGyms();
@@ -4309,6 +4315,76 @@ async function cloudSignUp() {
 }
 async function cloudSignOut() {
   await Cloud.signOut(); renderCloudUI(); toast('ออกจากระบบแล้ว (เซฟในเครื่องยังอยู่)', '');
+}
+// ================================================================
+//  LEADERBOARD (กระดานจัดอันดับผ่านคลาวด์)
+// ================================================================
+let _lbTab = 'dex';
+const LB_TABS = [
+  { key: 'dex', label: '📖 เดกซ์', fmt: v => `${v}/${MONSTERS.length}` },
+  { key: 'tower', label: '🗼 หอคอย', fmt: v => `ชั้น ${v}` },
+  { key: 'caught', label: '🎯 จับรวม', fmt: v => `${v}` },
+  { key: 'playtime', label: '⏱️ เวลาเล่น', fmt: v => `${Math.floor(v / 60)}ชม ${v % 60}น` },
+];
+function myLbScore() {
+  return {
+    name: state.playerName || 'เทรนเนอร์',
+    dex: speciesOwnedCount(),
+    tower: (state.tower && state.tower.bestFloor) || 0,
+    caught: state.totalCaught || 0,
+    playtime: Math.floor((state.playSec || 0) / 60),
+  };
+}
+function renderLeaderboard() {
+  const box = $('#leaderboardBox'); if (!box) return;
+  if (!(window.Cloud && Cloud.enabled)) {
+    box.innerHTML = `<div class="sr-sub">ยังไม่ได้ตั้งค่าคลาวด์ — กระดานจัดอันดับใช้ไม่ได้ในโหมดออฟไลน์</div>`;
+    return;
+  }
+  if (!Cloud.loggedIn()) {
+    box.innerHTML = `<div class="sr-sub">เข้าสู่ระบบที่ส่วน "☁️ บัญชี / เซฟคลาวด์" ก่อน เพื่อส่งสถิติขึ้นกระดานและดูอันดับ</div>`;
+    return;
+  }
+  const me = myLbScore();
+  const tabs = LB_TABS.map(t => `<button class="lb-tab${t.key === _lbTab ? ' active' : ''}" data-lbtab="${t.key}">${t.label}</button>`).join('');
+  box.innerHTML = `
+    <div class="lb-name-row">
+      <input class="save-io lb-name" id="lbName" maxlength="24" placeholder="ชื่อที่แสดงบนกระดาน" value="${(state.playerName || '').replace(/"/g, '&quot;')}" style="min-height:auto;padding:9px;font-family:inherit;font-size:13px;flex:1">
+      <button class="set-btn" id="lbSubmit" style="flex:0 0 auto;background:var(--good);color:#062611">📤 ส่งสถิติ</button>
+    </div>
+    <div class="sr-sub" style="margin:4px 0 8px">สถิติของคุณ: 📖 ${me.dex}/${MONSTERS.length} · 🗼 ชั้น ${me.tower} · 🎯 ${me.caught} · ⏱️ ${Math.floor(me.playtime / 60)}ชม</div>
+    <div class="lb-tabs">${tabs}</div>
+    <div id="lbList" class="lb-list"><div class="sr-sub">⏳ กำลังโหลด...</div></div>`;
+  $('#lbSubmit').onclick = lbSubmit;
+  box.querySelectorAll('[data-lbtab]').forEach(el => el.onclick = () => { _lbTab = el.dataset.lbtab; renderLeaderboard(); });
+  lbLoadList();
+}
+async function lbLoadList() {
+  const list = $('#lbList'); if (!list) return;
+  const tab = LB_TABS.find(t => t.key === _lbTab) || LB_TABS[0];
+  const res = await Cloud.topScores(_lbTab, 20);
+  if (!$('#lbList')) return;   // เปลี่ยนหน้าไปแล้ว
+  if (res.error) {
+    $('#lbList').innerHTML = `<div class="sr-sub">⚠️ ยังเปิดกระดานไม่ได้ — เจ้าของเกมต้องสร้างตาราง leaderboard ใน Supabase ก่อน (ดู CLOUD_SETUP.md)<br><span style="opacity:.6">${res.error}</span></div>`;
+    return;
+  }
+  if (!res.rows.length) { $('#lbList').innerHTML = `<div class="sr-sub">ยังไม่มีใครส่งสถิติ — เป็นคนแรกเลย! 📤</div>`; return; }
+  const myName = state.playerName || 'เทรนเนอร์';
+  $('#lbList').innerHTML = res.rows.map((r, i) => {
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `<span class="lb-rank">${i + 1}</span>`;
+    const mine = r.name === myName;
+    return `<div class="lb-row${mine ? ' mine' : ''}"><span class="lb-medal">${medal}</span><span class="lb-nm">${escapeHtml(r.name || '—')}</span><span class="lb-sc">${tab.fmt(r[_lbTab] || 0)}</span></div>`;
+  }).join('');
+}
+async function lbSubmit() {
+  const nm = ($('#lbName').value || '').trim();
+  if (!nm) { toast('ตั้งชื่อที่จะแสดงก่อน', 'bad'); return; }
+  state.playerName = nm.slice(0, 24); save();
+  toast('⏳ กำลังส่งสถิติ...', '');
+  const res = await Cloud.submitScore(myLbScore());
+  if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  toast('✅ ส่งสถิติขึ้นกระดานแล้ว!', 'good');
+  renderLeaderboard();
 }
 async function cloudSyncNow() {
   if (!Cloud.loggedIn()) return;

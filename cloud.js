@@ -100,6 +100,36 @@ const Cloud = {
     } catch (e) { return { error: String(e) }; }
   },
 
+  // ===== กระดานจัดอันดับ (ต้องสร้างตาราง public.leaderboard ก่อน — ดู CLOUD_SETUP.md) =====
+  // ส่งสถิติของผู้เล่นขึ้นกระดาน (upsert แถวของตัวเอง)
+  async submitScore(score) {
+    if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };
+    try {
+      const row = {
+        user_id: this.user.id,
+        name: (score.name || 'เทรนเนอร์').slice(0, 24),
+        dex: score.dex | 0, playtime: score.playtime | 0,
+        tower: score.tower | 0, caught: score.caught | 0,
+        updated_at: new Date().toISOString(),
+      };
+      const { error } = await this.client.from('leaderboard').upsert(row);
+      if (error) return { error: error.message };
+      return { ok: true };
+    } catch (e) { return { error: String(e) }; }
+  },
+  // ดึงอันดับสูงสุดตามคอลัมน์ (dex/playtime/tower/caught)
+  async topScores(column, limit) {
+    if (!this.enabled) return { error: 'cloud ปิดอยู่' };
+    const col = ['dex', 'playtime', 'tower', 'caught'].includes(column) ? column : 'dex';
+    try {
+      const { data, error } = await this.client
+        .from('leaderboard').select('name, dex, playtime, tower, caught')
+        .order(col, { ascending: false }).limit(limit || 20);
+      if (error) return { error: error.message };
+      return { ok: true, rows: data || [], me: this.user ? this.user.id : null };
+    } catch (e) { return { error: String(e) }; }
+  },
+
   email() { return this.user ? this.user.email : null; },
   loggedIn() { return this.enabled && !!this.user; },
 };

@@ -25,6 +25,22 @@ alter table public.saves enable row level security;
 create policy "own save select" on public.saves for select using (auth.uid() = user_id);
 create policy "own save insert" on public.saves for insert with check (auth.uid() = user_id);
 create policy "own save update" on public.saves for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ===== (ตัวเลือก) ตารางกระดานจัดอันดับ =====
+-- ทุกคนอ่านได้ (ดูอันดับคนอื่น) แต่แก้ได้เฉพาะแถวตัวเอง
+create table public.leaderboard (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  name text,
+  dex int default 0,
+  playtime int default 0,
+  tower int default 0,
+  caught int default 0,
+  updated_at timestamptz default now()
+);
+alter table public.leaderboard enable row level security;
+create policy "lb public read"  on public.leaderboard for select using (true);
+create policy "lb own insert" on public.leaderboard for insert with check (auth.uid() = user_id);
+create policy "lb own update" on public.leaderboard for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 ```
 
 ## 3. (แนะนำ) ปิดยืนยันอีเมล เพื่อล็อกอินง่ายขึ้น
