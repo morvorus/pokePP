@@ -497,7 +497,33 @@ main { flex: 1; padding: 12px; }
   max-width: 400px; width: 100%; box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto;
 }
 .battle-arena { display: flex; flex-direction: column; gap: 10px; }
-.bt-side { background: rgba(0,0,0,.25); border-radius: 12px; padding: 10px 12px; }
+.bt-side { position: relative; background: rgba(0,0,0,.25); border-radius: 12px; padding: 10px 12px; }
+.hit-shake { animation: hitShake .4s ease; }
+@keyframes hitShake {
+  0% { transform: translateX(0); filter: none; }
+  15% { transform: translateX(-5px) rotate(-4deg); filter: brightness(2.2) drop-shadow(0 0 6px #ff5d6c); }
+  30% { transform: translateX(5px) rotate(4deg); filter: brightness(2.2) drop-shadow(0 0 6px #ff5d6c); }
+  45% { transform: translateX(-4px); filter: brightness(1.6); }
+  60% { transform: translateX(4px); filter: brightness(1.3); }
+  100% { transform: translateX(0); filter: none; }
+}
+.dmg-float {
+  position: absolute; top: 8px; right: 16px; z-index: 20; pointer-events: none;
+  font-size: 20px; font-weight: 900; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,.8), 0 0 8px rgba(255,93,108,.6);
+  animation: dmgFloat 1s ease-out forwards;
+}
+.bt-side.me .dmg-float { right: auto; left: 16px; }
+.dmg-float.crit { color: #ffd76b; font-size: 24px; text-shadow: 0 2px 4px rgba(0,0,0,.8), 0 0 10px rgba(255,215,107,.9); }
+.dmg-float.super { color: #8ef0a5; }
+.dmg-float.weak { color: #9fd3ff; font-size: 17px; }
+@keyframes dmgFloat {
+  0% { transform: translateY(0) scale(.6); opacity: 0; }
+  20% { transform: translateY(-6px) scale(1.15); opacity: 1; }
+  100% { transform: translateY(-38px) scale(1); opacity: 0; }
+}
+.reduce-motion .hit-shake { animation: none; }
+.reduce-motion .dmg-float { animation: dmgFloatStatic 1s ease-out forwards; }
+@keyframes dmgFloatStatic { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
 .bt-side.foe { border: 1px solid rgba(255,93,108,.3); }
 .bt-side.me { border: 1px solid rgba(71,209,108,.3); }
 .bt-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; }

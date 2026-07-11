@@ -3466,6 +3466,28 @@ function renderBattle() {
     const mgBtn = $('#btMega'); if (mgBtn) mgBtn.onclick = battleMegaEvolve;
     const dyBtn = $('#btDynamax'); if (dyBtn) dyBtn.onclick = battleDynamax;
   }
+  applyBattleFx(b);
+}
+// เอฟเฟกต์ต่อสู้: สั่น/แฟลชสไปรต์ + ตัวเลขดาเมจลอย (อ่านจาก b._fx ที่ตั้งไว้ตอนคำนวณดาเมจ)
+function applyBattleFx(b) {
+  if (!b || !b._fx) return;
+  const fx = b._fx; b._fx = null;
+  const reduce = state.settings && state.settings.reduceMotion;
+  const doSide = (sel, info) => {
+    if (!info) return;
+    const side = $(sel); if (!side) return;
+    const img = side.querySelector('.bt-head img');
+    if (img && !reduce) { img.classList.remove('hit-shake'); void img.offsetWidth; img.classList.add('hit-shake'); }
+    if (info.dmg > 0) {
+      const f = document.createElement('div');
+      f.className = 'dmg-float' + (info.crit ? ' crit' : '') + (info.eff > 1 ? ' super' : info.eff < 1 && info.eff > 0 ? ' weak' : '');
+      f.textContent = '-' + info.dmg + (info.crit ? '!' : '');
+      side.appendChild(f);
+      setTimeout(() => { if (f.parentNode) f.parentNode.removeChild(f); }, 1000);
+    }
+  };
+  doSide('.bt-side.foe', fx.foe);
+  doSide('.bt-side.me', fx.me);
 }
 // ===== สถานะผิดปกติ (Status) =====
 const STATUS = {
@@ -3612,6 +3634,7 @@ function foeTurn(b) {
   let sturdyMsg = '';
   if (defAbility && defAbility.name === 'Sturdy' && wasFull && dmg >= active.hp) { dmg = active.hp - 1; sturdyMsg = ` · 🗿 ${view.name} ทนอยู่ด้วย Sturdy!`; }
   active.hp = Math.max(0, active.hp - dmg);
+  b._fx = Object.assign(b._fx || {}, { me: { dmg, crit: atkRes.crit, eff: atkRes.eff } });
   b.msg += ` · ${foeName} ใช้ ${mv.name}! ${atkRes.crit ? '🎯คริติคอล! ' : ''}${atkRes.weather ? '🌦️ ' : ''}-${dmg}${sturdyMsg}`;
   b.msg += tryInflict(mv, active, view.types, view.name, defAbility, atkAbility);
   b.msg += applyStatFx(mv, b.foe.stages, active.stages, foeName, view.name, atkAbility, defAbility);
@@ -3779,6 +3802,7 @@ function battleAttack(moveIdx) {
     let sturdyMsg = '';
     if (defAbility && defAbility.name === 'Sturdy' && foeWasFull && dmg >= b.foeHp && b.mode !== 'wild') { dmg = b.foeHp - 1; sturdyMsg = ` · 🗿 ${foeNameForMsg} ทนอยู่ด้วย Sturdy!`; }
     b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - dmg);
+    b._fx = Object.assign(b._fx || {}, { foe: { dmg, crit: atk.crit, eff: atk.eff } });
     b.msg += `${view.name} ใช้ ${mv.name}! ${atk.crit ? '🎯 คริติคอล! ' : ''}${atk.weather ? '🌦️ อากาศช่วย! ' : ''}-${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}${sturdyMsg}`;
     b.msg += tryInflict(mv, b.foe, foeTypesForDef, foeNameForMsg, defAbility, atkAbility);
     b.msg += applyStatFx(mv, active.stages, b.foe.stages, view.name, foeNameForMsg, atkAbility, defAbility);
