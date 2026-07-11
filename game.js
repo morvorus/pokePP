@@ -3386,9 +3386,31 @@ function renderBattleIntro(b) {
     </div>`;
   $('#btVsStart').onclick = () => { b.showIntro = false; playSfx('rare'); renderBattle(); };
 }
+// ===== หน้าสรุปชัยชนะ (หลังชนะเทรนเนอร์/บอส/คู่แข่ง) =====
+function renderVictory(b) {
+  const v = b.victory;
+  const rows = [];
+  if (v.coins) rows.push(['🪙', 'เหรียญ', '+' + v.coins]);
+  if (v.bp) rows.push(['🎖️', 'Battle Points', '+' + v.bp]);
+  if (v.xp) rows.push(['⭐', 'Trainer XP', '+' + v.xp]);
+  if (v.items) rows.push(['🎁', 'ไอเทม', v.items]);
+  $('#battleBox').innerHTML = `
+    <div class="vic-screen">
+      <div class="vic-title">🏆 ชนะแล้ว!</div>
+      <div class="vic-portrait">${trainerImg(v.trainerKey, 'vic-tr')}<span class="vic-emoji">${v.emoji || '👑'}</span></div>
+      <div class="vic-foe-name">เอาชนะ <b>${v.emoji || ''} ${v.title}</b></div>
+      <div class="vic-rewards">
+        ${rows.map(([i, l, val]) => `<div class="vic-row"><span class="vic-ic">${i}</span><span class="vic-lbl">${l}</span><span class="vic-val">${val}</span></div>`).join('')}
+      </div>
+      ${v.bonus ? `<div class="vic-bonus">✨ ${v.bonus}</div>` : ''}
+      <button class="vs-start" id="btVicDone">รับรางวัล ✅</button>
+    </div>`;
+  $('#btVicDone').onclick = endBattle;
+}
 function renderBattle() {
   const b = battleState; if (!b) return;
   if (b.showIntro) { renderBattleIntro(b); return; }
+  if (b.over && b.victory) { renderVictory(b); return; }
   const active = b.team[b.activeIdx];
   const mon = MON_BY_ID[active.ind.id];
   const view = activeMonView(active);
@@ -3932,6 +3954,7 @@ function onFoeDown() {
       const itemMsg = grantItemRewards(b.gym.items);
       gainTrainerXp(80);
       state._rivalWon = true;
+      b.victory = { trainerKey: foeTrainerName(b), emoji: '🔥', title: `คู่แข่ง ${RIVAL_NAME}`, coins: reward, bp, xp: 80, items: itemMsg, bonus: `ชนะรวม ${state.rival.wins} ครั้ง` };
       b.msg = `🔥 ชนะคู่แข่ง ${RIVAL_NAME}! +${reward}🪙 +${bp}🎖️BP${itemMsg ? ' +' + itemMsg : ''} (ชนะรวม ${state.rival.wins} ครั้ง)`;
       logMsg(`🔥 ชนะคู่แข่ง <b>${RIVAL_NAME}</b>! +${reward}🪙 +${bp}BP ${itemMsg}`, 'big');
       playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
@@ -3947,6 +3970,7 @@ function onFoeDown() {
     const itemMsg = first ? grantItemRewards(g.items) : '';
     if (first) { state.fishTokens = (state.fishTokens || 0) + 8; state.lockboxes = (state.lockboxes || 0) + 1; }
     gainTrainerXp(150);
+    b.victory = { trainerKey: foeTrainerName(b), emoji: g.emoji, title: g.name, coins: coinsEarned, bp, xp: 150, items: itemMsg, bonus: first ? '🎁 กล่องสุ่ม + 🎣 เหรียญตกปลา ×8 (ชนะครั้งแรก!)' : 'ชนะซ้ำ — รางวัลลดลง' };
     b.msg = `🏆 ชนะ ${g.emoji} ${g.name}! +${coinsEarned}🪙 +${bp}🎖️BP${itemMsg ? ' +' + itemMsg : ''}${first ? ' +🎁กล่องสุ่ม (ชนะครั้งแรก!)' : ' (ชนะซ้ำ — รางวัลลดลง)'}`;
     logMsg(`🏆 พิชิต <b>${g.name}</b>! +${coinsEarned}🪙 +${bp}BP ${itemMsg}`, 'big');
     playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
@@ -3963,6 +3987,7 @@ function onFoeDown() {
     state.battlePoints = (state.battlePoints || 0) + bp;
     if (first) state.balls.ultra = (state.balls.ultra || 0) + 2;
     gainXpTo(active.ind, Math.round(b.foeLevel * 2.5)); gainTrainerXp(80);
+    b.victory = { trainerKey: foeTrainerName(b), emoji: '👑', title: `บอส ${b.foeMon.name}`, coins: reward, bp, xp: 80, items: first ? '🟡 Ultra Ball ×2' : '', bonus: first ? '🏅 เหรียญตราประจำเขต!' : 'ชนะซ้ำ — รางวัลลดลง' };
     b.msg = `🏆 ชนะบอส ${b.foeMon.name}! ได้ 🏅 เหรียญตรา + ${reward}🪙 + ${bp}🎖️BP${first ? ' + Ultra Ball ×2' : ' (ชนะซ้ำ — รางวัลลดลง)'}`;
     logMsg(`🏆 ชนะบอสเขต <b>${b.bossData.region.name}</b>! +${reward}🪙 +${bp}BP`, 'big');
     playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
