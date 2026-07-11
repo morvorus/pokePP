@@ -58,6 +58,8 @@ body {
 }
 .stat-chip .ico { font-size: 16px; }
 .stat-chip .coin-ico { width: 18px; height: 18px; object-fit: contain; image-rendering: pixelated; }
+.fishtok-chip { padding: 8px 12px; font-size: 14px; }
+.fishtok-chip .fishtok-ico { font-size: 15px; }
 .buddy-chip { margin-left: auto; flex: 1; max-width: 240px; gap: 8px; padding: 6px 10px 6px 6px; cursor: pointer; }
 .buddy-chip img {
   width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated;

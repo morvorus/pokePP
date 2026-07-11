@@ -1021,6 +1021,7 @@ function removeFromParty(uid) {
 // ================================================================
 function renderTopbar() {
   $('#coins').textContent = state.coins;
+  const ft = $('#fishTokens'); if (ft) ft.textContent = state.fishTokens || 0;
   const b = getBuddy();
   if (b) {
     const m = MON_BY_ID[b.id];
