@@ -200,11 +200,21 @@ const CHARMS = {
   catch: { name: 'Catch Charm', emoji: '🧲', img: 'oval-charm', mult: 1.5, price: 1200, desc: 'โอกาสจับ ×1.5' },
   xp:    { name: 'XP Charm',    emoji: '📿', img: 'lucky-egg',      mult: 2,   price: 800,  desc: 'XP ที่ได้ ×2' },
 };
-const CHARM_ORDER = ['catch', 'xp'];
+const CHARM_ORDER = ['xp'];   // Catch Charm ย้ายไปเป็นพาสซีฟถาวร (เหมือน Shiny Charm) เหลือแค่ XP Charm ที่เป็นแบบเวลา
 
 // Shiny Charm — ไอเทมติดตัวถาวรแบบพาสซีฟ (แบบเกมจริง/PokeMeow) สะสมได้สูงสุด 5 ชิ้น เพิ่มโอกาส Shiny ทีละเล็กน้อย
 const SHINY_CHARM_MAX = 5, SHINY_CHARM_PRICE = 4500, SHINY_CHARM_PER = 0.02;   // +2%/ชิ้น ทบต้น (แบบเกมจริง เพิ่มน้อยแต่ถาวร)
 function shinyCharmMultiplier() { return Math.pow(1 + SHINY_CHARM_PER, Math.min(state.shinyCharms || 0, SHINY_CHARM_MAX)); }
+// Catch Charm — พาสซีฟถาวรเหมือน Shiny Charm สะสมได้สูงสุด 5 ชิ้น เพิ่มโอกาสจับถาวร (ไม่ใช่จับเวลา)
+const CATCH_CHARM_MAX = 5, CATCH_CHARM_PRICE = 2500, CATCH_CHARM_PER = 0.08;   // +8%/ชิ้น ทบต้น (สูงสุด ~×1.47 ถาวร)
+function catchCharmMultiplier() { return Math.pow(1 + CATCH_CHARM_PER, Math.min(state.catchCharms || 0, CATCH_CHARM_MAX)); }
+function buyCatchCharm() {
+  if ((state.catchCharms || 0) >= CATCH_CHARM_MAX) { toast('มี Catch Charm ครบ 5 ชิ้นแล้ว', ''); return; }
+  if (!spend(CATCH_CHARM_PRICE)) return;
+  state.catchCharms = (state.catchCharms || 0) + 1;
+  toast(`🧲 Catch Charm ${state.catchCharms}/${CATCH_CHARM_MAX} (ติดตัวถาวร เพิ่มโอกาสจับ)`, 'good');
+  playSfx('rare'); postBuy();
+}
 function buyShinyCharm() {
   if ((state.shinyCharms || 0) >= SHINY_CHARM_MAX) { toast('มี Shiny Charm ครบ 5 ชิ้นแล้ว', ''); return; }
   if (!spend(SHINY_CHARM_PRICE)) return;
@@ -344,6 +354,7 @@ const LOCKBOX_REWARDS = [
   { w: 8, act: () => { state.berries.golden = (state.berries.golden || 0) + 1; return 'Golden Razz'; } },
   { w: 5, act: () => { state.eggs.push({ kind: 'rare', progressStart: state.totalCaught }); return 'ไข่หายาก'; } },
   { w: 2, act: () => { if ((state.shinyCharms || 0) >= SHINY_CHARM_MAX) { state.coins += 1000; return '1000🪙 (Shiny Charm เต็มแล้ว)'; } state.shinyCharms = (state.shinyCharms || 0) + 1; return `Shiny Charm ${state.shinyCharms}/${SHINY_CHARM_MAX}`; } },
+  { w: 3, act: () => { if ((state.catchCharms || 0) >= CATCH_CHARM_MAX) { state.coins += 800; return '800🪙 (Catch Charm เต็มแล้ว)'; } state.catchCharms = (state.catchCharms || 0) + 1; return `🧲 Catch Charm ${state.catchCharms}/${CATCH_CHARM_MAX}`; } },
   { w: 1, act: () => { state.balls.master = (state.balls.master || 0) + 1; return 'Master Ball! 🟣'; } },
 ];
 
@@ -1803,7 +1814,7 @@ function throwBall(k) {
 
   const ctx = { mon: currentSpawn.mon, throws: prevThrows, time: timeOfDay(), region: region(), alreadyCaught: speciesCount(currentSpawn.mon.id) > 0 };
   const mods = { hpBonus: hpBonusFor(currentSpawn),
-    catchMult: boostActive('catch') ? CHARMS.catch.mult : 1, ctx };
+    catchMult: catchCharmMultiplier(), ctx };   // Catch Charm พาสซีฟถาวร
   const p = catchChance(currentSpawn.mon, currentSpawn.level, BALLS[k], mods);
   const success = Math.random() < p;
 
@@ -2409,7 +2420,7 @@ function renderShop() {
     { emoji: '💍', img: 'mega-ring', name: state.hasMegaRing ? 'กำไลเมก้า (มีแล้ว)' : 'กำไลเมก้า', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนเมก้าอีโวลูชันตัวไหนก็ได้ทั้งหมด', price: MEGA_RING_PRICE, act: () => { if (state.hasMegaRing) { toast('มีกำไลเมก้าอยู่แล้ว', ''); return; } if (spend(MEGA_RING_PRICE)) { state.hasMegaRing = true; toast('💍 ได้กำไลเมก้าแล้ว! เมก้าอีโวลูชันได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
     { emoji: '⌚', img: 'macho-brace', name: state.hasDynamaxBand ? 'กำไลไดนาแม็กซ์ (มีแล้ว)' : 'กำไลไดนาแม็กซ์', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนไดนาแม็กซ์ตัวไหนก็ได้ทั้งหมด', price: DYNAMAX_BAND_PRICE, act: () => { if (state.hasDynamaxBand) { toast('มีกำไลไดนาแม็กซ์อยู่แล้ว', ''); return; } if (spend(DYNAMAX_BAND_PRICE)) { state.hasDynamaxBand = true; toast('⌚ ได้กำไลไดนาแม็กซ์แล้ว! ไดนาแม็กซ์ได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
     { emoji: '🔮', img: 'shiny-charm', name: `Shiny Charm (${state.shinyCharms || 0}/${SHINY_CHARM_MAX})`, desc: `ติดตัวถาวร เพิ่มโอกาส Shiny +${Math.round(SHINY_CHARM_PER * 100)}% ทบต้น (ไม่หมดอายุ)`, price: SHINY_CHARM_PRICE, act: buyShinyCharm },
-    { emoji: CHARMS.catch.emoji, img: CHARMS.catch.img, name: 'Catch Charm', desc: CHARMS.catch.desc + ' · 30 นาที', price: CHARMS.catch.price, act: () => buyCharm('catch') },
+    { emoji: '🧲', img: 'oval-charm', name: `Catch Charm (${state.catchCharms || 0}/${CATCH_CHARM_MAX})`, desc: `ติดตัวถาวร เพิ่มโอกาสจับ +${Math.round(CATCH_CHARM_PER * 100)}% ทบต้น (ไม่หมดอายุ)`, price: CATCH_CHARM_PRICE, act: buyCatchCharm },
     { emoji: CHARMS.xp.emoji, img: CHARMS.xp.img, name: 'XP Charm', desc: CHARMS.xp.desc + ' · 30 นาที', price: CHARMS.xp.price, act: () => buyCharm('xp') },
     ...HELD_ORDER.map(k => ({ emoji: HELD_ITEMS[k].emoji, img: HELD_ITEMS[k].img, name: HELD_ITEMS[k].name, desc: '🎽 สวมสู้: ' + HELD_ITEMS[k].desc, price: HELD_ITEMS[k].price, act: () => buyHeld(k) })),
     // แลกด้วยเหรียญตกปลา 🎟️
@@ -2828,11 +2839,19 @@ function redeemBP(id) {
 function renderCharms() {
   const box = $('#charmBox'); if (!box) return;
   const shinyPct = Math.round((shinyCharmMultiplier() - 1) * 100);
+  const catchPct = Math.round((catchCharmMultiplier() - 1) * 100);
   box.innerHTML = `<div class="ach done">
       <div class="ach-ico">${itemIcon('🔮', 'shiny-charm', 'big')}</div>
       <div class="ach-body">
         <div class="ach-name">Shiny Charm (ติดตัวถาวร) ${state.shinyCharms || 0}/${SHINY_CHARM_MAX}</div>
         <div class="ach-desc">โอกาส Shiny รวม +${shinyPct}% · ซื้อเพิ่มได้ที่ร้านค้า</div>
+      </div>
+    </div>
+    <div class="ach done">
+      <div class="ach-ico">${itemIcon('🧲', 'oval-charm', 'big')}</div>
+      <div class="ach-body">
+        <div class="ach-name">Catch Charm (ติดตัวถาวร) ${state.catchCharms || 0}/${CATCH_CHARM_MAX}</div>
+        <div class="ach-desc">โอกาสจับรวม +${catchPct}% · ซื้อเพิ่มได้ที่ร้านค้า (พาสซีฟ ไม่หมดอายุ)</div>
       </div>
     </div>` +
     CHARM_ORDER.map(k => {
