@@ -279,7 +279,8 @@ const MEGA_FORMS = {
 };
 // ราคาหินเมก้าในร้าน (แพงมาก — ต้องซื้อ/แลกเองทั้งหมด ไม่มีทางได้ฟรี ให้การวิวัฒนาการเมก้ารู้สึกคุ้มค่า)
 const MEGA_STONE_PRICE = 7000;
-const MEGA_RING_PRICE = 15000;   // กำไลเมก้า — ปลดล็อกครั้งเดียว จำเป็นก่อนเมก้าอีโวลูชันได้ทุกตัว
+const MEGA_RING_PRICE = 15000;   // (เดิม) — ปัจจุบันแลกด้วยเหรียญเช็คอินแทน
+const MEGA_RING_CHECKIN = 150, DYNAMAX_BAND_CHECKIN = 300;   // ราคาแลกด้วยเหรียญเช็คอิน
 
 // ===== Gigantamax — สายพันธุ์ที่มีร่าง G-Max จริง (spriteId จาก PokeAPI) =====
 const GMAX_FORMS = {
@@ -971,6 +972,12 @@ function buyMegaStone(stone, price) {
   if (!spend(price)) return;
   state.megaStoneInv[stone] = (state.megaStoneInv[stone] || 0) + 1;
   save(); toast(`💎 ซื้อ ${stone} แล้ว — แนบได้ในหน้าโปเกมอน`, 'good');
+}
+// มอบหินเมก้าให้ 1 ชิ้น (รางวัลจากลีคเมก้า) — คืนชื่อหิน
+function grantMegaStone(stone) {
+  state.megaStoneInv = state.megaStoneInv || {};
+  state.megaStoneInv[stone] = (state.megaStoneInv[stone] || 0) + 1;
+  return stone;
 }
 // ---------- หินปลุกพลัง G-Max เฉพาะสายพันธุ์ (mirror ของระบบหินเมก้า) ----------
 function attuneGmaxStone(uid) {
@@ -2446,20 +2453,22 @@ function renderShop() {
     { emoji: '🎫', img: 'member-card', name: 'ตั๋ว Safari', desc: `เข้า Safari Zone ${SAFARI_SPAWNS} ตัวหายากสุดๆ (กดปุ่ม Safari หน้าล่า)`, price: 800, act: () => { if (spend(800)) { state.safariTickets = (state.safariTickets || 0) + 1; toast('🎫 +1 ตั๋ว Safari', 'good'); postBuy(); } } },
     { emoji: '💎', img: 'shiny-stone', name: 'หินวิวัฒนาการ', desc: 'วิวัฒนาการตัวที่ต้องใช้ไอเทม', price: STONE_PRICE, act: () => { if (spend(STONE_PRICE)) { state.stones = (state.stones || 0) + 1; toast('💎 +1 หินวิวัฒนาการ', 'good'); postBuy(); } } },
     { emoji: '💥', img: 'comet-shard', name: `พลังงานไดนาแม็กซ์ (มี ${state.maxEnergy || 0})`, desc: 'ใช้ครั้งละ 1 ในการต่อสู้ · HP×2 + ดาเมจ +30% เป็นเวลา 3 เทิร์น', price: MAX_ENERGY_PRICE, act: () => { if (spend(MAX_ENERGY_PRICE)) { state.maxEnergy = (state.maxEnergy || 0) + 1; toast('💥 +1 พลังงานไดนาแม็กซ์', 'good'); postBuy(); } } },
-    { emoji: '💍', img: 'mega-ring', name: state.hasMegaRing ? 'กำไลเมก้า (มีแล้ว)' : 'กำไลเมก้า', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนเมก้าอีโวลูชันตัวไหนก็ได้ทั้งหมด', price: MEGA_RING_PRICE, act: () => { if (state.hasMegaRing) { toast('มีกำไลเมก้าอยู่แล้ว', ''); return; } if (spend(MEGA_RING_PRICE)) { state.hasMegaRing = true; toast('💍 ได้กำไลเมก้าแล้ว! เมก้าอีโวลูชันได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
-    { emoji: '⌚', img: 'macho-brace', name: state.hasDynamaxBand ? 'กำไลไดนาแม็กซ์ (มีแล้ว)' : 'กำไลไดนาแม็กซ์', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนไดนาแม็กซ์ตัวไหนก็ได้ทั้งหมด', price: DYNAMAX_BAND_PRICE, act: () => { if (state.hasDynamaxBand) { toast('มีกำไลไดนาแม็กซ์อยู่แล้ว', ''); return; } if (spend(DYNAMAX_BAND_PRICE)) { state.hasDynamaxBand = true; toast('⌚ ได้กำไลไดนาแม็กซ์แล้ว! ไดนาแม็กซ์ได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
+    // แลกด้วยเหรียญเช็คอิน 🎟️ (ได้จากล็อกอินรายวัน)
+    { emoji: '💍', img: 'mega-ring', name: state.hasMegaRing ? 'กำไลเมก้า (มีแล้ว)' : 'กำไลเมก้า', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนเมก้าอีโวลูชัน · แลกด้วยเหรียญเช็คอิน', checkinPrice: MEGA_RING_CHECKIN, act: () => { if (state.hasMegaRing) { toast('มีกำไลเมก้าอยู่แล้ว', ''); return; } if (spendCheckin(MEGA_RING_CHECKIN)) { state.hasMegaRing = true; toast('💍 ได้กำไลเมก้าแล้ว! เมก้าอีโวลูชันได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
+    { emoji: '⌚', img: 'macho-brace', name: state.hasDynamaxBand ? 'กำไลไดนาแม็กซ์ (มีแล้ว)' : 'กำไลไดนาแม็กซ์', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนไดนาแม็กซ์ · แลกด้วยเหรียญเช็คอิน', checkinPrice: DYNAMAX_BAND_CHECKIN, act: () => { if (state.hasDynamaxBand) { toast('มีกำไลไดนาแม็กซ์อยู่แล้ว', ''); return; } if (spendCheckin(DYNAMAX_BAND_CHECKIN)) { state.hasDynamaxBand = true; toast('⌚ ได้กำไลไดนาแม็กซ์แล้ว! ไดนาแม็กซ์ได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
     // แลกด้วยเหรียญตกปลา 🎟️
     { emoji: '🟡', img: 'ultra-ball', name: 'Ultra Ball', desc: 'แลกด้วยเหรียญตกปลา', tokenPrice: 3, act: () => { if (spendTokens(3)) { state.balls.ultra = (state.balls.ultra || 0) + 1; toast('🟡 +1 Ultra Ball', 'good'); postBuy(); } } },
   ];
   $('#shopGrid').innerHTML =
-    `<div class="dex-stats">💎 ${state.stones || 0} · 🍬 ${state.candies || 0} · 🎟️ ${state.fishTokens || 0} เหรียญตกปลา · บอล: ` +
+    `<div class="dex-stats">💎 ${state.stones || 0} · 🎟️ ${state.fishTokens || 0} เหรียญตกปลา · 🎟️ ${state.checkinCoins || 0} เหรียญเช็คอิน · บอล: ` +
     BALL_ORDER.map(k => `${itemIcon(BALLS[k].emoji, BALLS[k].img)}${state.balls[k] || 0}`).join(' ') + `</div>` +
     ballsHtml +
     items.map((it, i) => {
       const isTok = it.tokenPrice != null;
+      const isCheckin = it.checkinPrice != null;
       const owned = (it.img === 'mega-ring' && state.hasMegaRing) || (it.img === 'macho-brace' && state.hasDynamaxBand);
-      const cant = owned || (isTok ? (state.fishTokens || 0) < it.tokenPrice : state.coins < it.price);
-      const label = owned ? 'มีแล้ว' : (isTok ? `${it.tokenPrice}🎟️` : `${it.price}${itemIcon('🪙', 'nugget', 'price-ico')}`);
+      const cant = owned || (isCheckin ? (state.checkinCoins || 0) < it.checkinPrice : isTok ? (state.fishTokens || 0) < it.tokenPrice : state.coins < it.price);
+      const label = owned ? 'มีแล้ว' : (isCheckin ? `${it.checkinPrice} 🎟️เช็คอิน` : isTok ? `${it.tokenPrice}🎟️` : `${it.price}${itemIcon('🪙', 'nugget', 'price-ico')}`);
       return `<div class="shop-item">
         <div class="emoji">${itemIcon(it.emoji, it.img, 'big')}</div>
         <div class="si-body"><div class="si-name">${it.name}</div><div class="si-desc">${it.desc}</div></div>
@@ -2478,6 +2487,7 @@ function renderShop() {
   });
 }
 function spendTokens(n) { if ((state.fishTokens || 0) < n) { toast('❌ เหรียญตกปลาไม่พอ', 'bad'); return false; } state.fishTokens -= n; return true; }
+function spendCheckin(n) { if ((state.checkinCoins || 0) < n) { toast('❌ เหรียญเช็คอินไม่พอ (ได้จากล็อกอินรายวัน)', 'bad'); return false; } state.checkinCoins -= n; return true; }
 function spend(n) { if (state.coins < n) { toast('❌ เงินไม่พอ', 'bad'); return false; } state.coins -= n; return true; }
 function postBuy() { save(); renderTopbar(); renderShop(); renderBallBar(); }
 function addBalls(k, n, price) { if (spend(price)) { state.balls[k] = (state.balls[k] || 0) + n; toast(`${BALLS[k].emoji} +${n} ${BALLS[k].name}`, 'good'); postBuy(); } }
@@ -2722,6 +2732,7 @@ function renderMenu() {
   renderTrade();
   renderIdle();
   renderTower();
+  renderMegaLeague();
   renderGyms();
   renderBpShop();
   renderCharms();
@@ -3024,13 +3035,13 @@ function resetGame() {
 //  OFFLINE REWARDS + DAILY LOGIN CALENDAR (วนทุก 7 วัน เห็นล่วงหน้าได้ว่าแต่ละวันได้อะไร)
 // ================================================================
 const LOGIN_CALENDAR = [
-  { day: 1, coins: 80,  ball: ['poke', 3] },
-  { day: 2, coins: 120, ball: ['poke', 5] },
-  { day: 3, coins: 180, ball: ['great', 2] },
-  { day: 4, coins: 240, ball: ['great', 3] },
-  { day: 5, coins: 320, ball: ['ultra', 1] },
-  { day: 6, coins: 420, ball: ['ultra', 2] },
-  { day: 7, coins: 800, ball: ['ultra', 3], lockbox: 1 },   // วันที่ 7 ของรอบ — รางวัลใหญ่ ก่อนวนกลับวันที่ 1
+  { day: 1, coins: 80,  ball: ['poke', 3],  checkin: 15 },
+  { day: 2, coins: 120, ball: ['poke', 5],  checkin: 15 },
+  { day: 3, coins: 180, ball: ['great', 2], checkin: 20 },
+  { day: 4, coins: 240, ball: ['great', 3], checkin: 20 },
+  { day: 5, coins: 320, ball: ['ultra', 1], checkin: 25 },
+  { day: 6, coins: 420, ball: ['ultra', 2], checkin: 25 },
+  { day: 7, coins: 800, ball: ['ultra', 3], lockbox: 1, checkin: 50 },   // วันที่ 7 ของรอบ — รางวัลใหญ่ ก่อนวนกลับวันที่ 1
 ];
 function loginCycleDay(streak) { return ((Math.max(1, streak) - 1) % 7) + 1; }   // 1-7 วนทุกสัปดาห์ (ไม่รีเซ็ต streak สะสมจริง)
 function applyDailyLogin() {
@@ -3043,10 +3054,12 @@ function applyDailyLogin() {
   state.coins += cd.coins;
   state.balls[cd.ball[0]] = (state.balls[cd.ball[0]] || 0) + cd.ball[1];
   if (cd.lockbox) state.lockboxes = (state.lockboxes || 0) + cd.lockbox;
+  if (cd.checkin) state.checkinCoins = (state.checkinCoins || 0) + cd.checkin;   // เหรียญเช็คอิน — แลกกำไลเมก้า/ไดนาแม็กซ์
   save();
   const ballTxt = `${cd.ball[1]}${BALLS[cd.ball[0]].emoji}`;
   const lockboxTxt = cd.lockbox ? ` +${cd.lockbox}🎁` : '';
-  setTimeout(() => toast(`📅 ล็อกอินวันที่ ${state.streak} ติดต่อกัน (วันที่ ${loginCycleDay(state.streak)}/7)! +${cd.coins}🪙 +${ballTxt}${lockboxTxt}`, 'good'), 600);
+  const ciTxt = cd.checkin ? ` +${cd.checkin}🎟️เช็คอิน` : '';
+  setTimeout(() => toast(`📅 ล็อกอินวันที่ ${state.streak} ติดต่อกัน (วันที่ ${loginCycleDay(state.streak)}/7)! +${cd.coins}🪙 +${ballTxt}${lockboxTxt}${ciTxt}`, 'good'), 600);
 }
 function applyOfflineRewards() {
   const now = Date.now();
@@ -3189,7 +3202,7 @@ function renderProfile() {
     </div>
     <div style="margin-top:8px;font-size:12px;font-weight:700">⏱️ สถานะพร้อมใช้</div>
     ${readyStatusHtml()}
-    <div style="margin-top:8px;font-size:12px;font-weight:700">📅 ปฏิทินล็อกอิน (วนทุก 7 วัน)</div>
+    <div style="margin-top:8px;font-size:12px;font-weight:700">📅 ปฏิทินล็อกอิน (วนทุก 7 วัน) · 🎟️ เหรียญเช็คอิน: <b style="color:#ffd76b">${state.checkinCoins || 0}</b></div>
     ${loginCalendarHtml()}
     <div class="stat-grid">
       <div class="stat-tile"><div class="st-num">${speciesOwnedCount()}/${MONSTERS.length}</div><div class="st-lbl">📖 เดกซ์ (${dexPct}%)</div></div>
@@ -3989,6 +4002,7 @@ function faintActive(b, aMon) {
     } else {
       b.msg += ' · แพ้! ลองใหม่';
       if (b.isRival) { state.rival = state.rival || { readyAt: 0, wins: 0, losses: 0 }; state.rival.losses = (state.rival.losses || 0) + 1; save(); }
+      if (b.isLeague && b.league) { state.megaLeague = state.megaLeague || {}; state.megaLeague.cooldowns = state.megaLeague.cooldowns || {}; state.megaLeague.cooldowns[b.league.id] = Date.now() + MEGA_LEAGUE_CD; b.msg += ` · 💎 แพ้บอสลีค! คูลดาวน์ 2 ชม.`; save(); }
     }
   } else { b.activeIdx = next; b.msg += ` ส่ง ${MON_BY_ID[b.team[next].ind.id].name} ลงสนาม!${applyIntimidate('player', b)}`; }
 }
@@ -4246,6 +4260,24 @@ function onFoeDown() {
       return;   // ยังไม่จบ สู้ตัวต่อไป
     }
     b.over = true;
+    if (b.isLeague && b.league) {   // ชนะบอสลีคเมก้า — การันตีหินเมก้า + ไข่ทอง + อุปกรณ์ + เงิน
+      const lg = b.league;
+      const stoneMsg = grantMegaStone(lg.stone);
+      state.eggs.push({ kind: 'gold', progressStart: state.totalCaught });
+      const heldMsg = grantRandomHeld();
+      const coins = 3000 + trainerLevel() * 40;
+      state.coins += coins;
+      const bp = 30;
+      state.battlePoints = (state.battlePoints || 0) + bp;
+      gainXpTo(active.ind, 100); gainTrainerXp(120);
+      state.megaLeague = state.megaLeague || {}; state.megaLeague.beaten = state.megaLeague.beaten || {};
+      state.megaLeague.beaten[lg.id] = true;
+      b.victory = { trainerKey: foeTrainerName(b), emoji: '💎', title: lg.name, coins, bp, xp: 120, items: `💎 ${lg.stone} + 🥚✨ ไข่ทอง + 🎽 ${heldMsg}`, bonus: `ได้หินเมก้า ${lg.name}! (แนบให้โปเกมอนในหน้าตัวมันได้)` };
+      b.msg = `💎 ชนะบอสลีค ${lg.name}! ได้ 💎 หินเมก้า + 🥚✨ ไข่ทอง + 🎽 ${heldMsg} + ${coins}🪙`;
+      logMsg(`💎 พิชิตบอสลีค <b>${lg.name}</b>! ได้หินเมก้า ${lg.stone} + ไข่ทอง + ${heldMsg}`, 'big');
+      playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
+      return;
+    }
     if (b.isGhost) {   // ชนะทีมผู้เล่นออนไลน์ (Ghost)
       const g = b.gym;
       const bp = 6 + Math.floor(trainerLevel() / 2);
@@ -4382,7 +4414,20 @@ function grantItemRewards(list) {
 function loadFoe(b, def) {
   b.foeMon = def.mon; b.foeLevel = def.level; b.foeStats = def.stats;
   b.foeMaxHp = def.maxHp; b.foeHp = def.maxHp; b.foeHeld = def.held || null;
+  // ฟิลด์ร่างพิเศษ (เมก้า/G-Max) — ตั้งถ้ามี ไม่มีก็เคลียร์ (กันค่าค้างจากตัวก่อนหน้า)
+  b.foeTypes = def.foeTypes || null;
+  b.foeSpriteId = def.foeSpriteId || null;
+  b.foeDisplayName = def.foeDisplayName || null;
+  b.special = def.special || null;
   b.foe = { status: null, sleepT: 0, stages: freshStages() };   // ศัตรูตัวใหม่ = สถานะ/สเตตัสเคลียร์
+}
+// สร้าง def ศัตรูร่างเมก้า (ใช้ในลีคเมก้า) — สเตตัสตามร่างเมก้าจริง + เก็บสไปรต์/ธาตุ/ชื่อ
+function makeMegaFoeDef(mon, form, level) {
+  const ms = statsForBase(form.stats, level);
+  const stats = { atk: ms.atk, def: ms.def, spatk: ms.spatk, spdef: ms.spdef, spd: ms.spd };
+  const held = pick(FOE_HELD_POOL); applyFoeHeld(stats, held);
+  return { mon, level, stats, maxHp: Math.floor(ms.hp * 1.25), held,
+    foeTypes: form.types, foeSpriteId: form.spriteId, foeDisplayName: form.name, special: 'mega' };
 }
 function startTrainerBattle(gymId) {
   const left = (state.gymReadyAt || 0) - Date.now();
@@ -4480,6 +4525,78 @@ function renderRival() {
 function updateRivalCd() {
   if (!$('#rivalBox') || currentView !== 'menu') return;
   renderRival();
+}
+// ================================================================
+//  MEGA LEAGUE — บอสร่างเมก้า สุ่ม 5 ตัว/สัปดาห์ · ชนะได้หินเมก้าของบอสนั้น
+// ================================================================
+const MEGA_LEAGUE_CD = 2 * 3600000;   // แพ้ = คูลดาวน์ 2 ชม.
+function ensureMegaLeague() {
+  const wk = weeklyEventKey();
+  state.megaLeague = state.megaLeague || {};
+  if (state.megaLeague.week === wk && Array.isArray(state.megaLeague.bosses) && state.megaLeague.bosses.length) return;
+  // สุ่ม 5 บอสจากทุกสายพันธุ์ที่มีร่างเมก้า (seed ตามสัปดาห์ — ทุกคนเจอชุดเดียวกัน + สุ่มวนหาครบทุกร่างได้)
+  let seed = 0; for (const c of wk) seed = (seed * 31 + c.charCodeAt(0)) >>> 0;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+  const pool = Object.keys(MEGA_FORMS).map(id => +id).sort(() => rnd() - 0.5);
+  state.megaLeague.bosses = pool.slice(0, 5).map((megaId, i) => {
+    const forms = MEGA_FORMS[megaId];
+    const form = forms[Math.floor(rnd() * forms.length)];   // สุ่มร่าง X/Y ถ้ามี
+    return { id: 'ml' + megaId + '_' + i, megaId, formKey: form.key, stone: form.stone, name: form.name, spriteId: form.spriteId };
+  });
+  state.megaLeague.beaten = {};
+  state.megaLeague.cooldowns = {};
+  state.megaLeague.week = wk;
+  save();
+}
+function startMegaLeagueBattle(bossId) {
+  ensureMegaLeague();
+  const boss = state.megaLeague.bosses.find(x => x.id === bossId);
+  if (!boss) return;
+  if (state.megaLeague.beaten[bossId]) { toast('✅ ชนะบอสนี้แล้วรอบนี้ (รอรีเซ็ตสัปดาห์หน้า)', ''); return; }
+  const cdLeft = (state.megaLeague.cooldowns[bossId] || 0) - Date.now();
+  if (cdLeft > 0) { toast(`⏳ แพ้บอสนี้ รออีก ${Math.ceil(cdLeft / 60000)} นาที`, 'bad'); return; }
+  const members = partyMembers();
+  if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
+  const forms = MEGA_FORMS[boss.megaId];
+  const form = forms.find(f => f.key === boss.formKey) || forms[0];
+  const megaMon = MON_BY_ID[boss.megaId];
+  // ทีมบอส: มอนสนับสนุน 3 ตัว (ธาตุเดียวกับเมก้า/ระดับสูง) + เมก้าเป็นตัวปิดท้าย · ทุกตัวเวล 100
+  const supPool = MONSTERS.filter(m => m.id !== boss.megaId && (m.types.some(t => form.types.includes(t)) || m._tier === 'superrare' || m._tier === 'legendary'));
+  const queue = [];
+  for (let i = 0; i < 3; i++) queue.push(makeFoeDef(pick(supPool.length ? supPool : MONSTERS), 100, 1.15, true));
+  queue.push(makeMegaFoeDef(megaMon, form, 100));
+  const team = buildBattleTeam(members);
+  const leagueGym = { id: boss.id, name: boss.name, emoji: '💎', sprite: bossTrainerFor(boss.id) };
+  battleState = {
+    mode: 'trainer', isBoss: false, isLeague: true, league: boss, gym: leagueGym, foeQueue: queue, foeIdx: 0,
+    foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp, foeHeld: queue[0].held || null,
+    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
+    usedMega: false, usedDynamax: false,
+    showIntro: !(state.settings && state.settings.fastBattle),
+    msg: `💎 ลีคเมก้า: ${boss.name} ท้าดวล! ทีมเวล 100`,
+  };
+  battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
+  renderBattle();
+  $('#battleModal').classList.remove('hidden');
+}
+function renderMegaLeague() {
+  const box = $('#megaLeagueBox'); if (!box) return;
+  ensureMegaLeague();
+  const ml = state.megaLeague;
+  const daysLeft = weeklyEventDaysLeft();
+  box.innerHTML = `<div class="sr-sub" style="margin-bottom:8px">บอสร่างเมก้า 5 ตัว (ทีมเวล 100) · ชนะได้ 💎 หินเมก้าของบอสนั้น + 🥚✨ ไข่ทอง + 🎽 อุปกรณ์ + เงิน · สุ่มบอสใหม่ทุกสัปดาห์ (เหลือ ${daysLeft} วัน) · แพ้ = คูลดาวน์ 2 ชม.</div>` +
+    ml.bosses.map(b => {
+      const beaten = ml.beaten[b.id];
+      const cdLeft = Math.max(0, Math.ceil(((ml.cooldowns[b.id] || 0) - Date.now()) / 60000));
+      const btn = beaten ? `<button class="claim-btn done" disabled>ชนะแล้ว ✓</button>`
+        : cdLeft > 0 ? `<button class="claim-btn" disabled>รอ ${cdLeft} น.</button>`
+          : `<button class="claim-btn" data-league="${b.id}">ท้าสู้</button>`;
+      return `<div class="ghost-row">
+        <span>${spriteImg(b.spriteId, false, 'roster-mini')}</span>
+        <div class="ghost-info"><div class="ghost-name">💎 ${b.name}</div><div class="sr-sub">รางวัล: หิน ${b.stone}</div></div>
+        ${btn}</div>`;
+    }).join('');
+  box.querySelectorAll('[data-league]').forEach(el => el.onclick = () => startMegaLeagueBattle(el.dataset.league));
 }
 
 // ================================================================
