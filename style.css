@@ -580,6 +580,15 @@ main { flex: 1; padding: 12px; }
 .bt-foe-dots .fd { width: 8px; height: 8px; border-radius: 50%; background: #ff8a95; box-shadow: 0 0 4px rgba(255,138,149,.6); }
 .bt-foe-dots .fd.down { background: rgba(255,255,255,.18); box-shadow: none; }
 .bt-foe-dots .fd.cur { background: #ffd76b; box-shadow: 0 0 6px rgba(255,215,107,.8); }
+/* rival portrait card */
+.rival-card { display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg,rgba(226,59,78,.25),rgba(0,0,0,.25)); border: 1px solid rgba(255,138,149,.3); border-radius: 12px; padding: 8px 12px; }
+.rival-portrait { position: relative; width: 48px; height: 48px; flex-shrink: 0; display: flex; align-items: flex-end; justify-content: center; }
+.rival-tr { max-width: 46px; max-height: 48px; image-rendering: pixelated; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); z-index: 1; }
+.rival-tr.ts-hide { display: none; }
+.rival-emoji { position: absolute; z-index: 0; font-size: 28px; opacity: .9; }
+.rival-info { flex: 1; min-width: 0; }
+.rival-name { font-size: 14px; font-weight: 800; color: #ffb3bb; }
+.rival-stat { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
 /* party strip on menu/home */
 .party-strip { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
@@ -596,7 +605,14 @@ main { flex: 1; padding: 12px; }
 /* profile / stats */
 .profile-card { background: linear-gradient(135deg,var(--accent2),#2a4a8a); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
 .profile-top { display: flex; align-items: center; gap: 12px; }
-.profile-top img { width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; background: rgba(0,0,0,.2); border-radius: 50%; }
+.pf-avatar { position: relative; width: 64px; height: 64px; flex-shrink: 0; border-radius: 16px; background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.18), rgba(0,0,0,.25)); border: 1px solid rgba(255,255,255,.2); display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
+.pf-trainer { max-width: 60px; max-height: 62px; image-rendering: pixelated; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
+.pf-trainer.ts-hide { display: none; }
+.pf-buddy { position: absolute; bottom: -4px; right: -4px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.55); border: 2px solid rgba(255,255,255,.35); display: flex; align-items: center; justify-content: center; }
+.pf-buddy img { width: 24px; height: 24px; object-fit: contain; image-rendering: pixelated; }
+.pf-xpbar { height: 7px; background: rgba(0,0,0,.35); border-radius: 999px; overflow: hidden; margin-top: 5px; border: 1px solid rgba(255,255,255,.15); }
+.pf-xpfill { height: 100%; background: linear-gradient(90deg,#ffd76b,#ffb03a); transition: width .4s; }
+.profile-top > div:last-child img { width: 56px; height: 56px; object-fit: contain; image-rendering: pixelated; background: rgba(0,0,0,.2); border-radius: 50%; }
 .profile-lv { font-size: 20px; font-weight: 800; }
 .profile-sub { font-size: 12px; opacity: .9; }
 .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }

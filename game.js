@@ -2913,11 +2913,19 @@ function renderProfile() {
   const partyStrip = state.party.length
     ? `<div class="party-strip">${partyMembers().map((ind, i) => `<div class="party-mini${i === 0 ? ' lead' : ''}" data-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}<span class="pm-lv">L${ind.level}</span></div>`).join('')}</div>`
     : '<div class="sr-sub" style="margin-top:6px">ยังไม่มีทีม — ตั้ง Buddy/เข้าทีมจากคลัง</div>';
+  const prevXp = Math.pow(tl - 1, 2) * 60;
+  const xpPct = clamp(Math.round(((state.trainerXp || 0) - prevXp) / Math.max(1, nextXp - prevXp) * 100), 0, 100);
   return `<div class="profile-card">
     <div class="profile-top">
-      ${b ? spriteImg(b.id, b.shiny) : '<div style="width:56px;height:56px"></div>'}
-      <div><div class="profile-lv">👤 เทรนเนอร์ Lv.${tl}</div>
-        <div class="profile-sub">Trainer XP ${state.trainerXp || 0} / ${nextXp} · 🔥 streak ${state.streak || 0} วัน</div></div>
+      <div class="pf-avatar">
+        ${trainerImg(TRAINER_SPRITES.player, 'pf-trainer')}
+        ${b ? `<span class="pf-buddy" title="Buddy: ${MON_BY_ID[b.id].name}">${spriteImg(b.id, b.shiny)}</span>` : ''}
+      </div>
+      <div style="flex:1;min-width:0"><div class="profile-lv">👤 เทรนเนอร์ Lv.${tl}</div>
+        <div class="profile-sub">🔥 streak ${state.streak || 0} วัน</div>
+        <div class="pf-xpbar"><div class="pf-xpfill" style="width:${xpPct}%"></div></div>
+        <div class="profile-sub" style="font-size:10px;margin-top:3px">Trainer XP ${state.trainerXp || 0} / ${nextXp}</div>
+      </div>
     </div>
     <div style="margin-top:8px;font-size:12px;font-weight:700">⏱️ สถานะพร้อมใช้</div>
     ${readyStatusHtml()}
@@ -4078,8 +4086,15 @@ function renderRival() {
   state.rival = state.rival || { readyAt: 0, wins: 0, losses: 0 };
   const left = Math.max(0, Math.ceil(rivalReadyLeft() / 1000));
   const tl = trainerLevel();
-  box.innerHTML = `<div class="preset-row"><span class="pr-name">🔥 ${RIVAL_NAME} · Lv.~${clamp(10 + tl * 3, 10, 100)} · ชนะ ${state.rival.wins || 0} แพ้ ${state.rival.losses || 0}</span>
-    <div class="pr-actions"><button class="claim-btn" id="btnRival" ${left > 0 ? 'disabled' : ''}>${left > 0 ? `รอ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'ท้าดวล'}</button></div></div>`;
+  const rw = state.rival.wins || 0, rl = state.rival.losses || 0;
+  box.innerHTML = `<div class="rival-card">
+    <div class="rival-portrait">${trainerImg(TRAINER_SPRITES.rival, 'rival-tr')}<span class="rival-emoji">🔥</span></div>
+    <div class="rival-info">
+      <div class="rival-name">🔥 ${RIVAL_NAME}</div>
+      <div class="rival-stat">Lv.~${clamp(10 + tl * 3, 10, 100)} · 🏆 ชนะ ${rw} · 💀 แพ้ ${rl}</div>
+    </div>
+    <button class="claim-btn" id="btnRival" ${left > 0 ? 'disabled' : ''}>${left > 0 ? `รอ ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}` : 'ท้าดวล'}</button>
+  </div>`;
   const btn = $('#btnRival'); if (btn) btn.onclick = startRivalBattle;
 }
 function updateRivalCd() {
