@@ -1108,6 +1108,34 @@ function currentWorldEvent() {
   if (we.until <= Date.now()) { state.worldEvent = null; renderRegionBanner(); return null; }
   return RANDOM_EVENTS.find(e => e.id === we.id) || null;
 }
+// ===== อีเวนต์ประจำสัปดาห์ — หมุนอัตโนมัติแบบ deterministic ตามเลขสัปดาห์ ทุกคนเห็นตรงกัน =====
+const WEEKLY_SHINY_MULT = 1.5, WEEKLY_COIN_MULT = 1.2, WEEKLY_LEG_MULT = 1.4;   // โบนัสถาวรตลอดสัปดาห์ (อ่อนกว่าอีเวนต์สุ่มเพราะอยู่นานทั้งสัปดาห์)
+function isoWeekNumber(d) {
+  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+}
+function weeklyEventKey() { const n = new Date(); return `${n.getUTCFullYear()}-W${isoWeekNumber(n)}`; }
+function weeklyEvent() {
+  const n = new Date();
+  const idx = (isoWeekNumber(n) + n.getUTCFullYear()) % RANDOM_EVENTS.length;
+  return RANDOM_EVENTS[idx];
+}
+function weeklyEventDaysLeft() {
+  const n = new Date();
+  const day = n.getUTCDay() || 7;   // 1=จันทร์..7=อาทิตย์ (ISO)
+  return 8 - day;                    // เหลือกี่วันจนถึงจันทร์หน้า
+}
+function checkWeeklyEvent() {   // แจ้งเตือนครั้งแรกของสัปดาห์ใหม่
+  const key = weeklyEventKey();
+  if (state.weeklyEventSeen === key) return;
+  state.weeklyEventSeen = key;
+  const wk = weeklyEvent();
+  logMsg(`📅 อีเวนต์ประจำสัปดาห์: ${wk.emoji} <b>${wk.name}</b> — ${wk.desc} (Shiny ×${WEEKLY_SHINY_MULT} · เหรียญ ×${WEEKLY_COIN_MULT} ทั้งสัปดาห์)`, 'big');
+  save();
+}
 function tryTriggerRandomEvent() {
   const now = Date.now();
   if (currentWorldEvent()) return;                     // มีอีเวนต์ทำงานอยู่แล้ว
@@ -1174,6 +1202,7 @@ function shinyMultiplier() {
   m *= shinyCharmMultiplier();         // Shiny Charm ติดตัวถาวร (+2%/ชิ้น สูงสุด 5 ชิ้น)
   const we = currentWorldEvent();
   if (we) m *= we.shinyMult;           // อีเวนต์สุ่มตามฤดูกาล
+  m *= WEEKLY_SHINY_MULT;              // อีเวนต์ประจำสัปดาห์ (ถาวรทั้งสัปดาห์)
   return m;
 }
 // ชั้น2 แบบ PokeMeow: Common 40% · Uncommon 30% · Rare 27% · Super Rare 3% (legendary แยกอิสระ)
@@ -1232,12 +1261,18 @@ function doSpawn() {
   const luck = r.boost + (isEventActive() ? 1 : 0) + (we ? 1 : 0) + berryLuck;
   let mon;
   // ชั้น1: legendary สุ่มแยกอิสระ (1/666 ปรับตามเขต/อีเวนต์/เบอร์รี่)
-  const legChance = LEGENDARY_CHANCE * (1 + r.boost * 0.6) * (isEventActive() ? 2 : 1) * (we ? we.legMult : 1) * (1 + berryLuck * 0.5);
+  const legChance = LEGENDARY_CHANCE * (1 + r.boost * 0.6) * (isEventActive() ? 2 : 1) * (we ? we.legMult : 1) * WEEKLY_LEG_MULT * (1 + berryLuck * 0.5);
   const legPool = r._byTier.legendary.length ? r._byTier.legendary : MONSTERS.filter(m => m._tier === 'legendary');
   if (Math.random() < legChance && legPool.length) {
     mon = pick(legPool);
   } else {
     mon = pickFromRegion(r, rollRarity(luck));
+    // อีเวนต์ประจำสัปดาห์: ดันให้เจอธาตุที่ featured บ่อยขึ้น (คงระดับความหายากเดิม)
+    const wk = weeklyEvent();
+    if (wk && wk.types.length && Math.random() < 0.35) {
+      const featured = r._pool.filter(m => m._tier === mon._tier && m.types.some(t => wk.types.includes(t)));
+      if (featured.length) mon = pick(featured);
+    }
   }
   // ชั้น shiny: overlay สุ่มแยกอิสระ (ซ้อนตัวที่สุ่มได้) + โบนัสคอมโบล่า shiny
   const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier() * comboShinyBoost(mon.id);
@@ -1590,7 +1625,9 @@ function renderRegionBanner() {
   const timeIco = timeOfDay() === 'night' ? '🌙' : '☀️';
   const ev = isEventActive() ? ' · <b style="color:var(--accent)">✨อีเวนต์สุดสัปดาห์ x2</b>' : '';
   const safari = (state.safari && state.safari.left > 0) ? ` · <b style="color:#ffd76b">🎫 Safari เหลือ ${state.safari.left}</b>` : '';
-  $('#rbLvl').innerHTML = `${timeIco} · ${w.emoji}${w.name}${ev}${safari}`;
+  const wk = weeklyEvent();
+  const wkChip = ` · <b style="color:#c9a3ff" title="${wk.desc} · Shiny ×${WEEKLY_SHINY_MULT} · เหรียญ ×${WEEKLY_COIN_MULT} ทั้งสัปดาห์ (เหลือ ${weeklyEventDaysLeft()} วัน)">📅 ${wk.emoji} ${wk.name}</b>`;
+  $('#rbLvl').innerHTML = `${timeIco} · ${w.emoji}${w.name}${wkChip}${ev}${safari}`;
   const card = $('#spawnCard');
   card.style.background = regionBgCss(r);
   card.classList.toggle('night', timeOfDay() === 'night');
@@ -1796,7 +1833,7 @@ function onCatchSuccess(ballKey) {
   updateCatchCombo(mon.id, shiny);
 
   const amuletMul = 1 + Math.min(state.amulets || 0, AMULET_MAX) * 0.05;   // Amulet Coin
-  const eventCoinMul = currentWorldEvent() ? currentWorldEvent().coinMult : 1;
+  const eventCoinMul = (currentWorldEvent() ? currentWorldEvent().coinMult : 1) * WEEKLY_COIN_MULT;   // อีเวนต์สุ่ม × อีเวนต์ประจำสัปดาห์
   const coins = Math.round(TIER_COIN[tier] * (1 + level / 100) * (shiny ? 3 : 1) * amuletMul * eventCoinMul);
   const xp = Math.round(TIER_XP[tier] * (1 + level / 50) * (boostActive('xp') ? CHARMS.xp.mult : 1));
   state.coins += coins;
@@ -4647,6 +4684,7 @@ function init() {
   load();
   applyOfflineRewards();   // ต้องอ่าน lastSeen เก่าก่อน save ใดๆ
   applyDailyLogin();
+  checkWeeklyEvent();       // แจ้งอีเวนต์ประจำสัปดาห์ถ้าเข้าสัปดาห์ใหม่
   ensureDailyQuests();
   fillDexFilter();
   renderRegionBanner();
