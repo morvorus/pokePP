@@ -155,6 +155,13 @@ const BALLS = {
 const BALL_ORDER = ['poke', 'premier', 'great', 'luxury', 'ultra', 'net', 'dusk', 'quick', 'timer', 'repeat', 'heavy', 'beast', 'master'];
 // บอลที่ขายในร้าน (ที่เหลือ net/dusk/quick/timer/repeat/heavy/beast/luxury หาได้จากกล่องสุ่ม/ตียิม/บอส/หอคอย)
 const SHOP_BALL_ORDER = ['poke', 'premier', 'great', 'ultra', 'master'];
+const OFF_SHOP_BALLS = ['net', 'dusk', 'quick', 'timer', 'repeat', 'heavy', 'luxury', 'beast'];   // ดรอปจากกล่อง/ยิม/บอส/หอคอย
+function grantRandomBall() {   // สุ่มบอลนอกร้าน 1 ชนิด (beast หายากกว่า) จำนวน 1-3 · คืนข้อความ
+  const k = Math.random() < 0.1 ? 'beast' : pick(OFF_SHOP_BALLS.filter(b => b !== 'beast'));
+  const n = k === 'beast' ? 1 : rand(1, 3);
+  state.balls[k] = (state.balls[k] || 0) + n;
+  return `${BALLS[k].emoji} ${BALLS[k].name} ×${n}`;
+}
 
 // สภาพอากาศ (สุ่มต่อเขต) + กลางวัน/กลางคืน + อีเวนต์
 // dotImmune = ธาตุที่ไม่โดนดาเมจจากสภาพอากาศตอนจบเทิร์น (แบบพายุทราย/หิมะในเกมจริง — 1/16 ของ HP สูงสุด)
@@ -369,6 +376,7 @@ const LOCKBOX_REWARDS = [
   { w: 32, act: () => { const n = rand(200, 1000); state.coins += n; return `${n} เหรียญ`; } },              // เงิน 200-1000
   { w: 22, act: () => { const n = rand(3, 8); state.balls.great = (state.balls.great || 0) + n; return `${n} Great Ball`; } },
   { w: 15, act: () => { const n = rand(1, 3); state.balls.ultra = (state.balls.ultra || 0) + n; return `${n} Ultra Ball`; } },
+  { w: 14, act: () => grantRandomBall() },   // บอลพิเศษนอกร้าน (net/dusk/quick/timer/repeat/heavy/luxury/beast)
   { w: 12, act: () => { const n = rand(1, 3); const k = pick(BERRY_ORDER); state.berries[k] = (state.berries[k] || 0) + n; return `${n} ${BERRIES[k].name}`; } },   // ผลไม้
   { w: 12, act: () => { const n = rand(1, 3); state.candies = (state.candies || 0) + n; return `${n} Rare Candy`; } },
   { w: 4,  act: () => { state.eggs.push({ kind: 'mystery', progressStart: state.totalCaught }); return `🥚 ${EGG_KINDS.mystery.name}`; } },
@@ -603,6 +611,25 @@ MONSTERS.forEach(m => {
 });
 // tierOf + UB_LEGENDARY_IDS ย้ายไป logic.js แล้ว (import ด้านบน)
 MONSTERS.forEach(m => { m._tier = tierOf(m); });
+// เจนของโปเกมอนจาก national dex id
+function genOf(id) {
+  if (id <= 151) return 1; if (id <= 251) return 2; if (id <= 386) return 3;
+  if (id <= 493) return 4; if (id <= 649) return 5; if (id <= 721) return 6;
+  if (id <= 809) return 7; if (id <= 905) return 8; return 9;
+}
+// เทพทั้งหมดจัดกลุ่มตามเจน + น้ำหนักโอกาสออก (เจน 1 ง่ายสุด → เจน 9 ยากสุด)
+const ALL_LEGENDARY = MONSTERS.filter(m => m._tier === 'legendary');
+const LEGENDARY_BY_GEN = {};
+for (let g = 1; g <= 9; g++) LEGENDARY_BY_GEN[g] = ALL_LEGENDARY.filter(m => genOf(m.id) === g);
+const GEN_LEG_WEIGHT = { 1: 9, 2: 8, 3: 7, 4: 6, 5: 5, 6: 4, 7: 3, 8: 2, 9: 1 };
+function pickLegendaryGenWeighted() {
+  const gens = [1, 2, 3, 4, 5, 6, 7, 8, 9].filter(g => LEGENDARY_BY_GEN[g].length);
+  if (!gens.length) return pick(ALL_LEGENDARY.length ? ALL_LEGENDARY : MONSTERS);
+  const total = gens.reduce((s, g) => s + GEN_LEG_WEIGHT[g], 0);
+  let r = Math.random() * total, gen = gens[0];
+  for (const g of gens) { if ((r -= GEN_LEG_WEIGHT[g]) < 0) { gen = g; break; } }
+  return pick(LEGENDARY_BY_GEN[gen]);
+}
 const ALL_TYPES = [...new Set(MONSTERS.flatMap(m => m.types))].sort();
 
 // pool สำหรับตกปลา (ธาตุน้ำ/น้ำแข็ง)
@@ -1102,7 +1129,7 @@ function scheduleSpawn(delay) {
 function levelFor(tier) {
   const [lo, hi] = TIER_LEVEL[tier] || TIER_LEVEL.common;
   // เอนไปทางเลเวลต่ำมากขึ้น: โปเกมอนเลเวลสูงเจอยากขึ้นชัดเจน (pow สูง = ยิ่งเอนต่ำ)
-  return Math.round(lo + (hi - lo) * Math.pow(Math.random(), 2.6));
+  return Math.round(lo + (hi - lo) * Math.pow(Math.random(), 3.4));
 }
 // ---------- world: time / weather / event ----------
 function timeOfDay() { const h = new Date().getHours(); return (h >= 6 && h < 18) ? 'day' : 'night'; }
@@ -1266,11 +1293,11 @@ function doSpawn() {
   const berryLuck = consumeBerryLuck();   // เบอร์รี่: เพิ่มโอกาสเจอตัวหายากสำหรับสปอว์นนี้ (ไม่ใช่โอกาสจับ)
   const luck = r.boost + (isEventActive() ? 1 : 0) + (we ? 1 : 0) + berryLuck;
   let mon;
-  // ชั้น1: legendary สุ่มแยกอิสระ (1/666 ปรับตามเขต/อีเวนต์/เบอร์รี่)
-  const legChance = LEGENDARY_CHANCE * (1 + r.boost * 0.6) * (isEventActive() ? 2 : 1) * (we ? we.legMult : 1) * WEEKLY_LEG_MULT * (1 + berryLuck * 0.5);
-  const legPool = r._byTier.legendary.length ? r._byTier.legendary : MONSTERS.filter(m => m._tier === 'legendary');
-  if (Math.random() < legChance && legPool.length) {
-    mon = pick(legPool);
+  // ชั้น1: เจอเทพเท่ากันทุกแมพ 1/666 (มีอีเวนต์ = 1/500) แล้วสุ่มว่าเป็นเทพเจนไหน (เจน 9 ยากสุด)
+  const inEvent = isEventActive() || !!we;
+  const legChance = inEvent ? 1 / 500 : 1 / 666;
+  if (Math.random() < legChance) {
+    mon = pickLegendaryGenWeighted();
   } else {
     mon = pickFromRegion(r, rollRarity(luck));
     // อีเวนต์ประจำสัปดาห์: ดันให้เจอธาตุที่ featured บ่อยขึ้น (คงระดับความหายากเดิม)
@@ -1561,9 +1588,9 @@ const MERCHANT_DEALS = [
   { id: 'quick3', name: 'Quick Ball ×3',  emoji: BALLS.quick.emoji, img: BALLS.quick.img, basePrice: BALLS.quick.price * 3, give: () => { state.balls.quick = (state.balls.quick || 0) + 3; } },
   { id: 'ultra2', name: 'Ultra Ball ×2',  emoji: BALLS.ultra.emoji, img: BALLS.ultra.img, basePrice: BALLS.ultra.price * 2, give: () => { state.balls.ultra = (state.balls.ultra || 0) + 2; } },
   { id: 'candy3', name: 'Rare Candy ×3',  emoji: '🍬', img: 'rare-candy', basePrice: 450, give: () => { state.candies = (state.candies || 0) + 3; } },
+  { id: 'candy5', name: 'Rare Candy ×5',  emoji: '🍬', img: 'rare-candy', basePrice: 750, give: () => { state.candies = (state.candies || 0) + 5; } },
+  { id: 'razz3', name: 'Razz Berry ×3',  emoji: BERRIES.razz.emoji, img: BERRIES.razz.img, basePrice: BERRIES.razz.price * 3, give: () => { state.berries.razz = (state.berries.razz || 0) + 3; } },
   { id: 'golden2', name: 'Golden Razz ×2', emoji: BERRIES.golden.emoji, img: BERRIES.golden.img, basePrice: BERRIES.golden.price * 2, give: () => { state.berries.golden = (state.berries.golden || 0) + 2; } },
-  { id: 'lifeorb', name: 'Life Orb',      emoji: HELD_ITEMS['life-orb'].emoji,     img: HELD_ITEMS['life-orb'].img,     basePrice: HELD_ITEMS['life-orb'].price,     give: () => { state.heldInv['life-orb'] = (state.heldInv['life-orb'] || 0) + 1; } },
-  { id: 'shellbell', name: 'Shell Bell',  emoji: HELD_ITEMS['shell-bell'].emoji,   img: HELD_ITEMS['shell-bell'].img,   basePrice: HELD_ITEMS['shell-bell'].price,   give: () => { state.heldInv['shell-bell'] = (state.heldInv['shell-bell'] || 0) + 1; } },
   { id: 'lockbox1', name: 'กล่องสุ่ม (Lockbox)', emoji: '🎁', img: null, basePrice: 1200, give: () => { state.lockboxes = (state.lockboxes || 0) + 1; } },
 ];
 function tryTriggerMerchant() {
@@ -2232,7 +2259,7 @@ function megaSectionHtml(ind) {
         const have = state.megaStoneInv[f.stone] || 0;
         return have > 0
           ? `<button class="pill" data-attune="${f.stone}" style="cursor:pointer;border:none;display:inline-flex;align-items:center;gap:4px">${itemIcon('💎', f.stone)} แนบ ${f.name} ×${have}</button>`
-          : `<button class="pill" data-buystone="${f.stone}" style="cursor:pointer;border:none;display:inline-flex;align-items:center;gap:4px">${itemIcon('💎', f.stone)} ซื้อ ${f.name} (${MEGA_STONE_PRICE}🪙)</button>`;
+          : `<span class="pill" style="opacity:.55;display:inline-flex;align-items:center;gap:4px" title="ชนะบอสในลีคเมก้าเพื่อรับหิน">${itemIcon('💎', f.stone)} ${f.name} — หาจาก 💎 ลีคเมก้า</span>`;
       }).join('') + `</div>`;
   }
   if (gmax) {
@@ -2247,7 +2274,7 @@ function megaSectionHtml(ind) {
       <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:6px">` +
         (have > 0
           ? `<button class="pill" data-attunegx="1" style="cursor:pointer;border:none;display:inline-flex;align-items:center;gap:4px">${spriteImg(gmax.spriteId, false, 'item-ico')} แนบหินปลุกพลัง ×${have}</button>`
-          : `<button class="pill" data-buygx="1" style="cursor:pointer;border:none;display:inline-flex;align-items:center;gap:4px">${spriteImg(gmax.spriteId, false, 'item-ico')} ซื้อหินปลุกพลัง (${GMAX_STONE_PRICE}🪙)</button>`)
+          : `<span class="pill" style="opacity:.55;display:inline-flex;align-items:center;gap:4px">${spriteImg(gmax.spriteId, false, 'item-ico')} หินปลุกพลัง G-Max — หาจากกล่องสุ่ม/หอคอย</span>`)
         + `</div>`;
     }
   }
@@ -3717,7 +3744,7 @@ function renderBattle() {
            ${canDynamax ? `<button class="bt-flee" id="btDynamax" ${battleBusy ? 'disabled' : ''} style="background:linear-gradient(180deg,#ff6b6b,#c1122e);color:#fff">💥 ไดนาแม็กซ์ (${state.maxEnergy}⚡)</button>` : ''}
          </div>` : ''}
          <div class="move-grid${battleBusy ? ' move-grid-busy' : ''}">${moveBtns}</div>
-         <div class="bt-actions"><button class="bt-flee" id="btFlee" ${battleBusy ? 'disabled' : ''}>${b.isBoss ? 'ยอมแพ้' : (b.mode === 'tower' ? 'ล่าถอย (เก็บชั้นปัจจุบันไว้)' : 'หนี')}</button></div>`}`;
+         <div class="bt-actions"><button class="bt-flee" id="btFlee" ${battleBusy ? 'disabled' : ''}>${b.isBoss ? 'ยอมแพ้' : (b.mode === 'tower' ? 'ล่าถอย (คูลดาวน์ 12 ชม.)' : 'หนี')}</button></div>`}`;
 
   if (b.over) {
     $('#btDone').onclick = endBattle;
@@ -3936,7 +3963,8 @@ function faintActive(b, aMon) {
     else if (b.mode === 'tower') {
       const lostFloor = b.floorNow;
       state.tower.floor = 1;   // แพ้ = รีเซ็ตกลับชั้น 1 (สถิติสูงสุดยังเก็บไว้)
-      b.msg += ` · 🗼 แพ้ที่ชั้น ${lostFloor}! หอคอยรีเซ็ตกลับชั้น 1 (สถิติสูงสุด ${state.tower.bestFloor || 0})`;
+      state.towerReadyAt = Date.now() + TOWER_CD;   // คูลดาวน์ 12 ชม.
+      b.msg += ` · 🗼 แพ้ที่ชั้น ${lostFloor}! หอคอยรีเซ็ตกลับชั้น 1 + คูลดาวน์ 12 ชม. (สถิติสูงสุด ${state.tower.bestFloor || 0})`;
       save();
     } else {
       b.msg += ' · แพ้! ลองใหม่';
@@ -4181,6 +4209,7 @@ function onFoeDown() {
     if (floor % 20 === 0 && Math.random() < HELD_DROP_CHANCE) {   // ทุก 20 ชั้น มีโอกาส 5% ดรอปอุปกรณ์สวมใส่
       const h = grantRandomHeld(); itemMsg = (itemMsg ? itemMsg + ' + ' : '') + '🎽 ' + h;
     }
+    if (Math.random() < 0.25) { itemMsg = (itemMsg ? itemMsg + ' + ' : '') + grantRandomBall(); }   // 25% ดรอปบอลพิเศษนอกร้าน
     if (floor > (state.tower.bestFloor || 0)) state.tower.bestFloor = floor;
     state.tower.floor = floor + 1;
     b.over = true; b.towerCleared = true;
@@ -4271,6 +4300,7 @@ function onFoeDown() {
     if (first) { state.fishTokens = (state.fishTokens || 0) + 8; state.lockboxes = (state.lockboxes || 0) + 1; }
     let heldDrop = '';
     if (Math.random() < HELD_DROP_CHANCE) { heldDrop = grantRandomHeld(); itemMsg = (itemMsg ? itemMsg + ' ' : '') + heldDrop; }   // 5% ดรอปอุปกรณ์สวมใส่
+    if (Math.random() < 0.5) { itemMsg = (itemMsg ? itemMsg + ' ' : '') + grantRandomBall(); }   // 50% ดรอปบอลพิเศษนอกร้าน
     gainTrainerXp(150);
     b.victory = { trainerKey: foeTrainerName(b), emoji: g.emoji, title: g.name, coins: coinsEarned, bp, xp: 150, items: itemMsg, bonus: (first ? '🎁 กล่องสุ่ม + 🎣 เหรียญตกปลา ×8 (ชนะครั้งแรก!)' : 'ชนะซ้ำ — รางวัลลดลง') + (heldDrop ? ` · 🎽 ดรอป ${heldDrop}!` : '') };
     b.msg = `🏆 ชนะ ${g.emoji} ${g.name}! +${coinsEarned}🪙 +${bp}🎖️BP${itemMsg ? ' +' + itemMsg : ''}${first ? ' +🎁กล่องสุ่ม (ชนะครั้งแรก!)' : ' (ชนะซ้ำ — รางวัลลดลง)'}`;
@@ -4288,8 +4318,9 @@ function onFoeDown() {
     state.coins += reward;
     state.battlePoints = (state.battlePoints || 0) + bp;
     if (first) state.balls.ultra = (state.balls.ultra || 0) + 2;
+    const bossBall = Math.random() < 0.6 ? grantRandomBall() : '';   // 60% ดรอปบอลพิเศษนอกร้าน
     gainXpTo(active.ind, Math.round(b.foeLevel * 2.5)); gainTrainerXp(80);
-    b.victory = { trainerKey: foeTrainerName(b), emoji: '👑', title: `บอส ${b.foeMon.name}`, coins: reward, bp, xp: 80, items: first ? '🟡 Ultra Ball ×2' : '', bonus: first ? '🏅 เหรียญตราประจำเขต!' : 'ชนะซ้ำ — รางวัลลดลง' };
+    b.victory = { trainerKey: foeTrainerName(b), emoji: '👑', title: `บอส ${b.foeMon.name}`, coins: reward, bp, xp: 80, items: (first ? '🟡 Ultra Ball ×2 ' : '') + bossBall, bonus: first ? '🏅 เหรียญตราประจำเขต!' : 'ชนะซ้ำ — รางวัลลดลง' };
     b.msg = `🏆 ชนะบอส ${b.foeMon.name}! ได้ 🏅 เหรียญตรา + ${reward}🪙 + ${bp}🎖️BP${first ? ' + Ultra Ball ×2' : ' (ชนะซ้ำ — รางวัลลดลง)'}`;
     logMsg(`🏆 ชนะบอสเขต <b>${b.bossData.region.name}</b>! +${reward}🪙 +${bp}BP`, 'big');
     playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
@@ -4303,6 +4334,11 @@ function onFoeDown() {
 function endBattle() {
   if (battleState && !battleState.over && battleBusy) return;   // กันกดหนีขณะรออนิเมชันเทิร์นอยู่
   const wasMode = battleState ? battleState.mode : null;
+  // หนีหอคอยกลางคัน (ยังไม่จบ) = คูลดาวน์ 12 ชม. + รีเซ็ตชั้น (กันปั๊มเงินด้วยการเข้าๆ ออกๆ)
+  if (battleState && wasMode === 'tower' && !battleState.over) {
+    state.tower.floor = 1; state.towerReadyAt = Date.now() + TOWER_CD; save();
+    toast('🗼 หนีหอคอย — คูลดาวน์ 12 ชม. + รีเซ็ตกลับชั้น 1', 'bad');
+  }
   battleState = null;
   $('#battleModal').classList.add('hidden');
   if (wasMode === 'wild') { renderSpawn(); renderBerryBar(); }
@@ -4545,6 +4581,7 @@ function renderMegaLeague() {
 // ================================================================
 const TOWER_BOSS_EVERY = 5;
 const TOWER_MEGA_FLOOR = 20, TOWER_GMAX_FLOOR = 12;   // ต้องขึ้นสูงพอสมควรถึงจะเจอบอสร่างพิเศษ
+const TOWER_CD = 12 * 3600000;   // แพ้/หนีหอคอย = คูลดาวน์ 12 ชม. (กันปั๊มเงิน)
 function towerFoeDef(floor) {
   const lvl = clamp(18 + floor * 4, 18, 100);
   let tierPool;
@@ -4552,17 +4589,22 @@ function towerFoeDef(floor) {
   else if (floor < 10) tierPool = ['uncommon', 'rare'];
   else if (floor < 20) tierPool = ['rare', 'superrare'];
   else tierPool = ['superrare', 'legendary'];
-  const pool = MONSTERS.filter(m => tierPool.includes(m._tier));
-  const mon = pick(pool.length ? pool : MONSTERS);
+  const isMegaFloor = floor % 10 === 0;   // ทุก 10 ชั้น = บอสร่างเมก้าแน่นอน
   const isBossFloor = floor % TOWER_BOSS_EVERY === 0;
-  let special = null;
-  if (isBossFloor) {
-    if (floor >= TOWER_MEGA_FLOOR && megaFormsFor(mon.id) && Math.random() < 0.7) special = 'mega';
-    else if (floor >= TOWER_GMAX_FLOOR && gmaxFormFor(mon.id) && Math.random() < 0.7) special = 'gmax';
-    else special = 'elite';
+  let mon, special = null;
+  if (isMegaFloor) {
+    mon = MON_BY_ID[pick(Object.keys(MEGA_FORMS).map(Number))];   // เลือกมอนที่มีร่างเมก้า
+    special = 'mega';
+  } else {
+    const pool = MONSTERS.filter(m => tierPool.includes(m._tier));
+    mon = pick(pool.length ? pool : MONSTERS);
+    if (isBossFloor) {
+      if (floor >= TOWER_GMAX_FLOOR && gmaxFormFor(mon.id) && Math.random() < 0.7) special = 'gmax';
+      else special = 'elite';
+    }
   }
-  const held = isBossFloor ? pick(FOE_HELD_POOL) : null;   // ชั้นบอสถือไอเทมด้วย ท้าทายขึ้นจริง
-  return { mon, lvl, isBossFloor, special, held };
+  const held = (isBossFloor || isMegaFloor) ? pick(FOE_HELD_POOL) : null;
+  return { mon, lvl, isBossFloor: isBossFloor || isMegaFloor, special, held };
 }
 // เซ็ตศัตรูของชั้นนี้ลงใน battleState (ทับของเดิม แต่ทีมผู้เล่น/HP เดิมยังอยู่ — นี่คือความท้าทายของหอคอย)
 function applyTowerFoeToBattle(b, def, floor) {
@@ -4596,6 +4638,8 @@ function startTowerBattle() {
   if (battleState && battleState.mode === 'tower' && !battleState.over) {
     $('#battleModal').classList.remove('hidden'); renderBattle(); return;   // กลับเข้าไปสู้ต่อที่ค้างไว้
   }
+  const cdLeft = (state.towerReadyAt || 0) - Date.now();
+  if (cdLeft > 0) { toast(`⏳ หอคอยคูลดาวน์อีก ${Math.ceil(cdLeft / 3600000 * 10) / 10} ชม. (แพ้/หนีต้องรอ 12 ชม.)`, 'bad'); return; }
   const members = partyMembers();
   if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
   const floor = state.tower.floor || 1;
@@ -4839,11 +4883,15 @@ function renderGhostList(rows) {
   }).join('');
   list.querySelectorAll('[data-ghost]').forEach(el => el.onclick = () => startGhostBattle(rows[+el.dataset.ghost]));
 }
+const GHOST_CD = 3 * 3600000;   // สู้กับเพื่อน/บอทออนไลน์ คูลดาวน์ 3 ชม.
 function startGhostBattle(ghost) {
+  const cdLeft = (state.ghostReadyAt || 0) - Date.now();
+  if (cdLeft > 0) { toast(`⏳ รอสู้ออนไลน์อีก ${Math.ceil(cdLeft / 60000)} นาที (คูลดาวน์ 3 ชม.)`, 'bad'); return; }
   const members = partyMembers();
   if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
   const gTeam = (ghost.team || []).slice(0, 6).filter(m => MON_BY_ID[m.id]);
   if (!gTeam.length) { toast('ทีมคู่ต่อสู้ไม่ถูกต้อง', 'bad'); return; }
+  state.ghostReadyAt = Date.now() + GHOST_CD; save();   // เริ่มคูลดาวน์ 3 ชม. ทันทีที่เริ่มสู้
   const team = buildBattleTeam(members);
   const queue = gTeam.map((m, i) => makeFoeDef(MON_BY_ID[m.id], clamp(m.level || 20, 1, 100), i === gTeam.length - 1 ? 1.1 : 1.0, false));
   const nameHash = hashIdx(ghost.name || 'x', BOSS_TRAINER_POOL.length);
@@ -5119,6 +5167,7 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
   window.__dev = {
     get state() { return state; }, get spawn() { return currentSpawn; }, get battle() { return battleState; },
     MON_BY_ID, makeIndividual, startBattle, beginSpawn, startTrainerBattle, startBossBattle,
-    startMegaLeagueBattle, startGhostBattle, onFoeDown, endBattle, throwBall, save, switchView,
+    startMegaLeagueBattle, startGhostBattle, startTowerBattle, startRivalBattle, towerFoeDef,
+    pickLegendaryGenWeighted, genOf, onFoeDown, endBattle, throwBall, save, switchView,
   };
 }
