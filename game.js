@@ -6,6 +6,9 @@
 import { MONSTERS } from './monsters-data.js';
 import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber } from './logic.js';
 
+// cloud.js (classic script) รันก่อนโมดูลนี้และตั้ง window.Cloud ไว้ — ผูกเป็น const ให้อ้าง Cloud ในสโคปโมดูลได้
+const Cloud = window.Cloud;
+
 // ---------- config ----------
 const SAVE_KEY = 'pokepp_save_v2';
 // ใช้ jsDelivr CDN (เสถียร/เร็วกว่า raw.githubusercontent มาก โดยเฉพาะในไทย)
@@ -28,11 +31,12 @@ function spriteChain(id, shiny) {
     : [SP.gif(id), (id <= 649 ? SP.anim5(id) : null), SP.art(id), SP.png(id)];
   return anim.filter(Boolean);
 }
-// ตัว fallback: เมื่อรูปโหลดไม่ได้ ไล่ไปรูปถัดไปในลิสต์
-window.__sf = function (img) {
+// ตัว fallback: เมื่อรูปโหลดไม่ได้ ไล่ไปรูปถัดไปในลิสต์ (ผูก window ให้ inline onerror ใช้ได้ด้วย)
+function __sf(img) {
   const fb = (img.dataset.fb || '').split('|').filter(Boolean);
   if (fb.length) { img.dataset.fb = fb.slice(1).join('|'); img.src = fb[0]; }
-};
+}
+window.__sf = __sf;
 // watchdog กลาง: ถ้ารูปค้าง (เน็ตช้า/CDN cold ไม่ยิง error) บังคับสลับ fallback หลัง 4 วิ กันจอว่างค้าง
 (function () {
   const seen = new WeakSet();
