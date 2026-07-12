@@ -238,6 +238,14 @@ main { flex: 1; padding: 12px; }
 .rarity-legendary { background: linear-gradient(90deg,#d4a017,#ffcb05); color:#3a2c00; }
 .rarity-shiny { background: linear-gradient(90deg,#00d4e0,#7ef9ff); color:#003; }
 
+/* ===== ระบบไล่ศักดิ์ความหายาก (ใช้ box-shadow เพื่อไม่ชนกับ border/background เดิมของแต่ละการ์ด) =====
+   ใช้ร่วมกันทุกจุดที่โชว์การ์ดโปเกมอน: dex-cell, ind-row, party-mini, team-chip, dex-cell(HOF) */
+.tier-uncommon { box-shadow: 0 0 0 1px rgba(63,163,77,.55); }
+.tier-rare { box-shadow: 0 0 0 1px rgba(61,125,202,.65); }
+.tier-superrare { box-shadow: 0 0 0 1.5px rgba(155,89,182,.75), 0 0 10px rgba(155,89,182,.3); }
+.tier-legendary { box-shadow: 0 0 0 1.5px #ffcb05, 0 0 12px rgba(255,203,5,.4); }
+.tier-shiny { box-shadow: 0 0 0 1.5px #7ef9ff, 0 0 14px rgba(126,249,255,.45); }
+
 /* ===== Ball selector ===== */
 .ball-bar { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
 .ball-opt {

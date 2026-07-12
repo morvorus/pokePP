@@ -945,6 +945,8 @@ function rollGender(id) {
   return Math.random() < 0.5 ? 'M' : 'F';
 }
 function genderIcon(g) { return g === 'M' ? '♂️' : g === 'F' ? '♀️' : '⚧'; }
+// คลาสไล่ศักดิ์ความหายาก — ใช้ร่วมกันทุกจุดที่โชว์การ์ดโปเกมอน (คลัง/ทีม/ต่อสู้) ให้สายตาจับหายากได้ทันที
+function tierClass(tier, shiny) { return shiny ? 'tier-shiny' : (tier && tier !== 'common' ? 'tier-' + tier : ''); }
 function makeIndividual(id, level, tier, shiny) {
   const iv = {}; ['hp', 'atk', 'def', 'spatk', 'spdef', 'spd'].forEach(k => iv[k] = rand(0, 31));
   return { uid: genUid(), id, level, xp: 0, tier, shiny: !!shiny,
@@ -2065,7 +2067,7 @@ function renderDex() {
         <div style="height:56px;display:flex;align-items:center;justify-content:center;font-size:28px">❓</div>
         <div class="dname">???</div><div class="dnum">#${String(m.id).padStart(3, '0')}</div></div>`;
     }
-    return `<div class="dex-cell${cnt ? '' : ' locked'}" data-id="${m.id}">
+    return `<div class="dex-cell${cnt ? '' : ' locked'} ${tierClass(m._tier, hasShiny)}" data-id="${m.id}">
       ${cnt ? `<div class="count">×${cnt}</div>` : ''}
       ${isBuddy ? '<div class="buddytag">⭐</div>' : ''}
       ${hasShiny ? '<div class="shinytag">✨</div>' : ''}
@@ -2103,7 +2105,7 @@ function renderBulkList() {
     const m = MON_BY_ID[ind.id];
     const sel = bulkSelected.has(ind.uid);
     const tags = (ind.locked ? '🔒' : '') + (inParty(ind.uid) ? '⭐' : '') + (ind.shiny ? '✨' : '');
-    return `<div class="ind-row bulk-mode${sel ? ' selected' : ''}" data-uid="${ind.uid}">
+    return `<div class="ind-row bulk-mode${sel ? ' selected' : ''} ${tierClass(ind.tier, ind.shiny)}" data-uid="${ind.uid}">
       <div class="ir-check">${sel ? '✓' : ''}</div>
       ${spriteImg(ind.id, ind.shiny)}
       <div class="ir-main">
@@ -2210,7 +2212,7 @@ function indRow(ind) {
   const m = MON_BY_ID[ind.id];
   const b = getBuddy();
   const isBuddy = b && b.uid === ind.uid;
-  return `<div class="ind-row" data-uid="${ind.uid}">
+  return `<div class="ind-row ${tierClass(ind.tier, ind.shiny)}" data-uid="${ind.uid}">
     ${spriteImg(ind.id, ind.shiny)}
     <div class="ir-main">
       <div class="ir-name">${ind.shiny ? '✨' : ''}${ind.nick ? ind.nick : m.name} ${genderIcon(ind.gender)} ${isBuddy ? '⭐' : ''}</div>
@@ -3199,7 +3201,7 @@ function renderProfile() {
   const legendN = state.caught.filter(c => c.tier === 'legendary').length;
   const playH = Math.floor((state.playSec || 0) / 3600), playM = Math.floor(((state.playSec || 0) % 3600) / 60);
   const partyStrip = state.party.length
-    ? `<div class="party-strip">${partyMembers().map((ind, i) => `<div class="party-mini${i === 0 ? ' lead' : ''}" data-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}<span class="pm-lv">L${ind.level}</span></div>`).join('')}</div>`
+    ? `<div class="party-strip">${partyMembers().map((ind, i) => `<div class="party-mini${i === 0 ? ' lead' : ''} ${tierClass(ind.tier, ind.shiny)}" data-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}<span class="pm-lv">L${ind.level}</span></div>`).join('')}</div>`
     : '<div class="sr-sub" style="margin-top:6px">ยังไม่มีทีม — ตั้ง Buddy/เข้าทีมจากคลัง</div>';
   const prevXp = Math.pow(tl - 1, 2) * 60;
   const xpPct = clamp(Math.round(((state.trainerXp || 0) - prevXp) / Math.max(1, nextXp - prevXp) * 100), 0, 100);
@@ -3281,7 +3283,7 @@ function deletePreset(slot) {
 function hofIndRow(ind, sub) {
   if (!ind) return '';
   const m = MON_BY_ID[ind.id];
-  return `<div class="ind-row" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}
+  return `<div class="ind-row ${tierClass(ind.tier, ind.shiny)}" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}
     <div class="ir-main"><div class="ir-name">${ind.shiny ? '✨' : ''}${ind.nick || m.name}</div>
     <div class="ir-sub">${sub}</div></div></div>`;
 }
@@ -3362,7 +3364,7 @@ function renderHallOfFame() {
   const galleryRow = (list, emptyMsg) => list.length
     ? `<div class="dex-grid">` + list.slice(0, 12).map(ind => {
         const m = MON_BY_ID[ind.id];
-        return `<div class="dex-cell" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}<div class="dname">${ind.nick || m.name}</div><div class="dnum">IV ${ivPercent(ind)}%</div></div>`;
+        return `<div class="dex-cell ${tierClass(ind.tier, ind.shiny)}" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}<div class="dname">${ind.nick || m.name}</div><div class="dnum">IV ${ivPercent(ind)}%</div></div>`;
       }).join('') + `</div>`
     : `<div class="sr-sub">${emptyMsg}</div>`;
   box.innerHTML = `
@@ -3720,7 +3722,7 @@ function renderBattle() {
 
   const teamStrip = b.team.map((t, i) => {
     const fainted = t.hp <= 0;
-    return `<div class="team-chip${i === b.activeIdx ? ' active' : ''}${fainted ? ' fainted' : ''}" data-sw="${i}" title="${MON_BY_ID[t.ind.id].name} HP ${Math.ceil(t.hp)}/${t.maxHp}">
+    return `<div class="team-chip${i === b.activeIdx ? ' active' : ''}${fainted ? ' fainted' : ''} ${tierClass(t.ind.tier, t.ind.shiny)}" data-sw="${i}" title="${MON_BY_ID[t.ind.id].name} HP ${Math.ceil(t.hp)}/${t.maxHp}">
       ${spriteImg(t.ind.id, t.ind.shiny)}<span class="tc-hp">${Math.ceil(t.hp)}</span></div>`;
   }).join('');
 
