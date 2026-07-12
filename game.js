@@ -2449,35 +2449,45 @@ function renderShop() {
   }).join('');
   // ร้านหลักขายเฉพาะ "บอล + ตั๋วซาฟารี + อุปกรณ์ปลดล็อกถาวร" — ไอเทมสิ้นเปลือง/ของสวมใส่ได้จากการเล่น (ตียิม/หอคอย/กล่องสุ่ม) แทน
   const items = [
-    { emoji: '🎫', img: 'member-card', name: 'ตั๋ว Safari', desc: `เข้า Safari Zone ${SAFARI_SPAWNS} ตัวหายากสุดๆ (กดปุ่ม Safari หน้าล่า)`, price: 800, act: () => { if (spend(800)) { state.safariTickets = (state.safariTickets || 0) + 1; toast('🎫 +1 ตั๋ว Safari', 'good'); postBuy(); } } },
-    { emoji: '💎', img: 'shiny-stone', name: 'หินวิวัฒนาการ', desc: 'วิวัฒนาการตัวที่ต้องใช้ไอเทม', price: STONE_PRICE, act: () => { if (spend(STONE_PRICE)) { state.stones = (state.stones || 0) + 1; toast('💎 +1 หินวิวัฒนาการ', 'good'); postBuy(); } } },
+    { cat: 'ball', emoji: '🟡', img: 'ultra-ball', name: 'Ultra Ball', desc: 'แลกด้วยเหรียญตกปลา', tokenPrice: 3, act: () => { if (spendTokens(3)) { state.balls.ultra = (state.balls.ultra || 0) + 1; toast('🟡 +1 Ultra Ball', 'good'); postBuy(); } } },
+    { cat: 'ticket', emoji: '🎫', img: 'member-card', name: 'ตั๋ว Safari', desc: `เข้า Safari Zone ${SAFARI_SPAWNS} ตัวหายากสุดๆ (กดปุ่ม Safari หน้าล่า)`, price: 800, act: () => { if (spend(800)) { state.safariTickets = (state.safariTickets || 0) + 1; toast('🎫 +1 ตั๋ว Safari', 'good'); postBuy(); } } },
+    { cat: 'ticket', emoji: '💎', img: 'shiny-stone', name: 'หินวิวัฒนาการ', desc: 'วิวัฒนาการตัวที่ต้องใช้ไอเทม', price: STONE_PRICE, act: () => { if (spend(STONE_PRICE)) { state.stones = (state.stones || 0) + 1; toast('💎 +1 หินวิวัฒนาการ', 'good'); postBuy(); } } },
+    { cat: 'ticket', emoji: '📿', img: 'lucky-egg', name: 'XP Charm', desc: 'ได้ XP ×2 นาน 30 นาที (กดใช้ในเมนู 🔮 Charms)', price: CHARMS.xp.price, act: () => buyCharm('xp') },
     // แลกด้วยเหรียญเช็คอิน (ได้จากล็อกอินรายวัน)
-    { emoji: '💍', img: 'mega-ring', name: state.hasMegaRing ? 'กำไลเมก้า (มีแล้ว)' : 'กำไลเมก้า', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนเมก้าอีโวลูชัน · แลกด้วยเหรียญเช็คอิน', checkinPrice: MEGA_RING_CHECKIN, act: () => { if (state.hasMegaRing) { toast('มีกำไลเมก้าอยู่แล้ว', ''); return; } if (spendCheckin(MEGA_RING_CHECKIN)) { state.hasMegaRing = true; toast('💍 ได้กำไลเมก้าแล้ว! เมก้าอีโวลูชันได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
-    { emoji: '⌚', img: 'macho-brace', name: state.hasDynamaxBand ? 'กำไลไดนาแม็กซ์ (มีแล้ว)' : 'กำไลไดนาแม็กซ์', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนไดนาแม็กซ์ · แลกด้วยเหรียญเช็คอิน', checkinPrice: DYNAMAX_BAND_CHECKIN, act: () => { if (state.hasDynamaxBand) { toast('มีกำไลไดนาแม็กซ์อยู่แล้ว', ''); return; } if (spendCheckin(DYNAMAX_BAND_CHECKIN)) { state.hasDynamaxBand = true; toast('⌚ ได้กำไลไดนาแม็กซ์แล้ว! ไดนาแม็กซ์ได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
-    { emoji: '🪙', img: 'amulet-coin', name: `Amulet Coin (${state.amulets || 0}/${AMULET_MAX})`, desc: 'เงินที่ได้จากการจับ +5% ต่อชิ้น สูงสุด +50% (ติดตัวถาวร)', price: 150000, act: () => { if ((state.amulets || 0) >= AMULET_MAX) { toast('มี Amulet Coin เต็มแล้ว', ''); return; } if (spend(150000)) { state.amulets = (state.amulets || 0) + 1; toast(`🪙 Amulet Coin +1 (เงิน +${state.amulets * 5}%)`, 'good'); postBuy(); } } },
-    { emoji: '🎓', img: null, owned: !!state.hasExpShare, name: state.hasExpShare ? 'EXP Share (มีแล้ว)' : 'EXP Share', desc: 'ปลดล็อกครั้งเดียว ถาวร — จับได้ทีนึงแบ่ง XP ให้ทั้งทีม', price: 2500000, act: () => { if (state.hasExpShare) { toast('มี EXP Share อยู่แล้ว', ''); return; } if (spend(2500000)) { state.hasExpShare = true; toast('🎓 ได้ EXP Share! ทั้งทีมได้ XP จากการจับ', 'good'); postBuy(); } } },
+    { cat: 'perm', emoji: '💍', img: 'mega-ring', name: state.hasMegaRing ? 'กำไลเมก้า (มีแล้ว)' : 'กำไลเมก้า', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนเมก้าอีโวลูชัน · แลกด้วยเหรียญเช็คอิน', checkinPrice: MEGA_RING_CHECKIN, act: () => { if (state.hasMegaRing) { toast('มีกำไลเมก้าอยู่แล้ว', ''); return; } if (spendCheckin(MEGA_RING_CHECKIN)) { state.hasMegaRing = true; toast('💍 ได้กำไลเมก้าแล้ว! เมก้าอีโวลูชันได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
+    { cat: 'perm', emoji: '⌚', img: 'macho-brace', name: state.hasDynamaxBand ? 'กำไลไดนาแม็กซ์ (มีแล้ว)' : 'กำไลไดนาแม็กซ์', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนไดนาแม็กซ์ · แลกด้วยเหรียญเช็คอิน', checkinPrice: DYNAMAX_BAND_CHECKIN, act: () => { if (state.hasDynamaxBand) { toast('มีกำไลไดนาแม็กซ์อยู่แล้ว', ''); return; } if (spendCheckin(DYNAMAX_BAND_CHECKIN)) { state.hasDynamaxBand = true; toast('⌚ ได้กำไลไดนาแม็กซ์แล้ว! ไดนาแม็กซ์ได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
+    { cat: 'perm', emoji: '🪙', img: 'amulet-coin', name: `Amulet Coin (${state.amulets || 0}/${AMULET_MAX})`, desc: 'เงินที่ได้จากการจับ +5% ต่อชิ้น สูงสุด +50% (ติดตัวถาวร)', price: 150000, act: () => { if ((state.amulets || 0) >= AMULET_MAX) { toast('มี Amulet Coin เต็มแล้ว', ''); return; } if (spend(150000)) { state.amulets = (state.amulets || 0) + 1; toast(`🪙 Amulet Coin +1 (เงิน +${state.amulets * 5}%)`, 'good'); postBuy(); } } },
+    { cat: 'perm', emoji: '🎓', img: null, owned: !!state.hasExpShare, name: state.hasExpShare ? 'EXP Share (มีแล้ว)' : 'EXP Share', desc: 'ปลดล็อกครั้งเดียว ถาวร — จับได้ทีนึงแบ่ง XP ให้ทั้งทีม', price: 2500000, act: () => { if (state.hasExpShare) { toast('มี EXP Share อยู่แล้ว', ''); return; } if (spend(2500000)) { state.hasExpShare = true; toast('🎓 ได้ EXP Share! ทั้งทีมได้ XP จากการจับ', 'good'); postBuy(); } } },
     // แลกด้วยเหรียญเช็คอิน 🎟️
-    { emoji: '🔮', img: 'shiny-charm', name: `Shiny Charm (${state.shinyCharms || 0}/${SHINY_CHARM_MAX})`, desc: `ติดตัวถาวร เพิ่มโอกาส Shiny +${Math.round(SHINY_CHARM_PER * 100)}% ทบต้น · แลกด้วยเหรียญเช็คอิน`, checkinPrice: 50, act: () => { if ((state.shinyCharms || 0) >= SHINY_CHARM_MAX) { toast('มี Shiny Charm ครบแล้ว', ''); return; } if (spendCheckin(50)) { state.shinyCharms = (state.shinyCharms || 0) + 1; toast(`🔮 Shiny Charm ${state.shinyCharms}/${SHINY_CHARM_MAX}`, 'good'); postBuy(); } } },
-    { emoji: '🧲', img: 'oval-charm', name: `Catch Charm (${state.catchCharms || 0}/${CATCH_CHARM_MAX})`, desc: `ติดตัวถาวร เพิ่มโอกาสจับ +${Math.round(CATCH_CHARM_PER * 100)}% ทบต้น · แลกด้วยเหรียญเช็คอิน`, checkinPrice: 50, act: () => { if ((state.catchCharms || 0) >= CATCH_CHARM_MAX) { toast('มี Catch Charm ครบแล้ว', ''); return; } if (spendCheckin(50)) { state.catchCharms = (state.catchCharms || 0) + 1; toast(`🧲 Catch Charm ${state.catchCharms}/${CATCH_CHARM_MAX}`, 'good'); postBuy(); } } },
-    // แลกด้วยเงิน
-    { emoji: '📿', img: 'lucky-egg', name: 'XP Charm', desc: 'ได้ XP ×2 นาน 30 นาที (กดใช้ในเมนู 🔮 Charms)', price: CHARMS.xp.price, act: () => buyCharm('xp') },
-    // แลกด้วยเหรียญตกปลา 🎟️
-    { emoji: '🟡', img: 'ultra-ball', name: 'Ultra Ball', desc: 'แลกด้วยเหรียญตกปลา', tokenPrice: 3, act: () => { if (spendTokens(3)) { state.balls.ultra = (state.balls.ultra || 0) + 1; toast('🟡 +1 Ultra Ball', 'good'); postBuy(); } } },
+    { cat: 'perm', emoji: '🔮', img: 'shiny-charm', name: `Shiny Charm (${state.shinyCharms || 0}/${SHINY_CHARM_MAX})`, desc: `ติดตัวถาวร เพิ่มโอกาส Shiny +${Math.round(SHINY_CHARM_PER * 100)}% ทบต้น · แลกด้วยเหรียญเช็คอิน`, checkinPrice: 50, act: () => { if ((state.shinyCharms || 0) >= SHINY_CHARM_MAX) { toast('มี Shiny Charm ครบแล้ว', ''); return; } if (spendCheckin(50)) { state.shinyCharms = (state.shinyCharms || 0) + 1; toast(`🔮 Shiny Charm ${state.shinyCharms}/${SHINY_CHARM_MAX}`, 'good'); postBuy(); } } },
+    { cat: 'perm', emoji: '🧲', img: 'oval-charm', name: `Catch Charm (${state.catchCharms || 0}/${CATCH_CHARM_MAX})`, desc: `ติดตัวถาวร เพิ่มโอกาสจับ +${Math.round(CATCH_CHARM_PER * 100)}% ทบต้น · แลกด้วยเหรียญเช็คอิน`, checkinPrice: 50, act: () => { if ((state.catchCharms || 0) >= CATCH_CHARM_MAX) { toast('มี Catch Charm ครบแล้ว', ''); return; } if (spendCheckin(50)) { state.catchCharms = (state.catchCharms || 0) + 1; toast(`🧲 Catch Charm ${state.catchCharms}/${CATCH_CHARM_MAX}`, 'good'); postBuy(); } } },
   ];
+  const SHOP_CATS = [
+    { key: 'ball', label: '🔴 บอล' },
+    { key: 'ticket', label: '🎫 ตั๋ว & ไอเทมใช้แล้วหมด' },
+    { key: 'perm', label: '💎 อัปเกรดถาวร' },
+  ];
+  const renderItem = (it, i) => {
+    const isTok = it.tokenPrice != null;
+    const isCheckin = it.checkinPrice != null;
+    const owned = it.owned || (it.img === 'mega-ring' && state.hasMegaRing) || (it.img === 'macho-brace' && state.hasDynamaxBand);
+    const cant = owned || (isCheckin ? (state.checkinCoins || 0) < it.checkinPrice : isTok ? (state.fishTokens || 0) < it.tokenPrice : state.coins < it.price);
+    const label = owned ? 'มีแล้ว' : (isCheckin ? `${it.checkinPrice} 🗓️เช็คอิน` : isTok ? `${it.tokenPrice}🎟️` : `${it.price}${itemIcon('🪙', 'nugget', 'price-ico')}`);
+    const curClass = isCheckin ? ' cur-checkin' : isTok ? ' cur-token' : '';
+    return `<div class="shop-item">
+      <div class="emoji">${itemIcon(it.emoji, it.img, 'big')}</div>
+      <div class="si-body"><div class="si-name">${it.name}</div><div class="si-desc">${it.desc}</div></div>
+      <button class="buy-btn${curClass}" data-i="${i}" ${cant ? 'disabled' : ''}>${label}</button></div>`;
+  };
   $('#shopGrid').innerHTML =
     `<div class="dex-stats">💎 ${state.stones || 0} · 🎟️ ${state.fishTokens || 0} เหรียญตกปลา · 🗓️ ${state.checkinCoins || 0} เหรียญเช็คอิน · บอล: ` +
     BALL_ORDER.map(k => `${itemIcon(BALLS[k].emoji, BALLS[k].img)}${state.balls[k] || 0}`).join(' ') + `</div>` +
-    ballsHtml +
-    items.map((it, i) => {
-      const isTok = it.tokenPrice != null;
-      const isCheckin = it.checkinPrice != null;
-      const owned = it.owned || (it.img === 'mega-ring' && state.hasMegaRing) || (it.img === 'macho-brace' && state.hasDynamaxBand);
-      const cant = owned || (isCheckin ? (state.checkinCoins || 0) < it.checkinPrice : isTok ? (state.fishTokens || 0) < it.tokenPrice : state.coins < it.price);
-      const label = owned ? 'มีแล้ว' : (isCheckin ? `${it.checkinPrice} 🗓️เช็คอิน` : isTok ? `${it.tokenPrice}🎟️` : `${it.price}${itemIcon('🪙', 'nugget', 'price-ico')}`);
-      return `<div class="shop-item">
-        <div class="emoji">${itemIcon(it.emoji, it.img, 'big')}</div>
-        <div class="si-body"><div class="si-name">${it.name}</div><div class="si-desc">${it.desc}</div></div>
-        <button class="buy-btn" data-i="${i}" ${cant ? 'disabled' : ''}>${label}</button></div>`;
+    `<div class="shop-cat">${SHOP_CATS[0].label}</div>` + ballsHtml +
+    SHOP_CATS.map(c => {
+      const rows = items.map((it, i) => ({ it, i })).filter(({ it }) => it.cat === c.key);
+      if (!rows.length) return '';
+      const head = c.key === 'ball' ? '' : `<div class="shop-cat">${c.label}</div>`;
+      return head + rows.map(({ it, i }) => renderItem(it, i)).join('');
     }).join('');
   $('#shopGrid').querySelectorAll('.buy-btn[data-i]').forEach(btn => btn.onclick = () => items[+btn.dataset.i].act());
   $('#shopGrid').querySelectorAll('[data-ballqty]').forEach(sel => sel.onchange = () => {

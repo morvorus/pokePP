@@ -12,6 +12,15 @@
   --bad: #ff5d6c;
   --radius: 16px;
   --shadow: 0 8px 24px rgba(0,0,0,.35);
+  /* --- ระบบดีไซน์: ฟอนต์ / สเปซ / เงา / สกุลเงิน --- */
+  --font-display: 'Kanit', "Segoe UI", "Noto Sans Thai", system-ui, sans-serif;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 20px; --sp-6: 24px;
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.25);
+  --shadow-md: var(--shadow);
+  --shadow-lg: 0 14px 36px rgba(0,0,0,.45);
+  --cur-gold: #ffd76b;
+  --cur-token: #7ec8ff;
+  --cur-checkin: #c9a3ff;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -22,10 +31,11 @@ html, body { margin: 0; padding: 0; }
   transition-duration: 0.001ms !important; scroll-behavior: auto !important;
 }
 body {
-  font-family: "Segoe UI", "Noto Sans Thai", system-ui, sans-serif;
+  font-family: var(--font-display);
   background: radial-gradient(1200px 600px at 50% -10%, #23285a 0%, var(--bg) 60%);
   color: var(--text);
   min-height: 100vh;
+  letter-spacing: .1px;
 }
 
 #app {
@@ -401,14 +411,21 @@ main { flex: 1; padding: 12px; }
 
 /* ===== Shop ===== */
 .shop-grid, .egg-list { display: flex; flex-direction: column; gap: 10px; }
-.shop-item { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 14px; padding: 12px 14px; }
+.shop-cat { font-size: 12px; font-weight: 800; letter-spacing: .5px; color: var(--muted); text-transform: uppercase;
+  margin: 18px 2px 8px; padding-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,.1); display: flex; align-items: center; gap: 6px; }
+.shop-cat:first-of-type { margin-top: 4px; }
+.shop-item { display: flex; align-items: center; gap: 12px; background: var(--card); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow-sm); transition: transform .1s; }
+.shop-item:active { transform: scale(.99); }
 .shop-item .emoji { font-size: 32px; }
 .shop-item .si-body { flex: 1; }
 .shop-item .si-name { font-weight: 700; font-size: 15px; }
 .shop-item .si-desc { font-size: 12px; color: var(--muted); }
-.buy-btn { padding: 10px 14px; border: none; border-radius: 10px; background: var(--accent); color: #3a2c00; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.buy-btn { padding: 10px 14px; border: none; border-radius: 10px; background: var(--accent); color: #3a2c00; font-weight: 800; cursor: pointer; white-space: nowrap; font-family: var(--font-display); }
 .buy-btn:disabled { opacity: .4; cursor: not-allowed; }
 .buy-btn:not(:disabled):active { transform: scale(.95); }
+/* สีปุ่มตามสกุลเงิน — ให้แยกออกทันทีว่าไอเทมนี้ซื้อด้วยอะไร */
+.buy-btn.cur-token { background: var(--cur-token); color: #06283f; }
+.buy-btn.cur-checkin { background: var(--cur-checkin); color: #2a0f4a; }
 
 /* ===== Quests ===== */
 .quest-reset { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
