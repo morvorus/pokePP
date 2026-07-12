@@ -947,6 +947,10 @@ function rollGender(id) {
 function genderIcon(g) { return g === 'M' ? '♂️' : g === 'F' ? '♀️' : '⚧'; }
 // คลาสไล่ศักดิ์ความหายาก — ใช้ร่วมกันทุกจุดที่โชว์การ์ดโปเกมอน (คลัง/ทีม/ต่อสู้) ให้สายตาจับหายากได้ทันที
 function tierClass(tier, shiny) { return shiny ? 'tier-shiny' : (tier && tier !== 'common' ? 'tier-' + tier : ''); }
+// การ์ด empty state มาตรฐาน — ใช้แทนข้อความเปล่าๆ ตรงจุดที่หน้าว่างจริง (ไม่ใช่ error) ให้ดูตั้งใจแทนดูเหมือนบั๊ก
+function emptyState(icon, title, sub) {
+  return `<div class="empty-state"><div class="es-ico">${icon}</div><div class="es-title">${title}</div>${sub ? `<div class="es-sub">${sub}</div>` : ''}</div>`;
+}
 function makeIndividual(id, level, tier, shiny) {
   const iv = {}; ['hp', 'atk', 'def', 'spatk', 'spdef', 'spd'].forEach(k => iv[k] = rand(0, 31));
   return { uid: genUid(), id, level, xp: 0, tier, shiny: !!shiny,
@@ -2056,6 +2060,7 @@ function renderDex() {
   if (bulkMode) { renderBulkList(); return; }
 
   const list = dexFilteredSpecies();
+  if (!list.length) { grid.innerHTML = `<div style="grid-column:1/-1">${emptyState('🔍', 'ไม่มีโปเกมอนตรงตัวกรอง', 'ลองเปลี่ยนคำค้นหาหรือตัวกรองดู')}</div>`; return; }
   grid.innerHTML = list.map(m => {
     const cnt = speciesCount(m.id);
     const seen = state.seen[m.id];
@@ -2113,7 +2118,7 @@ function renderBulkList() {
         <div class="ir-sub">Lv.${ind.level} · ${TIER_LABEL[ind.tier]}</div>
       </div>
       <div class="ir-iv">IV ${ivPercent(ind)}%</div></div>`;
-  }).join('') || `<p style="color:var(--muted);text-align:center;padding:20px">ไม่มีโปเกมอนตรงตัวกรอง</p>`;
+  }).join('') || emptyState('🔍', 'ไม่มีโปเกมอนตรงตัวกรอง', 'ลองเปลี่ยนคำค้นหาหรือตัวกรองดู');
   listEl.querySelectorAll('.ind-row[data-uid]').forEach(row => {
     row.onclick = () => { toggleBulkSelect(row.dataset.uid); };
   });
@@ -3347,12 +3352,12 @@ function renderShinyDex() {
     ${uniqueIds.length
       ? `<div class="sr-sub" style="margin:8px 0 4px">Shiny ที่คุณมี (${uniqueIds.length} ชนิด):</div>
          <div class="shiny-grid">${uniqueIds.map(id => `<div class="shiny-cell" title="${MON_BY_ID[id].name}${speciesShinyCount(id) > 1 ? ' ×' + speciesShinyCount(id) : ''}">${spriteImg(id, true, 'roster-mini')}${speciesShinyCount(id) > 1 ? `<span class="shiny-cnt">${speciesShinyCount(id)}</span>` : ''}</div>`).join('')}</div>`
-      : '<div class="sr-sub" style="margin-top:8px">ยังไม่มี Shiny — ออกล่าหาตัวแวววาว! (คอมโบจับตัวเดิมช่วยเพิ่มโอกาส) ✨</div>'}`;
+      : emptyState('✨', 'ยังไม่มี Shiny', 'ออกล่าหาตัวแวววาว! คอมโบจับตัวเดิมซ้ำๆ ช่วยเพิ่มโอกาส')}`;
 }
 function speciesShinyCount(id) { return state.caught.filter(c => c.id === id && c.shiny).length; }
 function renderHallOfFame() {
   const box = $('#hallOfFameBox'); if (!box) return;
-  if (!state.caught.length) { box.innerHTML = `<div class="sr-sub">ยังไม่มีตัวในคลัง — จับสักตัวก่อนเพื่อเริ่มห้องโชว์!</div>`; return; }
+  if (!state.caught.length) { box.innerHTML = emptyState('🏛️', 'ยังไม่มีตัวในคลัง', 'จับโปเกมอนสักตัวก่อนเพื่อเริ่มห้องโชว์!'); return; }
   const byIv = [...state.caught].sort((a, b) => ivPercent(b) - ivPercent(a));
   const topIv = byIv[0];
   const shinies = state.caught.filter(c => c.shiny).sort((a, b) => (b.ts || 0) - (a.ts || 0));
@@ -4906,7 +4911,7 @@ async function lbLoadList() {
     $('#lbList').innerHTML = `<div class="sr-sub">⚠️ ยังเปิดกระดานไม่ได้ — เจ้าของเกมต้องสร้างตาราง leaderboard ใน Supabase ก่อน (ดู CLOUD_SETUP.md)<br><span style="opacity:.6">${res.error}</span></div>`;
     return;
   }
-  if (!res.rows.length) { $('#lbList').innerHTML = `<div class="sr-sub">ยังไม่มีใครส่งสถิติ — เป็นคนแรกเลย! 📤</div>`; return; }
+  if (!res.rows.length) { $('#lbList').innerHTML = emptyState('🏆', 'ยังไม่มีใครส่งสถิติ', 'เป็นคนแรกเลย! ตั้งชื่อแล้วกดส่งสถิติด้านบน'); return; }
   const myName = state.playerName || 'เทรนเนอร์';
   $('#lbList').innerHTML = res.rows.map((r, i) => {
     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `<span class="lb-rank">${i + 1}</span>`;
@@ -4961,7 +4966,7 @@ async function ghostRefresh() {
   const res = await Cloud.ghostList(40);
   if (!$('#ghostList')) return;
   if (res.error) { $('#ghostList').innerHTML = `<div class="sr-sub">⚠️ ยังใช้ไม่ได้ — ต้องมีคอลัมน์ team ในตาราง leaderboard (ดู CLOUD_SETUP.md)<br><span style="opacity:.6">${escapeHtml(res.error)}</span></div>`; return; }
-  if (!res.rows.length) { $('#ghostList').innerHTML = `<div class="sr-sub">ยังไม่มีทีมคนอื่นให้สู้ — ชวนเพื่อนมาเล่นแล้วส่งสถิติกัน!</div>`; return; }
+  if (!res.rows.length) { $('#ghostList').innerHTML = emptyState('👻', 'ยังไม่มีทีมคนอื่นให้สู้', 'ชวนเพื่อนมาเล่นแล้วส่งสถิติที่กระดานจัดอันดับกัน!'); return; }
   _ghostCache = res.rows.sort(() => Math.random() - 0.5).slice(0, 6);
   renderGhostList(_ghostCache);
 }
@@ -5109,7 +5114,7 @@ async function loadMyOpenTrades() {
   const res = await Cloud.myOpenTrades();
   if (!$('#tradeOpenList')) return;
   if (res.error) { $('#tradeOpenList').innerHTML = `<div class="sr-sub">⚠️ ยังใช้ไม่ได้ — ต้องสร้างตาราง trades ใน Supabase ก่อน (ดู CLOUD_SETUP.md)<br><span style="opacity:.6">${escapeHtml(res.error)}</span></div>`; return; }
-  if (!res.rows.length) { $('#tradeOpenList').innerHTML = `<div class="sr-sub">ยังไม่มีข้อเสนอที่เปิดอยู่</div>`; return; }
+  if (!res.rows.length) { $('#tradeOpenList').innerHTML = emptyState('🔄', 'ยังไม่มีข้อเสนอที่เปิดอยู่', 'เปิดข้อเสนอแลกของคุณเองด้านบนได้เลย'); return; }
   $('#tradeOpenList').innerHTML = res.rows.map(r => `<div class="trade-open-row">
     <span>${spriteImg(r.offer_mon.id, r.offer_mon.shiny, 'roster-mini')}</span>
     <span class="trade-open-info"><b>${monLabel(r.offer_mon)}</b><br>โค้ด <b class="trade-code">${r.code}</b></span>

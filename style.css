@@ -251,6 +251,12 @@ main { flex: 1; padding: 12px; }
 .rarity-legendary { background: linear-gradient(90deg,#d4a017,#ffcb05); color:#3a2c00; }
 .rarity-shiny { background: linear-gradient(90deg,#00d4e0,#7ef9ff); color:#003; }
 
+/* ===== Empty state — แทนที่ข้อความเปล่าๆ ตรงจุดที่หน้าว่างจริง ไม่ให้ดูเหมือนบั๊ก ===== */
+.empty-state { text-align: center; padding: 36px 16px; }
+.empty-state .es-ico { font-size: 42px; opacity: .5; filter: grayscale(.4); margin-bottom: 8px; }
+.empty-state .es-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.empty-state .es-sub { font-size: 12px; color: var(--muted); line-height: 1.5; max-width: 260px; margin: 0 auto; }
+
 /* ===== ระบบไล่ศักดิ์ความหายาก (ใช้ box-shadow เพื่อไม่ชนกับ border/background เดิมของแต่ละการ์ด) =====
    ใช้ร่วมกันทุกจุดที่โชว์การ์ดโปเกมอน: dex-cell, ind-row, party-mini, team-chip, dex-cell(HOF) */
 .tier-uncommon { box-shadow: 0 0 0 1px rgba(63,163,77,.55); }
