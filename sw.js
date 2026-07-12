@@ -1,5 +1,5 @@
 /* PokePP service worker — network-first สำหรับโค้ด (freshness), cache-first สำหรับข้อมูล/ไอคอน */
-const CACHE = 'pokepp-v4';
+const CACHE = 'pokepp-v5';
 const SHELL = [
   './', './index.html', './style.css', './game.js', './cloud.js',
   './monsters-data.js', './manifest.json', './icon.svg',
@@ -31,9 +31,9 @@ self.addEventListener('fetch', e => {
 
   const isCode = url.pathname === '/' || /\.(html|js|css)$/.test(url.pathname);
   if (isCode) {
-    // network-first: เอาโค้ดล่าสุดเสมอเมื่อออนไลน์ สำรองด้วยแคชเมื่อออฟไลน์
+    // network-first + บังคับข้าม HTTP cache ของเบราว์เซอร์ (cache:'reload') เอาโค้ดล่าสุดเสมอเมื่อออนไลน์ สำรองด้วยแคชเมื่อออฟไลน์
     e.respondWith(
-      fetch(e.request).then(res => putCache(e.request, res)).catch(() => caches.match(e.request))
+      fetch(e.request, { cache: 'reload' }).then(res => putCache(e.request, res)).catch(() => caches.match(e.request))
     );
   } else {
     // cache-first: ข้อมูล/ไอคอน (เปลี่ยนน้อย โหลดเร็ว)
