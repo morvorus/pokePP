@@ -59,8 +59,9 @@ export function isoWeekNumber(d) {
 
 // โอกาสจับ (0.02–0.96) จากอัตราจับพื้นฐาน × บอล × โบนัส HP/charm − ปรับตามเลเวล
 export function catchChance(mon, level, ball, mods) {
-  if (ball.mult >= 999) return 1;                // master ball การันตี
   mods = mods || {};
+  if (ball.flatBase != null) return mods.shiny && ball.flatShiny != null ? ball.flatShiny : ball.flatBase;   // Premier: จับคงที่ 45% · Shiny 100%
+  if (ball.mult >= 999) return 1;                // master ball การันตี
   let mult = ball.mult, add = ball.add;
   if (ball.cond && mods.ctx) {                    // บอลพิเศษ (Net/Dusk/Quick) โบนัสตามเงื่อนไข
     const c = ball.cond(mods.ctx);

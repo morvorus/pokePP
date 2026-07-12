@@ -132,7 +132,7 @@ const TIER_WEIGHTS = {
 // ชนิดบอล — บางลูกมีโบนัสตามเงื่อนไข (cond) · ราคาปรับสมดุลใหม่ (ยิมยากขึ้น เงินหมุนเวียนมากขึ้น)
 const BALLS = {
   poke:    { name: 'Poké Ball',   emoji: '🔴', img: 'poke-ball',    mult: 1.0, add: 0.00, price: 25,   hint: 'พื้นฐาน' },
-  premier: { name: 'Premier Ball',emoji: '⚪', img: 'premier-ball', mult: 1.3, add: 0.00, price: 45,   hint: '×1.3' },
+  premier: { name: 'Premier Ball',emoji: '⚪', img: 'premier-ball', flatBase: 0.45, flatShiny: 1.0, mult: 1.0, add: 0.00, price: 50000, hint: 'จับ 45% · ✨ Shiny 100%!' },
   great:   { name: 'Great Ball',  emoji: '🔵', img: 'great-ball',   mult: 1.7, add: 0.03, price: 90,   hint: '×1.7' },
   luxury:  { name: 'Luxury Ball', emoji: '🟤', img: 'luxury-ball',  mult: 1.9, add: 0.00, price: 240,  hint: '×1.9 +มิตรภาพ', friendBonus: 15 },
   ultra:   { name: 'Ultra Ball',  emoji: '🟡', img: 'ultra-ball',   mult: 2.6, add: 0.09, price: 240,  hint: '×2.6' },
@@ -150,9 +150,11 @@ const BALLS = {
             cond: ctx => (ctx.mon._tier === 'rare' || ctx.mon._tier === 'superrare') ? { mult: 2.4 } : { mult: 0.8 } },
   beast:   { name: 'Beast Ball',  emoji: '🟣', img: 'beast-ball',   mult: 1.0, add: 0.00, price: 1500, hint: '×4 กับ Legendary เท่านั้น',
             cond: ctx => ctx.mon._tier === 'legendary' ? { mult: 4.0 } : { mult: 0.2 } },
-  master:  { name: 'Master Ball', emoji: '🟣', img: 'master-ball',  mult: 999, add: 1, price: 15000, hint: '100%' },
+  master:  { name: 'Master Ball', emoji: '🟣', img: 'master-ball',  mult: 999, add: 1, price: 100000, hint: '100%' },
 };
 const BALL_ORDER = ['poke', 'premier', 'great', 'luxury', 'ultra', 'net', 'dusk', 'quick', 'timer', 'repeat', 'heavy', 'beast', 'master'];
+// บอลที่ขายในร้าน (ที่เหลือ net/dusk/quick/timer/repeat/heavy/beast/luxury หาได้จากกล่องสุ่ม/ตียิม/บอส/หอคอย)
+const SHOP_BALL_ORDER = ['poke', 'premier', 'great', 'ultra', 'master'];
 
 // สภาพอากาศ (สุ่มต่อเขต) + กลางวัน/กลางคืน + อีเวนต์
 // dotImmune = ธาตุที่ไม่โดนดาเมจจากสภาพอากาศตอนจบเทิร์น (แบบพายุทราย/หิมะในเกมจริง — 1/16 ของ HP สูงสุด)
@@ -1054,10 +1056,15 @@ function setBuddy(uid) {
 }
 function gainXp(amount) {
   const b = getBuddy(); if (!b) return;
-  amount = Math.round(amount * (1 + (b.friend || 0) / 500));   // มิตรภาพสูง = XP มากขึ้น (สูงสุด +20%)
-  b.xp += amount; let leveled = false;
+  const buddyAmt = Math.round(amount * (1 + (b.friend || 0) / 500));   // มิตรภาพสูง = XP มากขึ้น (สูงสุด +20%)
+  b.xp += buddyAmt; let leveled = false;
   while (b.xp >= xpForLevel(b.level) && b.level < 100) { b.xp -= xpForLevel(b.level); b.level++; leveled = true; }
   if (leveled) { toast(`⬆️ <b>${MON_BY_ID[b.id].name}</b> ขึ้น Lv.${b.level}`, 'good'); tryEvolveByLevel(b); }
+  // EXP Share: แบ่ง XP ครึ่งนึงให้สมาชิกทีมคนอื่น
+  if (state.hasExpShare) {
+    const share = Math.round(amount * 0.5);
+    partyMembers().forEach(ind => { if (ind.uid !== b.uid) gainXpTo(ind, share); });
+  }
   renderTopbar();
 }
 function tryEvolveByLevel(b) {
@@ -1795,8 +1802,8 @@ function throwBall(k) {
   renderBallBar();
 
   const ctx = { mon: currentSpawn.mon, throws: prevThrows, time: timeOfDay(), region: region(), alreadyCaught: speciesCount(currentSpawn.mon.id) > 0 };
-  const mods = { hpBonus: hpBonusFor(currentSpawn),
-    catchMult: catchCharmMultiplier(), ctx };   // Catch Charm พาสซีฟถาวร
+  const mods = { hpBonus: hpBonusFor(currentSpawn), shiny: currentSpawn.shiny,
+    catchMult: catchCharmMultiplier(), ctx };   // Catch Charm พาสซีฟถาวร · shiny สำหรับ Premier Ball
   const p = catchChance(currentSpawn.mon, currentSpawn.level, BALLS[k], mods);
   const success = Math.random() < p;
 
@@ -2383,7 +2390,7 @@ function releaseIndividual(uid) {
 // ================================================================
 const BALL_QTY_OPTIONS = [1, 5, 10, 25];
 function renderShop() {
-  const ballsHtml = BALL_ORDER.map(k => {
+  const ballsHtml = SHOP_BALL_ORDER.map(k => {
     const b = BALLS[k];
     const qty = (state.shopQty && state.shopQty[k]) || 1;
     const total = b.price * qty;
@@ -2406,6 +2413,10 @@ function renderShop() {
     // แลกด้วยเหรียญเช็คอิน 🎟️ (ได้จากล็อกอินรายวัน)
     { emoji: '💍', img: 'mega-ring', name: state.hasMegaRing ? 'กำไลเมก้า (มีแล้ว)' : 'กำไลเมก้า', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนเมก้าอีโวลูชัน · แลกด้วยเหรียญเช็คอิน', checkinPrice: MEGA_RING_CHECKIN, act: () => { if (state.hasMegaRing) { toast('มีกำไลเมก้าอยู่แล้ว', ''); return; } if (spendCheckin(MEGA_RING_CHECKIN)) { state.hasMegaRing = true; toast('💍 ได้กำไลเมก้าแล้ว! เมก้าอีโวลูชันได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
     { emoji: '⌚', img: 'macho-brace', name: state.hasDynamaxBand ? 'กำไลไดนาแม็กซ์ (มีแล้ว)' : 'กำไลไดนาแม็กซ์', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนไดนาแม็กซ์ · แลกด้วยเหรียญเช็คอิน', checkinPrice: DYNAMAX_BAND_CHECKIN, act: () => { if (state.hasDynamaxBand) { toast('มีกำไลไดนาแม็กซ์อยู่แล้ว', ''); return; } if (spendCheckin(DYNAMAX_BAND_CHECKIN)) { state.hasDynamaxBand = true; toast('⌚ ได้กำไลไดนาแม็กซ์แล้ว! ไดนาแม็กซ์ได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
+    { emoji: '🪙', img: 'amulet-coin', name: `Amulet Coin (${state.amulets || 0}/${AMULET_MAX})`, desc: 'เงินที่ได้จากการจับ +5% ต่อชิ้น สูงสุด +50% (ติดตัวถาวร)', price: 150000, act: () => { if ((state.amulets || 0) >= AMULET_MAX) { toast('มี Amulet Coin เต็มแล้ว', ''); return; } if (spend(150000)) { state.amulets = (state.amulets || 0) + 1; toast(`🪙 Amulet Coin +1 (เงิน +${state.amulets * 5}%)`, 'good'); postBuy(); } } },
+    { emoji: '🎓', img: null, owned: !!state.hasExpShare, name: state.hasExpShare ? 'EXP Share (มีแล้ว)' : 'EXP Share', desc: 'ปลดล็อกครั้งเดียว ถาวร — จับได้ทีนึงแบ่ง XP ให้ทั้งทีม', price: 2500000, act: () => { if (state.hasExpShare) { toast('มี EXP Share อยู่แล้ว', ''); return; } if (spend(2500000)) { state.hasExpShare = true; toast('🎓 ได้ EXP Share! ทั้งทีมได้ XP จากการจับ', 'good'); postBuy(); } } },
+    // แลกด้วยเหรียญเช็คอิน 🎟️
+    { emoji: '🔮', img: 'shiny-charm', name: `Shiny Charm (${state.shinyCharms || 0}/${SHINY_CHARM_MAX})`, desc: `ติดตัวถาวร เพิ่มโอกาส Shiny +${Math.round(SHINY_CHARM_PER * 100)}% ทบต้น · แลกด้วยเหรียญเช็คอิน`, checkinPrice: 50, act: () => { if ((state.shinyCharms || 0) >= SHINY_CHARM_MAX) { toast('มี Shiny Charm ครบแล้ว', ''); return; } if (spendCheckin(50)) { state.shinyCharms = (state.shinyCharms || 0) + 1; toast(`🔮 Shiny Charm ${state.shinyCharms}/${SHINY_CHARM_MAX}`, 'good'); postBuy(); } } },
     // แลกด้วยเหรียญตกปลา 🎟️
     { emoji: '🟡', img: 'ultra-ball', name: 'Ultra Ball', desc: 'แลกด้วยเหรียญตกปลา', tokenPrice: 3, act: () => { if (spendTokens(3)) { state.balls.ultra = (state.balls.ultra || 0) + 1; toast('🟡 +1 Ultra Ball', 'good'); postBuy(); } } },
   ];
@@ -2416,7 +2427,7 @@ function renderShop() {
     items.map((it, i) => {
       const isTok = it.tokenPrice != null;
       const isCheckin = it.checkinPrice != null;
-      const owned = (it.img === 'mega-ring' && state.hasMegaRing) || (it.img === 'macho-brace' && state.hasDynamaxBand);
+      const owned = it.owned || (it.img === 'mega-ring' && state.hasMegaRing) || (it.img === 'macho-brace' && state.hasDynamaxBand);
       const cant = owned || (isCheckin ? (state.checkinCoins || 0) < it.checkinPrice : isTok ? (state.fishTokens || 0) < it.tokenPrice : state.coins < it.price);
       const label = owned ? 'มีแล้ว' : (isCheckin ? `${it.checkinPrice} 🎟️เช็คอิน` : isTok ? `${it.tokenPrice}🎟️` : `${it.price}${itemIcon('🪙', 'nugget', 'price-ico')}`);
       return `<div class="shop-item">
