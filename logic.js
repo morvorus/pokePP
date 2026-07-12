@@ -56,3 +56,63 @@ export function isoWeekNumber(d) {
   const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
   return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
 }
+
+// โอกาสจับ (0.02–0.96) จากอัตราจับพื้นฐาน × บอล × โบนัส HP/charm − ปรับตามเลเวล
+export function catchChance(mon, level, ball, mods) {
+  if (ball.mult >= 999) return 1;                // master ball การันตี
+  mods = mods || {};
+  let mult = ball.mult, add = ball.add;
+  if (ball.cond && mods.ctx) {                    // บอลพิเศษ (Net/Dusk/Quick) โบนัสตามเงื่อนไข
+    const c = ball.cond(mods.ctx);
+    if (c.mult != null) mult = c.mult;
+    if (c.add != null) add += c.add;
+  }
+  const base = mon.captureRate / 300;            // 0.01 – 0.85
+  let p = base * mult + add;
+  p *= (mods.hpBonus || 1);
+  p *= (mods.catchMult || 1);
+  p *= (1 - Math.min(level, 80) * 0.004);        // เลเวลสูง จับยากขึ้น
+  return clamp(p, 0.02, 0.96);
+}
+
+// คำนวณสเตตัส NPC จาก base stats ใดก็ได้ (IV คงที่ 16)
+export function statsForBase(b, level) {
+  const IV = 16;
+  const s = key => Math.floor((2 * b[key] + IV) * level / 100) + 5;
+  return { hp: Math.floor((2 * b.hp + IV) * level / 100) + level + 10, atk: s('atk'), def: s('def'), spatk: s('spatk'), spdef: s('spdef'), spd: s('spd') };
+}
+
+// จัดระดับความหายากจากค่าสุ่ม 0-100 (แยก pure เพื่อทดสอบขอบเขต — rollRarity ใน game.js เรียกด้วย Math.random)
+export function rarityFromRoll(luck, roll) {
+  const srP = 3 + luck * 3;        // super rare
+  const raP = 27 + luck * 5;       // rare
+  const unP = 30;                  // uncommon
+  if (roll < srP) return 'superrare';
+  if (roll < srP + raP) return 'rare';
+  if (roll < srP + raP + unP) return 'uncommon';
+  return 'common';
+}
+
+// แกนคำนวณดาเมจ (pure) — รับความสุ่ม (rollRand/critRand) + weatherBoost เข้ามา เพื่อให้ deterministic ทดสอบได้
+export function damageCore(atkMon, atkStats, atkLevel, defMon, defStats, move, held, opts, weatherBoost, rollRand, critRand) {
+  opts = opts || {};
+  const physical = atkStats.atk >= atkStats.spatk;
+  let A = physical ? atkStats.atk : atkStats.spatk;
+  const D = physical ? defStats.def : defStats.spdef;
+  const moveType = move ? move.type : atkMon.types[0];
+  let power = move ? move.pow : 55;
+  let eff = typeEffect(moveType, defMon.types);
+  if (opts.defAbility && opts.defAbility.immuneType === moveType) eff = 0;   // Levitate ฯลฯ
+  const isStab = atkMon.types.includes(moveType);
+  let stab = isStab ? 1.5 : 1;
+  if (isStab && opts.atkAbility && opts.atkAbility.name === 'Adaptability') stab = 2;
+  if (opts.atkAbility && opts.atkAbility.boostType === moveType && opts.atkHpRatio != null && opts.atkHpRatio <= 1 / 3) power *= 1.5;
+  if (physical && opts.atkAbility && opts.atkAbility.name === 'Guts' && opts.atkHasStatus) A = Math.floor(A * 1.5);
+  const crit = critRand < (held === 'scope-lens' ? 4 / 16 : 1 / 16);
+  let dmg = (((2 * atkLevel / 5 + 2) * power * A / Math.max(1, D)) / 50 + 2);
+  dmg = dmg * stab * eff * (0.85 + rollRand * 0.15) * (crit ? 1.5 : 1) * (weatherBoost ? 1.2 : 1);
+  if (held === 'life-orb') dmg *= 1.3;
+  if (held === 'expert-belt' && eff > 1) dmg *= 1.2;
+  if (opts.defAbility && opts.defAbility.name === 'Multiscale' && opts.defHpRatio != null && opts.defHpRatio >= 1) dmg *= 0.5;
+  return { dmg: Math.max(1, Math.floor(dmg)), eff, crit, weather: weatherBoost };
+}

@@ -4,7 +4,7 @@
    ================================================================ */
 'use strict';
 import { MONSTERS } from './monsters-data.js';
-import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber } from './logic.js';
+import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore } from './logic.js';
 
 // cloud.js (classic script) รันก่อนโมดูลนี้และตั้ง window.Cloud ไว้ — ผูกเป็น const ให้อ้าง Cloud ในสโคปโมดูลได้
 const Cloud = window.Cloud;
@@ -1206,16 +1206,7 @@ function shinyMultiplier() {
 }
 // ชั้น2 แบบ PokeMeow: Common 40% · Uncommon 30% · Rare 27% · Super Rare 3% (legendary แยกอิสระ)
 // luck สูง (เขต boost/อีเวนต์) ดันโอกาสตัวหายากขึ้น
-function rollRarity(luck) {
-  const srP = 3 + luck * 3;        // super rare
-  const raP = 27 + luck * 5;       // rare
-  const unP = 30;                  // uncommon
-  const roll = Math.random() * 100;
-  if (roll < srP) return 'superrare';
-  if (roll < srP + raP) return 'rare';
-  if (roll < srP + raP + unP) return 'uncommon';
-  return 'common';                 // ที่เหลือ ~40%
-}
+function rollRarity(luck) { return rarityFromRoll(luck, Math.random() * 100); }   // logic บริสุทธิ์อยู่ที่ rarityFromRoll ใน logic.js
 function pickFromRegion(r, tier) {
   // ลดระดับถ้าเขตนี้ไม่มีตัว tier นั้น
   let ti = TIER_ORDER.indexOf(tier);
@@ -1778,22 +1769,7 @@ function hpBonusFor(spawn) {
   const missing = 1 - spawn.hp / spawn.maxHp;    // 0 = เต็ม, 1 = ใกล้ตาย
   return 1 + missing * 1.6;                       // ยิ่ง HP ลด ยิ่งจับง่าย (สูงสุด ×2.6)
 }
-function catchChance(mon, level, ball, mods) {
-  if (ball.mult >= 999) return 1;                // master ball การันตี
-  mods = mods || {};
-  let mult = ball.mult, add = ball.add;
-  if (ball.cond && mods.ctx) {                    // บอลพิเศษ (Net/Dusk/Quick) โบนัสตามเงื่อนไข
-    const c = ball.cond(mods.ctx);
-    if (c.mult != null) mult = c.mult;
-    if (c.add != null) add += c.add;
-  }
-  let base = mon.captureRate / 300;              // 0.01 – 0.85
-  let p = base * mult + add;
-  p *= (mods.hpBonus || 1);                       // โบนัสจากการสู้ทำ HP ลด
-  p *= (mods.catchMult || 1);                     // Catch Charm
-  p *= (1 - Math.min(level, 80) * 0.004);        // เลเวลสูง จับยากขึ้น
-  return clamp(p, 0.02, 0.96);
-}
+// catchChance ย้ายไป logic.js แล้ว (import ด้านบน)
 let throwing = false;
 function throwBall(k) {
   if (!currentSpawn || throwing) return;
@@ -3358,11 +3334,7 @@ function showTutorial() {
 //  BATTLE ENGINE
 // ================================================================
 let battleState = null;
-function statsForBase(b, level) {   // คำนวณสเตตัส NPC จาก base stats ใดก็ได้ (IV คงที่ 16)
-  const IV = 16;
-  const s = key => Math.floor((2 * b[key] + IV) * level / 100) + 5;
-  return { hp: Math.floor((2 * b.hp + IV) * level / 100) + level + 10, atk: s('atk'), def: s('def'), spatk: s('spatk'), spdef: s('spdef'), spd: s('spd') };
-}
+// statsForBase ย้ายไป logic.js แล้ว (import ด้านบน)
 function statsForWild(mon, level) { return statsForBase(mon.stats, level); }
 function gainXpTo(ind, amount) {
   if (!ind) return;
@@ -3480,28 +3452,10 @@ function applyRegenerator(member) {
   if (member.hp === before) return '';
   return ` · 🌿 Regenerator! ${MON_BY_ID[member.ind.id].name} ฟื้น ${member.hp - before}`;
 }
+// calcDamage — wrapper: คำนวณ weatherBoost (ขึ้นกับ state) + สุ่ม แล้วเรียก damageCore (pure) ใน logic.js
 function calcDamage(atkMon, atkStats, atkLevel, defMon, defStats, move, held, opts) {
-  opts = opts || {};
-  const physical = atkStats.atk >= atkStats.spatk;
-  let A = physical ? atkStats.atk : atkStats.spatk;
-  const D = physical ? defStats.def : defStats.spdef;
   const moveType = move ? move.type : atkMon.types[0];
-  let power = move ? move.pow : 55;
-  let eff = typeEffect(moveType, defMon.types);
-  if (opts.defAbility && opts.defAbility.immuneType === moveType) eff = 0;   // Levitate ฯลฯ
-  const isStab = atkMon.types.includes(moveType);
-  let stab = isStab ? 1.5 : 1;
-  if (isStab && opts.atkAbility && opts.atkAbility.name === 'Adaptability') stab = 2;
-  if (opts.atkAbility && opts.atkAbility.boostType === moveType && opts.atkHpRatio != null && opts.atkHpRatio <= 1 / 3) power *= 1.5;   // Blaze/Torrent/Overgrow/Swarm
-  if (physical && opts.atkAbility && opts.atkAbility.name === 'Guts' && opts.atkHasStatus) A = Math.floor(A * 1.5);
-  const weather = weatherBoosted(moveType);
-  const crit = Math.random() < (held === 'scope-lens' ? 4 / 16 : 1 / 16);   // คริติคอล 6.25% (Scope Lens ×4 ~25%)
-  let dmg = (((2 * atkLevel / 5 + 2) * power * A / Math.max(1, D)) / 50 + 2);
-  dmg = dmg * stab * eff * (0.85 + Math.random() * 0.15) * (crit ? 1.5 : 1) * (weather ? 1.2 : 1);
-  if (held === 'life-orb') dmg *= 1.3;                      // Life Orb
-  if (held === 'expert-belt' && eff > 1) dmg *= 1.2;        // Expert Belt (ธาตุได้เปรียบ)
-  if (opts.defAbility && opts.defAbility.name === 'Multiscale' && opts.defHpRatio != null && opts.defHpRatio >= 1) dmg *= 0.5;
-  return { dmg: Math.max(1, Math.floor(dmg)), eff, crit, weather };
+  return damageCore(atkMon, atkStats, atkLevel, defMon, defStats, move, held, opts, weatherBoosted(moveType), Math.random(), Math.random());
 }
 // ใส่ผล Held Item ที่ปรับสเตตัส (ตอนสร้างทีมสู้)
 function statsWithHeld(ind) {
@@ -5137,3 +5091,12 @@ function init() {
 // โมดูล ES เป็น deferred — ถ้า DOM พร้อมแล้วให้ init ทันที ไม่งั้นรอ event (กันเคสที่ event ยิงไปก่อน)
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
 else init();
+
+// สะพานดีบั๊ก — เปิดเฉพาะตอนรันบนเครื่อง (localhost) เพื่อทดสอบ ไม่โผล่บนเว็บจริง (กันโกง)
+if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+  window.__dev = {
+    get state() { return state; }, get spawn() { return currentSpawn; }, get battle() { return battleState; },
+    MON_BY_ID, makeIndividual, startBattle, beginSpawn, startTrainerBattle, startBossBattle,
+    startMegaLeagueBattle, startGhostBattle, onFoeDown, endBattle, throwBall, save, switchView,
+  };
+}
