@@ -3605,11 +3605,19 @@ function abilityRows(mons, shinyOf) {
       <span class="vs-ab-name">${mon.name}</span>${ab ? `<span class="vs-ab-dash">—</span><span class="vs-ab-skill">${ab.name}</span>` : ''}</div>`;
   }).join('');
 }
+// ปิดหน้า VS โดยไม่สู้ (ไม่คิดคูลดาวน์ใดๆ เพราะยังไม่เริ่มจริง)
+function cancelIntro() {
+  battleState = null;
+  $('#battleModal').classList.add('hidden');
+  renderTopbar();
+  if (currentView === 'menu') renderMenu();
+}
 function renderBattleIntro(b) {
   const foeTeam = (b.foeQueue && b.foeQueue.length) ? b.foeQueue.map(f => f.mon) : [b.foeMon];
   const myTeam = b.team.map(t => t.ind);
-  const foeLabel = b.isRival ? `${RIVAL_NAME}` : (b.mode === 'trainer' ? `${b.gym.name}` : `บอส ${b.foeMon.name}`);
-  const foeEmoji = b.isRival ? '🔥' : (b.mode === 'trainer' ? b.gym.emoji : '👑');
+  const foeLabel = b.mode === 'tower' ? `หอคอยชั้น ${b.floorNow || (state.tower && state.tower.floor) || 1}`
+    : b.isRival ? `${RIVAL_NAME}` : (b.mode === 'trainer' ? `${b.gym.name}` : `บอส ${b.foeMon.name}`);
+  const foeEmoji = b.mode === 'tower' ? '🗼' : b.isRival ? '🔥' : (b.mode === 'trainer' ? b.gym.emoji : '👑');
   const myLabel = `เทรนเนอร์ (คุณ)`;
   const foeTr = foeTrainerName(b), myTr = TRAINER_SPRITES.player;
   const myShiny = i => !!(myTeam[i] && myTeam[i].shiny);
@@ -3640,9 +3648,16 @@ function renderBattleIntro(b) {
           ${abilityRows(myTeam, myShiny)}
         </div>
       </div>
-      <button class="vs-start" id="btVsStart">เริ่มต่อสู้! ⚔️</button>
+      <div class="vs-actions">
+        <button class="vs-start" id="btVsStart">เริ่มต่อสู้! ⚔️</button>
+        <button class="vs-close" id="btVsClose">ปิด / ย้อนกลับ</button>
+      </div>
     </div>`;
-  $('#btVsStart').onclick = () => { b.showIntro = false; playSfx('rare'); renderBattle(); };
+  $('#btVsStart').onclick = () => {
+    if (b.isGhost) { state.ghostReadyAt = Date.now() + GHOST_CD; save(); }   // เริ่มสู้จริงถึงคิดคูลดาวน์ (ปิดก่อนไม่โดน)
+    b.showIntro = false; playSfx('rare'); renderBattle();
+  };
+  $('#btVsClose').onclick = cancelIntro;
 }
 // ===== หน้าสรุปชัยชนะ (หลังชนะเทรนเนอร์/บอส/คู่แข่ง) =====
 function renderVictory(b) {
@@ -4648,6 +4663,7 @@ function startTowerBattle() {
   battleState = {
     mode: 'tower', isBoss: false, team, activeIdx: 0, over: false, lost: false,
     foeQueue: [{ mon: def.mon }], foeIdx: 0, usedMega: false, usedDynamax: false,
+    showIntro: !(state.settings && state.settings.fastBattle),   // มีหน้า VS + ปุ่มปิด (ถอยก่อนเริ่มได้ ไม่โดนคูลดาวน์)
   };
   applyTowerFoeToBattle(battleState, def, floor);
   battleState.msg = `🗼 ชั้น ${floor}${def.isBossFloor ? ' (บอส!)' : ''} — ${battleState.foeDisplayName} Lv.${battleState.foeLevel} ท้าดวล!`;
@@ -4891,8 +4907,7 @@ function startGhostBattle(ghost) {
   if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
   const gTeam = (ghost.team || []).slice(0, 6).filter(m => MON_BY_ID[m.id]);
   if (!gTeam.length) { toast('ทีมคู่ต่อสู้ไม่ถูกต้อง', 'bad'); return; }
-  state.ghostReadyAt = Date.now() + GHOST_CD; save();   // เริ่มคูลดาวน์ 3 ชม. ทันทีที่เริ่มสู้
-  const team = buildBattleTeam(members);
+  const team = buildBattleTeam(members);   // คูลดาวน์คิดตอนกด "เริ่มต่อสู้" ในหน้า VS (ปิดก่อนไม่โดน)
   const queue = gTeam.map((m, i) => makeFoeDef(MON_BY_ID[m.id], clamp(m.level || 20, 1, 100), i === gTeam.length - 1 ? 1.1 : 1.0, false));
   const nameHash = hashIdx(ghost.name || 'x', BOSS_TRAINER_POOL.length);
   const ghostGym = { id: 'ghost', name: ghost.name || 'เทรนเนอร์', emoji: '👤', sprite: BOSS_TRAINER_POOL[nameHash], reward: 200 + queue.length * 40, items: [] };

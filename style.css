@@ -607,7 +607,10 @@ main { flex: 1; padding: 12px; }
 .vs-ab-name { font-weight: 700; }
 .vs-ab-dash { opacity: .5; }
 .vs-ab-skill { color: #ffd76b; font-weight: 700; }
+.vs-actions { display: flex; flex-direction: column; gap: 8px; }
 .vs-start { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 900; cursor: pointer; color: #fff; background: linear-gradient(180deg,#ff6b6b,#e23b4e); box-shadow: 0 4px 14px rgba(226,59,78,.45); animation: vsPulse 1.4s ease-in-out infinite; }
+.vs-close { width: 100%; padding: 11px; border: none; border-radius: 10px; font-size: 14px; font-weight: 800; cursor: pointer; color: var(--text); background: rgba(255,255,255,.12); }
+.vs-close:active { transform: scale(.98); }
 .vs-start:active { transform: scale(.97); }
 @keyframes vsPulse { 0%,100% { box-shadow: 0 4px 14px rgba(226,59,78,.45); } 50% { box-shadow: 0 4px 22px rgba(226,59,78,.85); } }
 .reduce-motion .vs-start { animation: none; }
