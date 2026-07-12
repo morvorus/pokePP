@@ -589,7 +589,19 @@ const REGIONS = [
     lvl: [40, 75], boost: 2, mascots: [333, 334, 176, 227],
     bg: 'linear-gradient(180deg,#aee0ff 0%,#7cc4f0 45%,#fff6d8 100%)',
     bgImg: 'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Sea_of_clouds_2023.jpg/1280px-Sea_of_clouds_2023.jpg',
-    desc: 'เขตขั้นสุด เหนือทะเลเมฆ ลมแรง โปเกมอนบินหายากรออยู่', unlock: 55 },
+    desc: 'เหนือทะเลเมฆ ลมแรง โปเกมอนบินหายากรออยู่', unlock: 55 },
+  { id: 'dragon', name: 'ถ้ำรังมังกร', emoji: '🐉', types: ['dragon', 'flying', 'fire', 'ground'],
+    lvl: [55, 90], boost: 2, mascots: [147, 149, 373, 445],
+    bg: 'linear-gradient(180deg,#3a1a2e 0%,#5a1f1a 50%,#1a0a10 100%)',
+    desc: 'รังของมังกรโบราณ ไอร้อนและพลังมังกรแผ่กระจาย', unlock: 62 },
+  { id: 'crystal', name: 'ถ้ำคริสตัล', emoji: '💠', types: ['ice', 'rock', 'steel', 'fairy', 'psychic'],
+    lvl: [58, 92], boost: 2, mascots: [615, 703, 476, 208],
+    bg: 'linear-gradient(180deg,#1e3a5a 0%,#2a5a7a 45%,#0f1e33 100%)',
+    desc: 'ผลึกเรืองแสงระยิบระยับ สะท้อนพลังลึกลับ', unlock: 70 },
+  { id: 'void', name: 'รอยแยกมิติ', emoji: '🌌', types: ['dark', 'ghost', 'dragon', 'psychic'],
+    lvl: [65, 100], boost: 3, mascots: [491, 487, 384, 249],
+    bg: 'linear-gradient(180deg,#1a0a2e 0%,#2a1050 45%,#05030f 100%)',
+    desc: 'ขอบสุดของโลก มิติบิดเบี้ยว โอกาสเจอเทพสูงสุด', unlock: 80 },
 ];
 const REGION_BY_ID = {};
 REGIONS.forEach(r => { REGION_BY_ID[r.id] = r; });
@@ -849,6 +861,9 @@ const REGION_MUSIC = {
   mystic:  { root: 55, tempo: 580, wave: 'triangle' },
   ruins:   { root: 52, tempo: 600, wave: 'triangle' },
   sky:     { root: 69, tempo: 460, wave: 'sine' },
+  dragon:  { root: 47, tempo: 490, wave: 'sawtooth' },
+  crystal: { root: 71, tempo: 600, wave: 'sine' },
+  void:    { root: 43, tempo: 720, wave: 'square' },
 };
 let musicTimer = null, musicStep = 0;
 function midiFreq(m) { return 440 * Math.pow(2, (m - 69) / 12); }
