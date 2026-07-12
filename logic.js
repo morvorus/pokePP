@@ -76,11 +76,10 @@ export function catchChance(mon, level, ball, mods) {
   return clamp(p, 0.02, 0.96);
 }
 
-// คำนวณสเตตัส NPC จาก base stats ใดก็ได้ (IV คงที่ 16)
-export function statsForBase(b, level) {
-  const IV = 16;
-  const s = key => Math.floor((2 * b[key] + IV) * level / 100) + 5;
-  return { hp: Math.floor((2 * b.hp + IV) * level / 100) + level + 10, atk: s('atk'), def: s('def'), spatk: s('spatk'), spdef: s('spdef'), spd: s('spd') };
+// คำนวณสเตตัส NPC จาก base stats ใดก็ได้ (IV ปรับได้ ค่าเริ่มต้น 16 · บอสใช้ 31 = IV max)
+export function statsForBase(b, level, iv = 16) {
+  const s = key => Math.floor((2 * b[key] + iv) * level / 100) + 5;
+  return { hp: Math.floor((2 * b.hp + iv) * level / 100) + level + 10, atk: s('atk'), def: s('def'), spatk: s('spatk'), spdef: s('spdef'), spd: s('spd') };
 }
 
 // จัดระดับความหายากจากค่าสุ่ม 0-100 (แยก pure เพื่อทดสอบขอบเขต — rollRarity ใน game.js เรียกด้วย Math.random)

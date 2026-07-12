@@ -4243,6 +4243,22 @@ function onFoeDown() {
       return;   // ยังไม่จบ สู้ตัวต่อไป
     }
     b.over = true;
+    if (b.isRegionBoss && b.bossData) {   // ชนะบอสประจำเขต (ทีม 6 ตัว IV/เลเวลสูงสุด + เมก้า)
+      const first = !state.badges[b.bossData.region.id];
+      state.badges[b.bossData.region.id] = true;
+      const baseReward = 500 + trainerLevel() * 20;
+      const reward = first ? baseReward : Math.round(baseReward * 0.3);
+      const bp = first ? 40 : 15;
+      state.coins += reward; state.battlePoints = (state.battlePoints || 0) + bp;
+      if (first) state.balls.ultra = (state.balls.ultra || 0) + 3;
+      const ballDrop = grantRandomBall();
+      gainTrainerXp(100);
+      b.victory = { trainerKey: foeTrainerName(b), emoji: b.gym.emoji, title: b.gym.name, coins: reward, bp, xp: 100, items: (first ? '🟡 Ultra Ball ×3 ' : '') + ballDrop, bonus: first ? '🏅 เหรียญตราประจำเขต!' : 'ชนะซ้ำ — รางวัลลดลง' };
+      b.msg = `🏆 ชนะ${b.gym.name}! +${reward}🪙 +${bp}🎖️BP`;
+      logMsg(`🏆 ชนะบอสเขต <b>${b.bossData.region.name}</b>! +${reward}🪙`, 'big');
+      playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
+      return;
+    }
     if (b.isLeague && b.league) {   // ชนะบอสลีคเมก้า — การันตีหินเมก้า + ไข่ทอง + อุปกรณ์ + เงิน
       const lg = b.league;
       const stoneMsg = grantMegaStone(lg.stone);
@@ -4374,14 +4390,36 @@ function startBossBattle(regionId) {
     if (p && p.length) bossMon = p.reduce((a, c) => c._bst > a._bst ? c : a, p[0]);
   }
   if (!bossMon) { toast('เขตนี้ยังไม่มีบอส', 'bad'); return; }
+  const members = partyMembers();
+  if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
   state.bossReadyAt = Date.now() + BOSS_CD;
-  const level = Math.min(100, r.lvl[1] + 12);   // บอสเลเวลสูงกว่าโปเกมอนในเขตชัดเจน
-  startBattle(true, { mon: bossMon, level, region: r });
+  // ทีมบอสประจำเขต: 6 ตัว · เวล 100 · IV max · มีร่างเมก้าปิดท้าย 1 ตัว (ท้าทายจริง)
+  const strong = r._pool.filter(m => ['rare', 'superrare', 'legendary'].includes(m._tier));
+  const usePool = strong.length ? strong : (r._pool.length ? r._pool : MONSTERS);
+  const megaInRegion = usePool.filter(m => megaFormsFor(m.id));
+  const megaId = megaInRegion.length ? pick(megaInRegion).id : pick(Object.keys(MEGA_FORMS).map(Number));
+  const megaForm = pick(MEGA_FORMS[megaId]);
+  const queue = [];
+  for (let i = 0; i < 5; i++) queue.push(makeFoeDef(pick(usePool), 100, 1.15, true, 31));
+  queue.push(makeMegaFoeDef(MON_BY_ID[megaId], megaForm, 100, 31));
+  const team = buildBattleTeam(members);
+  const bossGym = { id: 'rboss_' + regionId, name: `บอส${r.name}`, emoji: r.emoji, sprite: bossTrainerFor(regionId) };
+  battleState = {
+    mode: 'trainer', isBoss: false, isRegionBoss: true, bossData: { region: r }, gym: bossGym, foeQueue: queue, foeIdx: 0,
+    foeMon: queue[0].mon, foeLevel: queue[0].level, foeStats: queue[0].stats, foeMaxHp: queue[0].maxHp, foeHp: queue[0].maxHp, foeHeld: queue[0].held || null,
+    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
+    usedMega: false, usedDynamax: false,
+    showIntro: !(state.settings && state.settings.fastBattle),
+    msg: `${r.emoji} บอส${r.name} ท้าดวล! ทีม 6 ตัว เวล 100 IV สูงสุด`,
+  };
+  battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
+  renderBattle();
+  $('#battleModal').classList.remove('hidden');
 }
 // โหลดศัตรูตัวถัดไปเข้า current-foe fields (ใช้ในโหมดเทรนเนอร์) — statMult ใช้บูสต์เอซ/บอสให้แรงขึ้นจริง
 // giveHeld: true = สุ่มไอเทมถือให้ (ใช้กับเอซ/บอสเท่านั้น ให้ท้าทายขึ้นจริง ไม่ใช่แค่บวกสเตตัสเฉยๆ)
-function makeFoeDef(mon, level, statMult, giveHeld) {
-  const base = statsForWild(mon, level);
+function makeFoeDef(mon, level, statMult, giveHeld, iv) {
+  const base = statsForBase(mon.stats, level, iv || 16);   // iv=31 = IV max (บอส)
   const m = statMult || 1;
   const stats = { atk: Math.floor(base.atk * m), def: Math.floor(base.def * m), spatk: Math.floor(base.spatk * m), spdef: Math.floor(base.spdef * m), spd: Math.floor(base.spd * m) };
   const held = giveHeld ? pick(FOE_HELD_POOL) : null;
@@ -4412,12 +4450,21 @@ function loadFoe(b, def) {
   b.foe = { status: null, sleepT: 0, stages: freshStages() };   // ศัตรูตัวใหม่ = สถานะ/สเตตัสเคลียร์
 }
 // สร้าง def ศัตรูร่างเมก้า (ใช้ในลีคเมก้า) — สเตตัสตามร่างเมก้าจริง + เก็บสไปรต์/ธาตุ/ชื่อ
-function makeMegaFoeDef(mon, form, level) {
-  const ms = statsForBase(form.stats, level);
+function makeMegaFoeDef(mon, form, level, iv) {
+  const ms = statsForBase(form.stats, level, iv || 16);
   const stats = { atk: ms.atk, def: ms.def, spatk: ms.spatk, spdef: ms.spdef, spd: ms.spd };
   const held = pick(FOE_HELD_POOL); applyFoeHeld(stats, held);
   return { mon, level, stats, maxHp: Math.floor(ms.hp * 1.25), held,
     foeTypes: form.types, foeSpriteId: form.spriteId, foeDisplayName: form.name, special: 'mega' };
+}
+// ศัตรูร่างไดนาแม็กซ์/G-Max (ใช้ในลีค) — HP บวมมาก
+function makeGmaxFoeDef(mon, level, iv) {
+  const base = statsForBase(mon.stats, level, iv || 16);
+  const stats = { atk: base.atk, def: base.def, spatk: base.spatk, spdef: base.spdef, spd: base.spd };
+  const held = pick(FOE_HELD_POOL); applyFoeHeld(stats, held);
+  const g = gmaxFormFor(mon.id);
+  return { mon, level, stats, maxHp: Math.floor(base.hp * 1.9), held,
+    foeTypes: mon.types, foeSpriteId: g ? g.spriteId : mon.id, foeDisplayName: (g ? g.name : 'Dynamax ' + mon.name), special: 'gmax' };
 }
 function startTrainerBattle(gymId) {
   const left = (state.gymReadyAt || 0) - Date.now();
@@ -4433,12 +4480,13 @@ function startTrainerBattle(gymId) {
   const typePool = g.type ? MONSTERS.filter(m => m.types.includes(g.type)) : MONSTERS.filter(m => m._tier === 'superrare' || m._tier === 'legendary');
   const tierPool = (g.tierBias && g.tierBias.length) ? typePool.filter(m => g.tierBias.includes(m._tier)) : typePool;
   const pool = tierPool.length ? tierPool : (typePool.length ? typePool : MONSTERS);
+  const gymCount = Math.max(g.count, 6);   // ยิมทีมเต็ม 6 ตัว (บอทเก่งขึ้น)
   const queue = [];
-  for (let i = 0; i < g.count; i++) {
-    const isAce = i === g.count - 1;
+  for (let i = 0; i < gymCount; i++) {
+    const isAce = i === gymCount - 1;
     const mon = pick(pool);
     const lv = clamp(g.lvl + rand(-2, 3) + (isAce ? 6 : 0), 1, 100);   // เอซ (ตัวสุดท้าย) เลเวลสูง+สเตตัสบูสต์ 25%+ไอเทมถือ
-    queue.push(makeFoeDef(mon, lv, isAce ? 1.25 : 1.0, isAce));
+    queue.push(makeFoeDef(mon, lv, isAce ? 1.3 : 1.1, isAce));   // แรงขึ้น
   }
   const team = buildBattleTeam(members);
   battleState = {
@@ -4447,7 +4495,7 @@ function startTrainerBattle(gymId) {
     team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
     usedMega: false, usedDynamax: false,
     showIntro: !(state.settings && state.settings.fastBattle),
-    msg: `${g.emoji} ${g.name} — ศัตรู ${g.count} ตัว! เลือกท่าโจมตี`,
+    msg: `${g.emoji} ${g.name} — ศัตรู ${gymCount} ตัว! เลือกท่าโจมตี`,
   };
   battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
   renderBattle();
@@ -4474,13 +4522,13 @@ function startRivalBattle() {
   const tl = trainerLevel();
   const rivalLvl = clamp(10 + tl * 3, 10, 100);
   const pool = RIVAL_TEAM_POOL.length ? RIVAL_TEAM_POOL : MONSTERS;
-  const count = 3;
+  const count = 6;   // คู่แข่งทีมเต็ม 6 ตัว เก่งขึ้น
   const queue = [];
   for (let i = 0; i < count; i++) {
     const isAce = i === count - 1;
     const mon = pick(pool);
     const lv = clamp(rivalLvl + rand(-2, 3) + (isAce ? 5 : 0), 1, 100);
-    queue.push(makeFoeDef(mon, lv, isAce ? 1.2 : 1.0, isAce));
+    queue.push(makeFoeDef(mon, lv, isAce ? 1.35 : 1.15, isAce));   // แรงขึ้น
   }
   const team = buildBattleTeam(members);
   const rivalGym = { id: 'rival', name: `คู่แข่ง ${RIVAL_NAME}`, emoji: '🔥', reward: 300 + tl * 50, items: [['ultra', 2], ['candy', 2]] };
@@ -4550,11 +4598,13 @@ function startMegaLeagueBattle(bossId) {
   const forms = MEGA_FORMS[boss.megaId];
   const form = forms.find(f => f.key === boss.formKey) || forms[0];
   const megaMon = MON_BY_ID[boss.megaId];
-  // ทีมบอส: มอนสนับสนุน 3 ตัว (ธาตุเดียวกับเมก้า/ระดับสูง) + เมก้าเป็นตัวปิดท้าย · ทุกตัวเวล 100
+  // ทีมบอสลีค: 6 ตัว · เวล 100 · IV max · มอนสนับสนุน 4 + ไดนาแม็กซ์ 1 + เมก้า 1 (ปิดท้าย)
   const supPool = MONSTERS.filter(m => m.id !== boss.megaId && (m.types.some(t => form.types.includes(t)) || m._tier === 'superrare' || m._tier === 'legendary'));
+  const gmaxMon = MON_BY_ID[pick(Object.keys(GMAX_FORMS).map(Number))];
   const queue = [];
-  for (let i = 0; i < 3; i++) queue.push(makeFoeDef(pick(supPool.length ? supPool : MONSTERS), 100, 1.15, true));
-  queue.push(makeMegaFoeDef(megaMon, form, 100));
+  for (let i = 0; i < 4; i++) queue.push(makeFoeDef(pick(supPool.length ? supPool : MONSTERS), 100, 1.2, true, 31));
+  queue.push(makeGmaxFoeDef(gmaxMon, 100, 31));   // ไดนาแม็กซ์ 1 ตัว
+  queue.push(makeMegaFoeDef(megaMon, form, 100, 31));   // เมก้าปิดท้าย
   const team = buildBattleTeam(members);
   const leagueGym = { id: boss.id, name: boss.name, emoji: '💎', sprite: bossTrainerFor(boss.id) };
   battleState = {
