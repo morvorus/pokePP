@@ -16,6 +16,5 @@ jobs:
       - run: npm install
       - name: Lint (จับบั๊ก อ้างอิงชื่อที่ไม่มีจริง ฯลฯ)
         run: npm run lint
-        continue-on-error: true
       - name: Unit tests
         run: npm test
