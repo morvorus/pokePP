@@ -154,7 +154,7 @@ const BALLS = {
 };
 const BALL_ORDER = ['poke', 'premier', 'great', 'luxury', 'ultra', 'net', 'dusk', 'quick', 'timer', 'repeat', 'heavy', 'beast', 'master'];
 // บอลที่ขายในร้าน (ที่เหลือ net/dusk/quick/timer/repeat/heavy/beast/luxury หาได้จากกล่องสุ่ม/ตียิม/บอส/หอคอย)
-const SHOP_BALL_ORDER = ['poke', 'premier', 'great', 'ultra', 'master'];
+const SHOP_BALL_ORDER = ['poke', 'great', 'ultra', 'premier', 'master'];   // เรียงตามราคา (25/90/240/50k/100k)
 const OFF_SHOP_BALLS = ['net', 'dusk', 'quick', 'timer', 'repeat', 'heavy', 'luxury', 'beast'];   // ดรอปจากกล่อง/ยิม/บอส/หอคอย
 function grantRandomBall() {   // สุ่มบอลนอกร้าน 1 ชนิด (beast หายากกว่า) จำนวน 1-3 · คืนข้อความ
   const k = Math.random() < 0.1 ? 'beast' : pick(OFF_SHOP_BALLS.filter(b => b !== 'beast'));
@@ -2451,8 +2451,7 @@ function renderShop() {
   const items = [
     { emoji: '🎫', img: 'member-card', name: 'ตั๋ว Safari', desc: `เข้า Safari Zone ${SAFARI_SPAWNS} ตัวหายากสุดๆ (กดปุ่ม Safari หน้าล่า)`, price: 800, act: () => { if (spend(800)) { state.safariTickets = (state.safariTickets || 0) + 1; toast('🎫 +1 ตั๋ว Safari', 'good'); postBuy(); } } },
     { emoji: '💎', img: 'shiny-stone', name: 'หินวิวัฒนาการ', desc: 'วิวัฒนาการตัวที่ต้องใช้ไอเทม', price: STONE_PRICE, act: () => { if (spend(STONE_PRICE)) { state.stones = (state.stones || 0) + 1; toast('💎 +1 หินวิวัฒนาการ', 'good'); postBuy(); } } },
-    { emoji: '💥', img: 'comet-shard', name: `พลังงานไดนาแม็กซ์ (มี ${state.maxEnergy || 0})`, desc: 'ใช้ครั้งละ 1 ในการต่อสู้ · HP×2 + ดาเมจ +30% เป็นเวลา 3 เทิร์น', price: MAX_ENERGY_PRICE, act: () => { if (spend(MAX_ENERGY_PRICE)) { state.maxEnergy = (state.maxEnergy || 0) + 1; toast('💥 +1 พลังงานไดนาแม็กซ์', 'good'); postBuy(); } } },
-    // แลกด้วยเหรียญเช็คอิน 🎟️ (ได้จากล็อกอินรายวัน)
+    // แลกด้วยเหรียญเช็คอิน (ได้จากล็อกอินรายวัน)
     { emoji: '💍', img: 'mega-ring', name: state.hasMegaRing ? 'กำไลเมก้า (มีแล้ว)' : 'กำไลเมก้า', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนเมก้าอีโวลูชัน · แลกด้วยเหรียญเช็คอิน', checkinPrice: MEGA_RING_CHECKIN, act: () => { if (state.hasMegaRing) { toast('มีกำไลเมก้าอยู่แล้ว', ''); return; } if (spendCheckin(MEGA_RING_CHECKIN)) { state.hasMegaRing = true; toast('💍 ได้กำไลเมก้าแล้ว! เมก้าอีโวลูชันได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
     { emoji: '⌚', img: 'macho-brace', name: state.hasDynamaxBand ? 'กำไลไดนาแม็กซ์ (มีแล้ว)' : 'กำไลไดนาแม็กซ์', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนไดนาแม็กซ์ · แลกด้วยเหรียญเช็คอิน', checkinPrice: DYNAMAX_BAND_CHECKIN, act: () => { if (state.hasDynamaxBand) { toast('มีกำไลไดนาแม็กซ์อยู่แล้ว', ''); return; } if (spendCheckin(DYNAMAX_BAND_CHECKIN)) { state.hasDynamaxBand = true; toast('⌚ ได้กำไลไดนาแม็กซ์แล้ว! ไดนาแม็กซ์ได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
     { emoji: '🪙', img: 'amulet-coin', name: `Amulet Coin (${state.amulets || 0}/${AMULET_MAX})`, desc: 'เงินที่ได้จากการจับ +5% ต่อชิ้น สูงสุด +50% (ติดตัวถาวร)', price: 150000, act: () => { if ((state.amulets || 0) >= AMULET_MAX) { toast('มี Amulet Coin เต็มแล้ว', ''); return; } if (spend(150000)) { state.amulets = (state.amulets || 0) + 1; toast(`🪙 Amulet Coin +1 (เงิน +${state.amulets * 5}%)`, 'good'); postBuy(); } } },
@@ -2463,7 +2462,7 @@ function renderShop() {
     { emoji: '🟡', img: 'ultra-ball', name: 'Ultra Ball', desc: 'แลกด้วยเหรียญตกปลา', tokenPrice: 3, act: () => { if (spendTokens(3)) { state.balls.ultra = (state.balls.ultra || 0) + 1; toast('🟡 +1 Ultra Ball', 'good'); postBuy(); } } },
   ];
   $('#shopGrid').innerHTML =
-    `<div class="dex-stats">💎 ${state.stones || 0} · 🎟️ ${state.fishTokens || 0} เหรียญตกปลา · 🎟️ ${state.checkinCoins || 0} เหรียญเช็คอิน · บอล: ` +
+    `<div class="dex-stats">💎 ${state.stones || 0} · 🎟️ ${state.fishTokens || 0} เหรียญตกปลา · 🗓️ ${state.checkinCoins || 0} เหรียญเช็คอิน · บอล: ` +
     BALL_ORDER.map(k => `${itemIcon(BALLS[k].emoji, BALLS[k].img)}${state.balls[k] || 0}`).join(' ') + `</div>` +
     ballsHtml +
     items.map((it, i) => {
@@ -2471,7 +2470,7 @@ function renderShop() {
       const isCheckin = it.checkinPrice != null;
       const owned = it.owned || (it.img === 'mega-ring' && state.hasMegaRing) || (it.img === 'macho-brace' && state.hasDynamaxBand);
       const cant = owned || (isCheckin ? (state.checkinCoins || 0) < it.checkinPrice : isTok ? (state.fishTokens || 0) < it.tokenPrice : state.coins < it.price);
-      const label = owned ? 'มีแล้ว' : (isCheckin ? `${it.checkinPrice} 🎟️เช็คอิน` : isTok ? `${it.tokenPrice}🎟️` : `${it.price}${itemIcon('🪙', 'nugget', 'price-ico')}`);
+      const label = owned ? 'มีแล้ว' : (isCheckin ? `${it.checkinPrice} 🗓️เช็คอิน` : isTok ? `${it.tokenPrice}🎟️` : `${it.price}${itemIcon('🪙', 'nugget', 'price-ico')}`);
       return `<div class="shop-item">
         <div class="emoji">${itemIcon(it.emoji, it.img, 'big')}</div>
         <div class="si-body"><div class="si-name">${it.name}</div><div class="si-desc">${it.desc}</div></div>
@@ -3061,7 +3060,7 @@ function applyDailyLogin() {
   save();
   const ballTxt = `${cd.ball[1]}${BALLS[cd.ball[0]].emoji}`;
   const lockboxTxt = cd.lockbox ? ` +${cd.lockbox}🎁` : '';
-  const ciTxt = cd.checkin ? ` +${cd.checkin}🎟️เช็คอิน` : '';
+  const ciTxt = cd.checkin ? ` +${cd.checkin}🗓️เช็คอิน` : '';
   setTimeout(() => toast(`📅 ล็อกอินวันที่ ${state.streak} ติดต่อกัน (วันที่ ${loginCycleDay(state.streak)}/7)! +${cd.coins}🪙 +${ballTxt}${lockboxTxt}${ciTxt}`, 'good'), 600);
 }
 function applyOfflineRewards() {
@@ -3205,7 +3204,7 @@ function renderProfile() {
     </div>
     <div style="margin-top:8px;font-size:12px;font-weight:700">⏱️ สถานะพร้อมใช้</div>
     ${readyStatusHtml()}
-    <div style="margin-top:8px;font-size:12px;font-weight:700">📅 ปฏิทินล็อกอิน (วนทุก 7 วัน) · 🎟️ เหรียญเช็คอิน: <b style="color:#ffd76b">${state.checkinCoins || 0}</b></div>
+    <div style="margin-top:8px;font-size:12px;font-weight:700">📅 ปฏิทินล็อกอิน (วนทุก 7 วัน) · 🗓️ เหรียญเช็คอิน: <b style="color:#ffd76b">${state.checkinCoins || 0}</b></div>
     ${loginCalendarHtml()}
     <div class="stat-grid">
       <div class="stat-tile"><div class="st-num">${speciesOwnedCount()}/${MONSTERS.length}</div><div class="st-lbl">📖 เดกซ์ (${dexPct}%)</div></div>
@@ -3740,7 +3739,7 @@ function renderBattle() {
   }
 
   const canMega = state.hasMegaRing && !b.usedMega && !active.mega && !!(megaFormsFor(active.ind.id) || []).find(f => f.key === active.ind.megaKey);
-  const canDynamax = state.hasDynamaxBand && !b.usedDynamax && !active.dynamax && (state.maxEnergy || 0) > 0;
+  const canDynamax = state.hasDynamaxBand && !b.usedDynamax && !active.dynamax;   // ใช้แค่กำไลไดนาแม็กซ์ (ไม่ต้องใช้พลังงานแล้ว)
   const specialBadge = view.special ? `<span class="badge" style="background:linear-gradient(90deg,#ff6b6b,#ffcb05)">${active.mega ? '💎 MEGA' : '💥 G-MAX'}</span>` : (active.dynamax ? `<span class="badge" style="background:#e23b4e">💥 DYNAMAX ${active.dynamax.turnsLeft}T</span>` : '');
   const foeSpecialBadge = b.special ? `<span class="badge" style="background:${b.special === 'mega' ? 'linear-gradient(90deg,#8e5bff,#5a2ba8)' : b.special === 'gmax' ? 'linear-gradient(90deg,#ff6b6b,#c1122e)' : '#555'}">${b.special === 'mega' ? '💎 MEGA' : b.special === 'gmax' ? '💥 G-MAX' : '⭐ ELITE'}</span>` : '';
 
@@ -3771,7 +3770,7 @@ function renderBattle() {
           : `<div class="bt-actions"><button class="bt-flee" id="btDone">ปิด</button></div>`)
       : `${(canMega || canDynamax) ? `<div class="bt-actions" style="margin-bottom:6px">
            ${canMega ? `<button class="bt-flee" id="btMega" ${battleBusy ? 'disabled' : ''} style="background:linear-gradient(180deg,#8e5bff,#5a2ba8);color:#fff">💎 เมก้าอีโวลูชัน</button>` : ''}
-           ${canDynamax ? `<button class="bt-flee" id="btDynamax" ${battleBusy ? 'disabled' : ''} style="background:linear-gradient(180deg,#ff6b6b,#c1122e);color:#fff">💥 ไดนาแม็กซ์ (${state.maxEnergy}⚡)</button>` : ''}
+           ${canDynamax ? `<button class="bt-flee" id="btDynamax" ${battleBusy ? 'disabled' : ''} style="background:linear-gradient(180deg,#ff6b6b,#c1122e);color:#fff">💥 ไดนาแม็กซ์</button>` : ''}
          </div>` : ''}
          <div class="move-grid${battleBusy ? ' move-grid-busy' : ''}">${moveBtns}</div>
          <div class="bt-actions"><button class="bt-flee" id="btFlee" ${battleBusy ? 'disabled' : ''}>${b.isBoss ? 'ยอมแพ้' : (b.mode === 'tower' ? 'ล่าถอย (คูลดาวน์ 12 ชม.)' : 'หนี')}</button></div>`}`;
@@ -3865,10 +3864,9 @@ function battleMegaEvolve() {
 }
 function battleDynamax() {
   const b = battleState; if (!b || b.over || b.usedDynamax || battleBusy) return;
-  if (!state.hasDynamaxBand) { toast('❌ ต้องมีกำไลไดนาแม็กซ์ก่อน (ซื้อได้ที่ร้าน)', 'bad'); return; }
-  if ((state.maxEnergy || 0) <= 0) { toast('❌ ไม่มีพลังงานไดนาแม็กซ์ (ซื้อได้ที่ร้าน)', 'bad'); return; }
+  if (!state.hasDynamaxBand) { toast('❌ ต้องมีกำไลไดนาแม็กซ์ก่อน (แลกด้วยเหรียญเช็คอิน)', 'bad'); return; }
   const active = b.team[b.activeIdx];
-  state.maxEnergy--; b.usedDynamax = true;
+  b.usedDynamax = true;
   const gform = gmaxFormFor(active.ind.id);
   const isGmax = !!gform && active.ind.gmaxKey === gform.key;   // ต้องแนบหินปลุกพลังของตัวนั้นๆ ถึงจะได้ร่าง G-Max จริง
   const newMax = Math.round(active.maxHp * DYNAMAX_HP_MULT);
