@@ -21,10 +21,24 @@
   --cur-gold: #ffd76b;
   --cur-token: #7ec8ff;
   --cur-checkin: #c9a3ff;
+  /* --- ระบบปุ่ม: 4 บทบาท ใช้ร่วมกันทุกปุ่มในเกม ---
+     primary = คำสั่งหลัก/รุก (สู้/โยนบอล/ยืนยัน) · secondary = คำสั่งรอง (ตั้งค่า/นำทาง)
+     accent = รางวัล/ซื้อ (ทอง) · ghost = ยกเลิก/เป็นกลาง · danger = ทำลาย/ปฏิเสธ */
+  --btn-primary-grad: linear-gradient(180deg,#ff6b6b,#e23b4e);
+  --btn-primary-shadow: 0 4px 14px rgba(226,59,78,.4);
+  --btn-secondary-grad: linear-gradient(180deg,#5a6bd8,#3d47a8);
+  --btn-ghost-bg: rgba(255,255,255,.12);
+  --btn-danger-bg: rgba(255,93,108,.22);
+  --btn-radius: 12px;
+  --btn-radius-sm: 10px;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; }
+button, select, input, textarea { font-family: inherit; }
+button { transition: transform .08s ease, filter .15s ease, box-shadow .15s ease; }
+button:not(:disabled):active { transform: scale(.96); }
+button:disabled { opacity: .5; cursor: not-allowed; }
 /* ปิดแอนิเมชันส่วนใหญ่เมื่อผู้เล่นเปิดตัวเลือก "ลดแอนิเมชัน" */
 #app.reduce-motion *, #app.reduce-motion *::before, #app.reduce-motion *::after {
   animation-duration: 0.001ms !important; animation-iteration-count: 1 !important;
@@ -148,10 +162,9 @@ main { flex: 1; padding: 12px; }
 .boost-strip:empty { display: none; }
 .boost-chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: linear-gradient(90deg,#3d7dca,#47d16c); color: #fff; }
 .mini-btn {
-  padding: 8px 12px; border: none; border-radius: 10px; cursor: pointer;
-  background: var(--accent2); color: #fff; font-weight: 700; font-size: 13px;
+  padding: 8px 12px; border: none; border-radius: var(--btn-radius-sm); cursor: pointer;
+  background: var(--btn-secondary-grad); color: #fff; font-weight: 700; font-size: 13px;
 }
-.mini-btn:active { transform: scale(.95); }
 
 /* ===== Spawn card ===== */
 .spawn-card {
@@ -286,11 +299,9 @@ main { flex: 1; padding: 12px; }
 /* action row */
 .action-row { display: flex; gap: 8px; margin-top: 8px; }
 .act-btn {
-  flex: 1; padding: 12px; border: none; border-radius: 12px; cursor: pointer;
-  background: linear-gradient(180deg,#5a6bd8,#3d47a8); color: #fff; font-weight: 800; font-size: 14px;
+  flex: 1; padding: 12px; border: none; border-radius: var(--btn-radius); cursor: pointer;
+  background: var(--btn-secondary-grad); color: #fff; font-weight: 800; font-size: 14px;
 }
-.act-btn:disabled { opacity: .5; cursor: not-allowed; }
-.act-btn:not(:disabled):active { transform: scale(.97); }
 .fish-btn { background: linear-gradient(180deg,#2b8fc9,#12557f); flex: 1 1 30%; }
 .safari-btn { background: linear-gradient(180deg,#d4a017,#8a6d0a); color: #2a2000; flex: 1 1 26%; }
 
@@ -303,11 +314,9 @@ main { flex: 1; padding: 12px; }
 .wild-hp .hp-txt { font-size: 10px; color: #fff; text-shadow: 0 1px 2px #000; text-align: center; margin-top: 2px; }
 
 .throw-btn {
-  width: 100%; margin-top: 10px; padding: 15px; border: none; border-radius: 12px;
-  background: linear-gradient(180deg,#ff6b6b,#e23b4e); color: #fff; font-weight: 800; font-size: 17px; cursor: pointer;
+  width: 100%; margin-top: 10px; padding: 15px; border: none; border-radius: var(--btn-radius);
+  background: var(--btn-primary-grad); box-shadow: var(--btn-primary-shadow); color: #fff; font-weight: 800; font-size: 17px; cursor: pointer;
 }
-.throw-btn:disabled { opacity: .5; cursor: not-allowed; }
-.throw-btn:not(:disabled):active { transform: scale(.97); }
 .micro-hint { font-size: 12px; color: var(--muted); text-align: center; margin: 8px 0; }
 
 /* ===== Log (มุมซ้ายบน แบบลอย ไม่ต้องเลื่อน) ===== */
@@ -403,7 +412,7 @@ main { flex: 1; padding: 12px; }
 .bulk-bar #bulkCount { font-size: 13px; font-weight: 700; }
 .bulk-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .bulk-actions .mini-btn { font-size: 12px; padding: 6px 10px; }
-.bulk-actions .mini-btn.danger { background: rgba(255,93,108,.25); color: var(--bad); }
+.bulk-actions .mini-btn.danger { background: var(--btn-danger-bg); color: var(--bad); }
 .dex-list { display: flex; flex-direction: column; gap: 6px; }
 .dex-list.hidden, .dex-grid.hidden { display: none; }
 .ind-row.bulk-mode { position: relative; padding-left: 40px; }
@@ -428,9 +437,7 @@ main { flex: 1; padding: 12px; }
 .shop-item .si-body { flex: 1; }
 .shop-item .si-name { font-weight: 700; font-size: 15px; }
 .shop-item .si-desc { font-size: 12px; color: var(--muted); }
-.buy-btn { padding: 10px 14px; border: none; border-radius: 10px; background: var(--accent); color: #3a2c00; font-weight: 800; cursor: pointer; white-space: nowrap; font-family: var(--font-display); }
-.buy-btn:disabled { opacity: .4; cursor: not-allowed; }
-.buy-btn:not(:disabled):active { transform: scale(.95); }
+.buy-btn { padding: 10px 14px; border: none; border-radius: var(--btn-radius-sm); background: var(--accent); color: #3a2c00; font-weight: 800; cursor: pointer; white-space: nowrap; }
 /* สีปุ่มตามสกุลเงิน — ให้แยกออกทันทีว่าไอเทมนี้ซื้อด้วยอะไร */
 .buy-btn.cur-token { background: var(--cur-token); color: #06283f; }
 .buy-btn.cur-checkin { background: var(--cur-checkin); color: #2a0f4a; }
@@ -445,8 +452,7 @@ main { flex: 1; padding: 12px; }
 .quest-bar { height: 8px; background: rgba(255,255,255,.1); border-radius: 999px; margin: 8px 0 6px; overflow: hidden; }
 .quest-fill { height: 100%; background: linear-gradient(90deg,var(--accent2),var(--good)); }
 .quest-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
-.claim-btn { padding: 6px 14px; border: none; border-radius: 8px; font-weight: 800; cursor: pointer; background: var(--good); color: #062611; }
-.claim-btn:disabled { opacity: .4; }
+.claim-btn { padding: 6px 14px; border: none; border-radius: var(--btn-radius-sm); font-weight: 800; cursor: pointer; background: var(--good); color: #062611; }
 .claim-btn.done { background: var(--muted); }
 .egg-item { background: var(--card); border-radius: 14px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; }
 .egg-item .emoji { font-size: 32px; }
@@ -488,10 +494,10 @@ main { flex: 1; padding: 12px; }
 .iv-bar > div { height: 100%; background: linear-gradient(90deg,var(--accent2),var(--good)); }
 .iv-bar-wrap .val { width: 58px; text-align: right; font-weight: 700; }
 .modal-actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
-.modal-actions button { flex: 1; min-width: 100px; padding: 12px; border: none; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 14px; }
-.btn-primary { background: var(--accent2); color: #fff; }
-.btn-ghost { background: rgba(255,255,255,.1); color: var(--text); }
-.btn-danger { background: rgba(255,93,108,.2); color: var(--bad); }
+.modal-actions button { flex: 1; min-width: 100px; padding: 12px; border: none; border-radius: var(--btn-radius-sm); font-weight: 800; cursor: pointer; font-size: 14px; }
+.btn-primary { background: var(--btn-secondary-grad); color: #fff; }
+.btn-ghost { background: var(--btn-ghost-bg); color: var(--text); }
+.btn-danger { background: var(--btn-danger-bg); color: var(--bad); }
 .pill { display:inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,.12); margin: 2px; }
 
 /* ===== Menu: achievements + settings ===== */
@@ -516,8 +522,8 @@ main { flex: 1; padding: 12px; }
 }
 .set-row .sr-label { font-size: 14px; font-weight: 600; }
 .set-row .sr-sub { font-size: 11px; color: var(--muted); }
-.set-btn { padding: 9px 14px; border: none; border-radius: 10px; font-weight: 700; cursor: pointer; background: var(--accent2); color: #fff; font-size: 13px; }
-.set-btn.danger { background: rgba(255,93,108,.25); color: var(--bad); }
+.set-btn { padding: 9px 14px; border: none; border-radius: var(--btn-radius-sm); font-weight: 700; cursor: pointer; background: var(--btn-secondary-grad); color: #fff; font-size: 13px; }
+.set-btn.danger { background: var(--btn-danger-bg); color: var(--bad); }
 .toggle { width: 48px; height: 26px; border-radius: 999px; background: rgba(255,255,255,.15); position: relative; cursor: pointer; flex-shrink: 0; }
 .toggle.on { background: var(--good); }
 .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .2s; }
@@ -573,10 +579,9 @@ main { flex: 1; padding: 12px; }
 @keyframes btDotsPulse { 0%,100% { opacity: .25; } 50% { opacity: .8; } }
 .move-grid-busy { opacity: .45; pointer-events: none; }
 .bt-actions { display: flex; gap: 8px; }
-.bt-actions button { flex: 1; padding: 12px; border: none; border-radius: 10px; font-weight: 800; cursor: pointer; font-size: 14px; }
-.bt-attack { background: linear-gradient(180deg,#ff6b6b,#e23b4e); color: #fff; }
-.bt-flee { background: rgba(255,255,255,.12); color: var(--text); }
-.bt-actions button:disabled { opacity: .5; }
+.bt-actions button { flex: 1; padding: 12px; border: none; border-radius: var(--btn-radius-sm); font-weight: 800; cursor: pointer; font-size: 14px; }
+.bt-attack { background: var(--btn-primary-grad); color: #fff; }
+.bt-flee { background: var(--btn-ghost-bg); color: var(--text); }
 .eff-note { font-size: 11px; font-weight: 700; }
 .eff-super { color: #8ef0a5; }
 .eff-weak { color: #ff8a95; }
@@ -633,10 +638,8 @@ main { flex: 1; padding: 12px; }
 .vs-ab-dash { opacity: .5; }
 .vs-ab-skill { color: #ffd76b; font-weight: 700; }
 .vs-actions { display: flex; flex-direction: column; gap: 8px; }
-.vs-start { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 900; cursor: pointer; color: #fff; background: linear-gradient(180deg,#ff6b6b,#e23b4e); box-shadow: 0 4px 14px rgba(226,59,78,.45); animation: vsPulse 1.4s ease-in-out infinite; }
-.vs-close { width: 100%; padding: 11px; border: none; border-radius: 10px; font-size: 14px; font-weight: 800; cursor: pointer; color: var(--text); background: rgba(255,255,255,.12); }
-.vs-close:active { transform: scale(.98); }
-.vs-start:active { transform: scale(.97); }
+.vs-start { width: 100%; padding: 14px; border: none; border-radius: var(--btn-radius); font-size: 16px; font-weight: 900; cursor: pointer; color: #fff; background: var(--btn-primary-grad); box-shadow: var(--btn-primary-shadow); animation: vsPulse 1.4s ease-in-out infinite; }
+.vs-close { width: 100%; padding: 11px; border: none; border-radius: var(--btn-radius-sm); font-size: 14px; font-weight: 800; cursor: pointer; color: var(--text); background: var(--btn-ghost-bg); }
 @keyframes vsPulse { 0%,100% { box-shadow: 0 4px 14px rgba(226,59,78,.45); } 50% { box-shadow: 0 4px 22px rgba(226,59,78,.85); } }
 .reduce-motion .vs-start { animation: none; }
 /* ===== Weekly event quest ===== */
@@ -685,8 +688,8 @@ main { flex: 1; padding: 12px; }
 .rt-name { font-size: 13px; font-weight: 800; }
 .rt-sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
 .rt-btns { display: flex; gap: 6px; flex-shrink: 0; }
-.rt-fight { padding: 8px 14px; border: none; border-radius: 9px; background: linear-gradient(180deg,#ff6b6b,#e23b4e); color: #fff; font-weight: 800; font-size: 13px; cursor: pointer; }
-.rt-skip { padding: 8px 10px; border: none; border-radius: 9px; background: rgba(255,255,255,.12); color: var(--text); font-weight: 700; font-size: 12px; cursor: pointer; }
+.rt-fight { padding: 8px 14px; border: none; border-radius: var(--btn-radius-sm); background: var(--btn-primary-grad); color: #fff; font-weight: 800; font-size: 13px; cursor: pointer; }
+.rt-skip { padding: 8px 10px; border: none; border-radius: var(--btn-radius-sm); background: var(--btn-ghost-bg); color: var(--text); font-weight: 700; font-size: 12px; cursor: pointer; }
 .reduce-motion .route-ribbon { animation: none; }
 
 /* ===== Leaderboard ===== */
@@ -779,7 +782,7 @@ main { flex: 1; padding: 12px; }
 .tut-step { display: flex; gap: 10px; align-items: flex-start; margin: 10px 0; font-size: 13px; }
 .tut-step .ts-ico { font-size: 22px; flex-shrink: 0; }
 
-.boss-btn { margin-top: 6px; width: 100%; padding: 8px; border: none; border-radius: 8px; background: rgba(255,203,5,.9); color: #3a2c00; font-weight: 800; font-size: 12px; cursor: pointer; }
+.boss-btn { margin-top: 6px; width: 100%; padding: 8px; border: none; border-radius: var(--btn-radius-sm); background: var(--accent); color: #3a2c00; font-weight: 800; font-size: 12px; cursor: pointer; }
 .map-card .mc-badge { position: absolute; top: 6px; right: 6px; z-index: 3; font-size: 18px; }
 
 /* type badge colors */
