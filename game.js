@@ -648,7 +648,7 @@ function bossTrainerFor(regionId) {
 function trainerImg(name, cls) {
   if (!name) return '';
   const url = TRAINER_SP_BASE + name + '.png';
-  return `<img class="trainer-sprite ${cls || ''}" src="${url}" onerror="this.classList.add('ts-hide')" alt="">`;
+  return `<img class="trainer-sprite ${cls || ''}" loading="lazy" src="${url}" onerror="this.classList.add('ts-hide')" alt="">`;
 }
 // หา key เทรนเนอร์ของฝั่งศัตรูจาก battleState (ยิม/คู่แข่ง/บอสเขต)
 function foeTrainerName(b) {
@@ -5055,7 +5055,9 @@ function init() {
   setInterval(updateFarmCd, 1000);
   $('#toMapBtn').addEventListener('click', () => switchView('map'));
   document.querySelectorAll('.nav-btn').forEach(b => b.onclick = () => switchView(b.dataset.view));
-  $('#dexSearch').addEventListener('input', renderDex);
+  // debounce ช่องค้นหา — เดกซ์มีได้ถึง ~1025 การ์ด อย่ารีเรนเดอร์ทุกการกดคีย์ (ลดกระตุกตอนพิมพ์)
+  let _dexSearchTimer = null;
+  $('#dexSearch').addEventListener('input', () => { clearTimeout(_dexSearchTimer); _dexSearchTimer = setTimeout(renderDex, 180); });
   $('#dexFilter').addEventListener('change', renderDex);
   $('#dexSort').addEventListener('change', renderDex);
   $('#bulkModeBtn').addEventListener('click', toggleBulkMode);
