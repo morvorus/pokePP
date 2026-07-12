@@ -1,8 +1,8 @@
 /* PokePP service worker — network-first สำหรับโค้ด (freshness), cache-first สำหรับข้อมูล/ไอคอน */
-const CACHE = 'pokepp-v5';
+const CACHE = 'pokepp-v6';
 const SHELL = [
   './', './index.html', './style.css', './game.js', './cloud.js',
-  './monsters-data.js', './manifest.json', './icon.svg',
+  './logic.js', './monsters-data.js', './manifest.json', './icon.svg',
 ];
 
 self.addEventListener('install', e => {

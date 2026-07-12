@@ -1,0 +1,18 @@
+{
+  "name": "pokepp",
+  "version": "1.0.0",
+  "description": "PokePP — เกมจับมอนสเตอร์สไตล์ PokeMeow (vanilla JS + Supabase)",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint logic.js game.js cloud.js"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "eslint": "^9.13.0",
+    "globals": "^15.11.0",
+    "vitest": "^2.1.4"
+  }
+}

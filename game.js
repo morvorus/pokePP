@@ -3,6 +3,8 @@
    ปาบอล (ไม่พิมพ์ชื่อ) · ระดับความหายาก · โปเกมอนรายตัว (nature/เพศ/IV)
    ================================================================ */
 'use strict';
+import { MONSTERS } from './monsters-data.js';
+import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber } from './logic.js';
 
 // ---------- config ----------
 const SAVE_KEY = 'pokepp_save_v2';
@@ -369,33 +371,7 @@ const EGG_KINDS = {
   gold:    { name: 'ไข่ทอง',   catches: 30, price: 3000, shinyMul: 8, tiers: ['superrare', 'legendary'] },
 };
 
-// ตารางธาตุแพ้ทาง (attacker -> {defender: multiplier}) เฉพาะที่ไม่ใช่ 1x
-const TYPE_CHART = {
-  normal: { rock: .5, ghost: 0, steel: .5 },
-  fire: { fire: .5, water: .5, grass: 2, ice: 2, bug: 2, rock: .5, dragon: .5, steel: 2 },
-  water: { fire: 2, water: .5, grass: .5, ground: 2, rock: 2, dragon: .5 },
-  electric: { water: 2, electric: .5, grass: .5, ground: 0, flying: 2, dragon: .5 },
-  grass: { fire: .5, water: 2, grass: .5, poison: .5, ground: 2, flying: .5, bug: .5, rock: 2, dragon: .5, steel: .5 },
-  ice: { fire: .5, water: .5, grass: 2, ice: .5, ground: 2, flying: 2, dragon: 2, steel: .5 },
-  fighting: { normal: 2, ice: 2, poison: .5, flying: .5, psychic: .5, bug: .5, rock: 2, ghost: 0, dark: 2, steel: 2, fairy: .5 },
-  poison: { grass: 2, poison: .5, ground: .5, rock: .5, ghost: .5, steel: 0, fairy: 2 },
-  ground: { fire: 2, electric: 2, grass: .5, poison: 2, flying: 0, bug: .5, rock: 2, steel: 2 },
-  flying: { electric: .5, grass: 2, fighting: 2, bug: 2, rock: .5, steel: .5 },
-  psychic: { fighting: 2, poison: 2, psychic: .5, dark: 0, steel: .5 },
-  bug: { fire: .5, grass: 2, fighting: .5, poison: .5, flying: .5, psychic: 2, ghost: .5, dark: 2, steel: .5, fairy: .5 },
-  rock: { fire: 2, ice: 2, fighting: .5, ground: .5, flying: 2, bug: 2, steel: .5 },
-  ghost: { normal: 0, psychic: 2, ghost: 2, dark: .5 },
-  dragon: { dragon: 2, steel: .5, fairy: 0 },
-  dark: { fighting: .5, psychic: 2, ghost: 2, dark: .5, fairy: .5 },
-  steel: { fire: .5, water: .5, electric: .5, ice: 2, rock: 2, steel: .5, fairy: 2 },
-  fairy: { fire: .5, fighting: 2, poison: .5, dragon: 2, dark: 2, steel: .5 },
-};
-function typeEffect(atkType, defTypes) {
-  let m = 1;
-  const row = TYPE_CHART[atkType] || {};
-  defTypes.forEach(d => { if (row[d] != null) m *= row[d]; });
-  return m;
-}
+// ตารางธาตุแพ้ทาง (TYPE_CHART) + typeEffect ย้ายไป logic.js แล้ว (import ด้านบน)
 
 // พูลท่าโจมตีต่อธาตุ (หลายท่าต่อธาตุ — สุ่มเลือกแบบ deterministic ต่อสปีชีส์ เพื่อให้แต่ละตัวมีมูฟต่างกัน ไม่ใช่ท่าเดียวซ้ำทั้งธาตุ)
 const TYPE_MOVES = {
@@ -439,8 +415,7 @@ function getMoves(id) {
   const seen = new Set();
   return moves.filter(mv => { if (seen.has(mv.name)) return false; seen.add(mv.name); return true; }).slice(0, 4);
 }
-// PP ต่อท่า — ท่าแรงยิ่งใช้ได้น้อยครั้ง (ต้องวางแผน ไม่สแปมท่าแรงรัวๆ)
-function movePP(pow) { return pow >= 110 ? 5 : pow >= 90 ? 8 : pow >= 70 ? 12 : 20; }
+// movePP ย้ายไป logic.js แล้ว (import ด้านบน)
 const STRUGGLE_MOVE = { type: 'normal', name: 'ดิ้นรน', pow: 50, acc: 100, priority: 0, struggle: true };
 function rollHit(move, atkHeld, defHeld, defAbility) {   // เช็คว่าท่านี้แม่นเป้าไหม (คิดไอเทม Wide Lens/Bright Powder + Sand Veil ด้วยถ้ามี)
   let acc = move.acc == null ? 100 : move.acc;
@@ -611,15 +586,7 @@ MONSTERS.forEach(m => {
   const s = m.stats;
   m._bst = s.hp + s.atk + s.def + s.spatk + s.spdef + s.spd;
 });
-// Ultra Beasts — เป็นระดับ Legendary แบบ PokeMeow แต่ในดาต้าติดแท็ก rare (BST สูงเลยตกไป superrare) จึงบังคับเป็น legendary
-const UB_LEGENDARY_IDS = new Set([793, 794, 795, 796, 797, 798, 799, 803, 804, 805, 806]);
-function tierOf(m) {
-  if (m.rarity === 'legendary' || UB_LEGENDARY_IDS.has(m.id)) return 'legendary';
-  if (m._bst >= 525) return 'superrare';
-  if (m._bst >= 430) return 'rare';
-  if (m._bst >= 320) return 'uncommon';
-  return 'common';
-}
+// tierOf + UB_LEGENDARY_IDS ย้ายไป logic.js แล้ว (import ด้านบน)
 MONSTERS.forEach(m => { m._tier = tierOf(m); });
 const ALL_TYPES = [...new Set(MONSTERS.flatMap(m => m.types))].sort();
 
@@ -639,7 +606,7 @@ REGIONS.forEach(r => {
 const $ = sel => document.querySelector(sel);
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
-const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// clamp ย้ายไป logic.js แล้ว (import ด้านบน)
 const escapeHtml = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const todayStr = () => new Date().toISOString().slice(0, 10);
 let _uidc = 0;
@@ -1142,13 +1109,7 @@ function currentWorldEvent() {
 }
 // ===== อีเวนต์ประจำสัปดาห์ — หมุนอัตโนมัติแบบ deterministic ตามเลขสัปดาห์ ทุกคนเห็นตรงกัน =====
 const WEEKLY_SHINY_MULT = 1, WEEKLY_COIN_MULT = 1.2, WEEKLY_LEG_MULT = 1.4;   // อีเวนต์สัปดาห์ให้โบนัสเหรียญ/เลเจนดารี — ไม่ดันโอกาส Shiny (คง Shiny ให้หายากคุ้มการหา)
-function isoWeekNumber(d) {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const day = date.getUTCDay() || 7;
-  date.setUTCDate(date.getUTCDate() + 4 - day);
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
-}
+// isoWeekNumber ย้ายไป logic.js แล้ว (import ด้านบน)
 function weeklyEventKey() { const n = new Date(); return `${n.getUTCFullYear()}-W${isoWeekNumber(n)}`; }
 function weeklyEvent() {
   const n = new Date();
@@ -5169,4 +5130,6 @@ function init() {
 
   initCloud();   // เชื่อมคลาวด์ (ถ้าตั้งค่าไว้)
 }
-document.addEventListener('DOMContentLoaded', init);
+// โมดูล ES เป็น deferred — ถ้า DOM พร้อมแล้วให้ init ทันที ไม่งั้นรอ event (กันเคสที่ event ยิงไปก่อน)
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();

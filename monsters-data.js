@@ -22053,5 +22053,5 @@ const MONSTERS = [
         "evolveItem":  null
     }
 ];
-if (typeof module !== 'undefined') { module.exports = MONSTERS; }
+export { MONSTERS };
 
