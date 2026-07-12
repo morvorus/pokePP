@@ -9,6 +9,15 @@ const bugRules = {
   'no-dupe-args': 'error',
   'no-func-assign': 'error',
   'no-unreachable': 'error',
+  // กฎจับบั๊กเพิ่มเติม (ความเสี่ยง false-positive ต่ำ แต่จับพลาดจริงได้)
+  'use-isnan': 'error',                    // x === NaN (ผิดเสมอ)
+  'valid-typeof': 'error',                 // typeof x === 'stirng' (พิมพ์ผิด)
+  'no-dupe-else-if': 'error',              // เงื่อนไข else-if ซ้ำ
+  'no-self-compare': 'error',              // x === x
+  'no-unsafe-negation': 'error',           // !a in b
+  'no-compare-neg-zero': 'error',          // x === -0
+  'no-constant-binary-expression': 'error',// เงื่อนไข logic ที่คงที่เสมอ
+  'no-useless-backreference': 'error',     // regex backreference ที่ไม่ทำงาน
   'no-unused-vars': 'off',
 };
 
