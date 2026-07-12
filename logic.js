@@ -93,6 +93,19 @@ export function rarityFromRoll(luck, roll) {
   return 'common';
 }
 
+// รันไมเกรชันเซฟแบบเป็นขั้น: ใช้ migrations[v] ไล่จากเวอร์ชันเซฟปัจจุบันขึ้นไปจนถึง target
+// migrations = { 2: fn(save), 3: fn(save), ... } (fn แก้ save ในตัว) · คืน save ที่อัปเดต _v แล้ว
+export function runMigrations(save, targetVersion, migrations) {
+  let v = save._v || 1;
+  while (v < targetVersion) {
+    v++;
+    const fn = migrations[v];
+    if (typeof fn === 'function') fn(save);
+  }
+  save._v = targetVersion;
+  return save;
+}
+
 // แกนคำนวณดาเมจ (pure) — รับความสุ่ม (rollRand/critRand) + weatherBoost เข้ามา เพื่อให้ deterministic ทดสอบได้
 export function damageCore(atkMon, atkStats, atkLevel, defMon, defStats, move, held, opts, weatherBoost, rollRand, critRand) {
   opts = opts || {};

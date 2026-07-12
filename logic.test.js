@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { clamp, typeEffect, movePP, tierOf, isoWeekNumber, UB_LEGENDARY_IDS,
-  catchChance, statsForBase, rarityFromRoll, damageCore } from './logic.js';
+  catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations } from './logic.js';
 
 describe('clamp', () => {
   it('จำกัดค่าอยู่ในช่วง', () => {
@@ -155,5 +155,34 @@ describe('damageCore (แกนดาเมจ)', () => {
       { type: 'ground', pow: 100 }, null, { defAbility: { immuneType: 'ground' } }, false, 0.5, 0.99);
     expect(r.eff).toBe(0);
     expect(r.dmg).toBe(1);
+  });
+});
+
+describe('runMigrations (ไมเกรชันเซฟ)', () => {
+  it('ไล่รันไมเกรชันตามลำดับจาก _v เดิมถึง target', () => {
+    const order = [];
+    const migrations = { 2: () => order.push(2), 3: () => order.push(3), 4: () => order.push(4) };
+    const save = { _v: 1 };
+    runMigrations(save, 4, migrations);
+    expect(order).toEqual([2, 3, 4]);
+    expect(save._v).toBe(4);
+  });
+  it('เซฟไม่มี _v ถือเป็น v1', () => {
+    const applied = [];
+    runMigrations({}, 3, { 2: (s) => { s.twoRan = true; applied.push(2); }, 3: () => applied.push(3) });
+    expect(applied).toEqual([2, 3]);
+  });
+  it('ข้ามไมเกรชันที่ไม่มีฟังก์ชัน + ไม่รันซ้ำถ้า _v ถึง target แล้ว', () => {
+    let count = 0;
+    const save = { _v: 3 };
+    runMigrations(save, 3, { 3: () => count++ });
+    expect(count).toBe(0);          // _v ถึงแล้ว ไม่รัน
+    expect(save._v).toBe(3);
+  });
+  it('แก้ข้อมูลจริง (migration แก้ save ในตัว)', () => {
+    const save = { _v: 2, coins: 0 };
+    runMigrations(save, 3, { 3: (s) => { s.coins = 100; } });
+    expect(save.coins).toBe(100);
+    expect(save._v).toBe(3);
   });
 });

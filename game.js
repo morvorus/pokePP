@@ -4,13 +4,22 @@
    ================================================================ */
 'use strict';
 import { MONSTERS } from './monsters-data.js';
-import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore } from './logic.js';
+import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations } from './logic.js';
 
 // cloud.js (classic script) รันก่อนโมดูลนี้และตั้ง window.Cloud ไว้ — ผูกเป็น const ให้อ้าง Cloud ในสโคปโมดูลได้
 const Cloud = window.Cloud;
 
 // ---------- config ----------
 const SAVE_KEY = 'pokepp_save_v2';
+// เวอร์ชันสคีมาเซฟ + ไมเกรชันเป็นขั้น (สำหรับการเปลี่ยนโครงสร้างในอนาคต — ฟิลด์ใหม่ deepMergeDefaults จัดการให้อยู่แล้ว)
+const SAVE_VERSION = 3;
+const SAVE_MIGRATIONS = {
+  // v2→v3: ล้างคูลดาวน์ลีคเมก้าที่หมดอายุ กันอ็อบเจกต์บวมขึ้นเรื่อยๆ
+  3: (s) => {
+    const cd = s.megaLeague && s.megaLeague.cooldowns;
+    if (cd) { const now = Date.now(); for (const k of Object.keys(cd)) { if ((cd[k] || 0) <= now) delete cd[k]; } }
+  },
+};
 // ใช้ jsDelivr CDN (เสถียร/เร็วกว่า raw.githubusercontent มาก โดยเฉพาะในไทย)
 const SP_BASE = 'https://cdn.jsdelivr.net/gh/PokeAPI/sprites@master/sprites/pokemon';
 const SP = {
@@ -747,9 +756,9 @@ function mergeSave(obj) {
 function load() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
-    if (raw) { state = mergeSave(JSON.parse(raw)); migrateSave(); return; }
+    if (raw) { state = mergeSave(JSON.parse(raw)); runMigrations(state, SAVE_VERSION, SAVE_MIGRATIONS); migrateSave(); return; }
   } catch (e) { console.warn('load failed', e); }
-  state = newSave();
+  state = newSave(); state._v = SAVE_VERSION;
 }
 function migrateSave() {
   if (!Array.isArray(state.party)) state.party = [];
