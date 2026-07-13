@@ -694,6 +694,7 @@ function trainerImg(name, cls) {
 // หา key เทรนเนอร์ของฝั่งศัตรูจาก battleState (ยิม/คู่แข่ง/บอสเขต)
 function foeTrainerName(b) {
   if (!b) return null;
+  if (b.isRaid) return null;   // Raid บอสเป็นสัตว์ป่าเทพ ไม่ใช่เทรนเนอร์ — ไม่ต้องมีสไปรต์คน
   if (b.isRival) return TRAINER_SPRITES.rival;
   if (b.gym && b.gym.sprite) return b.gym.sprite;   // เทรนเนอร์เส้นทางมีสไปรต์เฉพาะตัว
   if (b.mode === 'trainer' && b.gym) return TRAINER_SPRITES[b.gym.id] || 'blackbelt';
@@ -767,7 +768,8 @@ function newSave() {
     quests: [], questDate: '',
     achievements: {},    // {achId:true} รับรางวัลแล้ว
     settings: { sound: true, music: false, spawnSpeed: 'normal',
-      rareAlerts: true, eventAlerts: true, mascotDeco: true, reduceMotion: false, confirmRelease: true, fastBattle: false },
+      rareAlerts: true, eventAlerts: true, mascotDeco: true, reduceMotion: false, confirmRelease: true, fastBattle: false, hardcoreMode: false },
+    hardcoreDeaths: 0,   // จำนวนตัวที่ถูกปล่อยถาวรจากโหมด Hardcore (สถิติ ไม่รีเซ็ตแม้ปิดโหมด)
     trainerXp: 0,
     streak: 0, lastLogin: '',
     lastSeen: Date.now(), playSec: 0,
@@ -2750,6 +2752,7 @@ function renderMenu() {
   renderRival();
   renderCloudUI();
   renderLeaderboard();
+  renderRaid();
   renderGhostArena();
   renderTrade();
   renderIdle();
@@ -2815,6 +2818,10 @@ function renderMenu() {
       <div class="toggle${st.fastBattle ? ' on' : ''}" id="tFastBattle"></div>
     </div>
     <div class="set-row">
+      <div class="sr-label">💀 โหมด Hardcore<div class="sr-sub">${st.hardcoreMode ? `เปิดอยู่ — มอนที่หมดแรงในสู้จะถูกปล่อยถาวร (ปล่อยไปแล้ว ${state.hardcoreDeaths || 0} ตัว)` : 'มอนที่ HP หมดระหว่างต่อสู้ = ปล่อยถาวร ห้ามใช้ซ้ำ (ท้าทายขึ้น มีกระดานอันดับแยก)'}</div></div>
+      <div class="toggle${st.hardcoreMode ? ' on' : ''}" id="tHardcore"></div>
+    </div>
+    <div class="set-row">
       <div class="sr-label">⏱️ ความเร็วการปรากฏ<div class="sr-sub">ปรับเวลารอโปเกมอนใหม่</div></div>
       <select class="set-select" id="selSpeed">
         <option value="fast"${st.spawnSpeed === 'fast' ? ' selected' : ''}>เร็ว</option>
@@ -2853,6 +2860,11 @@ function renderMenu() {
   $('#tReduceMotion').onclick = () => { st.reduceMotion = !st.reduceMotion; save(); applyReduceMotion(); renderMenu(); };
   $('#tConfirmRelease').onclick = () => { st.confirmRelease = !st.confirmRelease; save(); renderMenu(); };
   $('#tFastBattle').onclick = () => { st.fastBattle = !st.fastBattle; save(); renderMenu(); };
+  $('#tHardcore').onclick = () => {
+    if (!st.hardcoreMode && !confirm('เปิดโหมด Hardcore? มอนที่ HP หมดระหว่างต่อสู้จะถูกปล่อยออกจากคลังถาวร ไม่สามารถเรียกคืนได้')) return;
+    st.hardcoreMode = !st.hardcoreMode; save(); renderMenu();
+    toast(st.hardcoreMode ? '💀 เปิดโหมด Hardcore แล้ว — ระวังให้ดี!' : 'ปิดโหมด Hardcore แล้ว', st.hardcoreMode ? 'bad' : '');
+  };
   $('#selSpeed').onchange = e => { st.spawnSpeed = e.target.value; save(); toast('⏱️ ปรับความเร็วแล้ว', 'good'); };
   $('#btnExport').onclick = () => { $('#saveIO').value = exportSave(); toast('📤 สร้างโค้ดเซฟแล้ว — คัดลอกเก็บไว้', 'good'); };
   $('#btnCopy').onclick = () => {
@@ -4004,6 +4016,18 @@ function foeTurn(b) {
 }
 function faintActive(b, aMon) {
   b.msg += ` · 😵 ${aMon.name} หมดแรง!`;
+  if (state.settings && state.settings.hardcoreMode) {
+    const t = b.team[b.activeIdx];
+    if (t && t.ind && !t.hcDead) {
+      t.hcDead = true;   // กันปล่อยซ้ำถ้าถูกเรียกซ้ำในเทิร์นเดียว
+      state.caught = state.caught.filter(c => c.uid !== t.ind.uid);
+      state.party = (state.party || []).filter(u => u !== t.ind.uid);
+      state.buddyUid = state.party[0] || null;
+      state.hardcoreDeaths = (state.hardcoreDeaths || 0) + 1;
+      b.msg += ` · 💀 Hardcore: ${aMon.name} ถูกปล่อยถาวร!`;
+      save();
+    }
+  }
   const next = b.team.findIndex(t => t.hp > 0);
   if (next < 0) {
     b.over = true; b.lost = true;
@@ -4018,6 +4042,11 @@ function faintActive(b, aMon) {
       b.msg += ' · แพ้! ลองใหม่';
       if (b.isRival) { state.rival = state.rival || { readyAt: 0, wins: 0, losses: 0 }; state.rival.losses = (state.rival.losses || 0) + 1; save(); }
       if (b.isLeague && b.league) { state.megaLeague = state.megaLeague || {}; state.megaLeague.cooldowns = state.megaLeague.cooldowns || {}; state.megaLeague.cooldowns[b.league.id] = Date.now() + MEGA_LEAGUE_CD; b.msg += ` · 💎 แพ้บอสลีค! คูลดาวน์ 2 ชม.`; save(); }
+      if (b.isRaid) {   // ทีมล้มไม่ทันฆ่า Raid บอส — ความเสียหายที่ทำได้ยังสมทบเข้ากองกลาง
+        const dmgDealt = Math.max(0, b.foeMaxHp - b.foeHp);
+        b.msg += ` · 👹 ทีมหมดแรง! ส่งความเสียหาย ${dmgDealt.toLocaleString()} เข้ากองกลาง Raid`;
+        raidSubmitDamage(dmgDealt);
+      }
     }
   } else { b.activeIdx = next; b.msg += ` ส่ง ${MON_BY_ID[b.team[next].ind.id].name} ลงสนาม!${applyIntimidate('player', b)}`; }
 }
@@ -4310,6 +4339,18 @@ function onFoeDown() {
       playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
       return;
     }
+    if (b.isRaid) {   // ฆ่า Raid บอสได้เอง (หายากมาก HP สูงมาก แต่เป็นไปได้ถ้าทีมแข็งจริง) — เครดิตความเสียหายเต็ม maxHp
+      const dmgDealt = b.foeMaxHp;
+      const bonusCoins = 2000;
+      state.coins += bonusCoins;
+      gainTrainerXp(150);
+      b.victory = { trainerKey: null, emoji: '👹', title: `Raid ${b.foeMon.name}`, coins: bonusCoins, bp: 0, xp: 150, items: '', bonus: `🔥 ฆ่า Raid บอสได้เอง! ส่งความเสียหาย ${dmgDealt.toLocaleString()} เข้ากองกลาง` };
+      b.msg = `👹 พิชิต Raid บอส ${b.foeMon.name} ได้เอง! ส่งความเสียหาย ${dmgDealt.toLocaleString()} เข้ากองกลาง +${bonusCoins}🪙`;
+      logMsg(`👹 ฆ่า Raid บอส <b>${b.foeMon.name}</b> ได้เองทั้งตัว!`, 'big');
+      raidSubmitDamage(dmgDealt);
+      playSfx('rare'); checkAchievements(); save(); renderTopbar();
+      return;
+    }
     if (b.isGhost) {   // ชนะทีมผู้เล่นออนไลน์ (Ghost)
       const g = b.gym;
       const bp = 6 + Math.floor(trainerLevel() / 2);
@@ -4402,6 +4443,10 @@ function endBattle() {
   if (battleState && wasMode === 'tower' && !battleState.over) {
     state.tower.floor = 1; state.towerReadyAt = Date.now() + TOWER_CD; save();
     toast('🗼 หนีหอคอย — คูลดาวน์ 12 ชม. + รีเซ็ตกลับชั้น 1', 'bad');
+  }
+  // หนี Raid กลางคัน — ความเสียหายที่ทำไปแล้วยังนับเข้ากองกลาง (ไม่เสียเปล่า)
+  if (battleState && battleState.isRaid && !battleState.over) {
+    raidSubmitDamage(Math.max(0, battleState.foeMaxHp - battleState.foeHp));
   }
   battleState = null;
   $('#battleModal').classList.add('hidden');
@@ -4852,6 +4897,7 @@ const LB_TABS = [
   { key: 'tower', label: '🗼 หอคอย', fmt: v => `ชั้น ${v}` },
   { key: 'caught', label: '🎯 จับรวม', fmt: v => `${v}` },
   { key: 'playtime', label: '⏱️ เวลาเล่น', fmt: v => `${Math.floor(v / 60)}ชม ${v % 60}น` },
+  { key: 'hardcore', label: '💀 Hardcore', fmt: v => v > 0 ? `${v}/${MONSTERS.length}` : '—' },
 ];
 function myLbScore() {
   // จำกัดค่าให้อยู่ในกรอบที่เป็นไปได้จริง กันการแก้เซฟส่งค่าเว่อร์ (กันโกงเบื้องต้นฝั่ง client)
@@ -4861,6 +4907,8 @@ function myLbScore() {
     tower: clamp((state.tower && state.tower.bestFloor) || 0, 0, 999),
     caught: clamp(state.totalCaught || 0, 0, 9999999),
     playtime: clamp(Math.floor((state.playSec || 0) / 60), 0, 5259600),
+    // เดกซ์ที่ทำได้ ถ้าเปิดโหมด Hardcore อยู่ตอนนี้ (0 = ไม่ได้เปิด/ไม่ขึ้นกระดานนี้)
+    hardcore: state.settings && state.settings.hardcoreMode ? clamp(speciesOwnedCount(), 0, MONSTERS.length) : 0,
     team: myTeamSnapshot(),
   };
 }
@@ -4885,7 +4933,7 @@ function renderLeaderboard() {
       <input class="save-io lb-name" id="lbName" maxlength="24" placeholder="ชื่อที่แสดงบนกระดาน" value="${(state.playerName || '').replace(/"/g, '&quot;')}" style="min-height:auto;padding:9px;font-family:inherit;font-size:13px;flex:1">
       <button class="set-btn" id="lbSubmit" style="flex:0 0 auto;background:var(--good);color:#062611">📤 ส่งสถิติ</button>
     </div>
-    <div class="sr-sub" style="margin:4px 0 8px">สถิติของคุณ: 📖 ${me.dex}/${MONSTERS.length} · 🗼 ชั้น ${me.tower} · 🎯 ${me.caught} · ⏱️ ${Math.floor(me.playtime / 60)}ชม
+    <div class="sr-sub" style="margin:4px 0 8px">สถิติของคุณ: 📖 ${me.dex}/${MONSTERS.length} · 🗼 ชั้น ${me.tower} · 🎯 ${me.caught} · ⏱️ ${Math.floor(me.playtime / 60)}ชม${me.hardcore ? ' · 💀 Hardcore' : ''}
       <a href="#" id="lbDelete" style="color:#ff8a95;margin-left:6px">ลบสถิติของฉัน</a></div>
     <div class="lb-tabs">${tabs}</div>
     <div id="lbList" class="lb-list"><div class="sr-sub">⏳ กำลังโหลด...</div></div>`;
@@ -4928,6 +4976,101 @@ async function lbSubmit() {
   if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
   toast('✅ ส่งสถิติ + ทีมขึ้นกระดานแล้ว!', 'good');
   renderLeaderboard();
+}
+// ================================================================
+//  RAID บอสรายสัปดาห์ — ทุกคนช่วยกันตี บอสตัวเดียวกันทั้งเซิร์ฟเวอร์ สะสมความเสียหายผ่านคลาวด์
+//  (HP บอสสูงมาก แทบไม่มีใครเก็บคนเดียวจบได้ — ต้องรวมพลังหลายคนตลอดสัปดาห์)
+// ================================================================
+const RAID_CD = 24 * 3600000;      // ตีได้วันละ 1 ครั้ง/คน กันคนเดียวปั๊มจบในวันเดียว ต้องช่วยกันข้ามวัน
+const RAID_HP_MULT = 35;
+const RAID_TARGET = 80000;         // เป้าหมายความเสียหายรวมของเซิร์ฟเวอร์ต่อสัปดาห์ (~7 เท่าของ HP บอส ให้กลุ่มเล็กๆ ก็ไปถึงได้จริงถ้าช่วยกันหลายวัน)
+function raidBossForWeek() {   // deterministic ตามเลขสัปดาห์ — ทุกคนเจอบอสตัวเดียวกัน
+  const n = new Date();
+  const idx = (isoWeekNumber(n) + n.getUTCFullYear() * 7) % ALL_LEGENDARY.length;
+  return ALL_LEGENDARY[idx];
+}
+function raidReadyLeft() { return Math.max(0, (state.raidReadyAt || 0) - Date.now()); }
+function makeRaidFoeDef(mon) {
+  const base = statsForBase(mon.stats, 100, 31);
+  const stats = { atk: Math.floor(base.atk * 1.3), def: Math.floor(base.def * 1.3), spatk: Math.floor(base.spatk * 1.3), spdef: Math.floor(base.spdef * 1.3), spd: Math.floor(base.spd * 1.1) };
+  return { mon, level: 100, stats, maxHp: Math.floor(base.hp * RAID_HP_MULT), held: null };
+}
+let _raidCache = null;   // แคชล่าสุด { total, top, mine, contributors } จากคลาวด์
+function renderRaid() {
+  const box = $('#raidBox'); if (!box) return;
+  if (!(window.Cloud && Cloud.enabled)) { box.innerHTML = `<div class="sr-sub">ต้องตั้งค่าคลาวด์ก่อนถึงจะร่วม Raid ได้ (เล่นร่วมมือกับผู้เล่นคนอื่น)</div>`; return; }
+  if (!Cloud.loggedIn()) { box.innerHTML = `<div class="sr-sub">เข้าสู่ระบบก่อน (ส่วน "☁️ บัญชี / เซฟคลาวด์") เพื่อร่วม Raid กับผู้เล่นคนอื่น</div>`; return; }
+  const boss = raidBossForWeek();
+  const left = raidReadyLeft();
+  const daysLeft = weeklyEventDaysLeft();
+  box.innerHTML = `
+    <div class="rival-card" style="margin-bottom:8px">
+      <div class="rival-portrait">${spriteImg(boss.id, false, 'rival-tr')}</div>
+      <div class="rival-info">
+        <div class="rival-name">👹 ${boss.name} (Raid ประจำสัปดาห์)</div>
+        <div class="rival-stat">เหลืออีก ${daysLeft} วัน · ตีได้วันละ 1 ครั้ง · ความเสียหายที่ทำได้จะสะสมเข้ากองกลาง</div>
+      </div>
+    </div>
+    <div id="raidProgress" class="sr-sub" style="margin-bottom:8px">⏳ กำลังโหลดความคืบหน้า...</div>
+    <button class="rt-fight" id="raidFightBtn" style="width:100%" ${left > 0 ? 'disabled' : ''}>${left > 0 ? `รออีก ${Math.floor(left / 3600000)}ชม ${Math.floor((left % 3600000) / 60000)}น` : '⚔️ โจมตี Raid บอส!'}</button>`;
+  const btn = $('#raidFightBtn'); if (btn) btn.onclick = startRaidBattle;
+  raidLoadProgress();
+}
+async function raidLoadProgress() {
+  const el = $('#raidProgress'); if (!el) return;
+  const res = await Cloud.raidTotal(weeklyEventKey());
+  if (!$('#raidProgress')) return;   // เปลี่ยนหน้าไปแล้ว
+  if (res.error) { el.innerHTML = `⚠️ ยังใช้ไม่ได้ — เจ้าของเกมต้องสร้างตาราง raid_contrib ใน Supabase ก่อน (ดู CLOUD_SETUP.md)<br><span style="opacity:.6">${escapeHtml(res.error)}</span>`; return; }
+  _raidCache = res;
+  const pct = clamp(Math.round(res.total / RAID_TARGET * 100), 0, 100);
+  const done = res.total >= RAID_TARGET;
+  el.innerHTML = `รวมทั้งเซิร์ฟเวอร์: <b>${res.total.toLocaleString()}</b> / ${RAID_TARGET.toLocaleString()} (${pct}%) · ผู้ร่วม ${res.contributors} คน${res.mine ? ` · คุณทำไปแล้ว ${res.mine.toLocaleString()}` : ''}
+    <div class="quest-bar" style="margin-top:6px"><div class="quest-fill" style="width:${pct}%"></div></div>
+    ${done ? renderRaidClaim() : ''}`;
+  const claimBtn = $('#raidClaimBtn'); if (claimBtn) claimBtn.onclick = raidClaimReward;
+}
+function renderRaidClaim() {
+  const claimed = state.raidClaimedWeek === weeklyEventKey();
+  return `<div style="margin-top:8px"><button class="claim-btn${claimed ? ' done' : ''}" id="raidClaimBtn" ${claimed ? 'disabled' : ''}>${claimed ? '✅ รับรางวัลแล้ว' : '🎁 รับรางวัลร่วมมือ!'}</button></div>`;
+}
+function raidClaimReward() {
+  const key = weeklyEventKey();
+  if (state.raidClaimedWeek === key) return;
+  if (!_raidCache || _raidCache.total < RAID_TARGET) return;
+  state.raidClaimedWeek = key;
+  state.lockboxes = (state.lockboxes || 0) + 2;
+  state.coins += 5000;
+  state.checkinCoins = (state.checkinCoins || 0) + 20;
+  save(); renderTopbar(); renderMenu();
+  toast('🎉 ชุมชนพิชิต Raid! ได้ 🎁×2 + 5000🪙 + 20🗓️เช็คอิน', 'good');
+  logMsg('👹 ชุมชนร่วมมือกันพิชิต Raid บอสประจำสัปดาห์สำเร็จ!', 'big');
+}
+function startRaidBattle() {
+  const left = raidReadyLeft();
+  if (left > 0) { toast(`⏳ รอโจมตี Raid อีก ${Math.ceil(left / 60000)} นาที`, 'bad'); return; }
+  const members = partyMembers();
+  if (!members.length) { toast('❌ ต้องมีโปเกมอนในทีมก่อน', 'bad'); return; }
+  const boss = raidBossForWeek();
+  const def = makeRaidFoeDef(boss);
+  const team = buildBattleTeam(members);
+  const raidGym = { id: 'raid', name: `${boss.name} (Raid)`, emoji: '👹' };
+  battleState = {
+    mode: 'trainer', isBoss: false, isRaid: true, gym: raidGym, foeQueue: [def], foeIdx: 0,
+    foeMon: def.mon, foeLevel: def.level, foeStats: def.stats, foeMaxHp: def.maxHp, foeHp: def.maxHp, foeHeld: def.held || null,
+    team, activeIdx: 0, over: false, lost: false, foe: { status: null, sleepT: 0, stages: freshStages() },
+    usedMega: false, usedDynamax: false,
+    showIntro: !(state.settings && state.settings.fastBattle),
+    msg: `👹 Raid บอส ${boss.name}! HP มหาศาล — สู้จนสุดกำลัง ความเสียหายที่ทำได้จะสะสมเข้ากองกลาง`,
+  };
+  battleState.msg += applyIntimidate('player', battleState) + applyIntimidate('foe', battleState);
+  renderBattle();
+  $('#battleModal').classList.remove('hidden');
+}
+async function raidSubmitDamage(dmgDealt) {
+  state.raidReadyAt = Date.now() + RAID_CD; save();   // คูลดาวน์นับตอนจบการโจมตี (ไม่ว่าผลจะเป็นยังไง)
+  if (!(dmgDealt > 0) || !(window.Cloud && Cloud.enabled) || !Cloud.loggedIn()) return;
+  const res = await Cloud.raidAddDamage(weeklyEventKey(), state.playerName || 'เทรนเนอร์', dmgDealt);
+  if (res && res.ok) { toast(`👹 ส่งความเสียหายเข้ากองกลาง Raid: +${dmgDealt.toLocaleString()}`, 'good'); if (currentView === 'menu') renderRaid(); }
 }
 // ================================================================
 //  GHOST BATTLE — สู้กับทีมของผู้เล่นคนอื่นแบบ AI (async PvP)
@@ -5267,5 +5410,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     MON_BY_ID, makeIndividual, startBattle, beginSpawn, startTrainerBattle, startBossBattle,
     startMegaLeagueBattle, startGhostBattle, startTowerBattle, startRivalBattle, towerFoeDef,
     pickLegendaryGenWeighted, genOf, onFoeDown, endBattle, throwBall, save, switchView,
+    renderMenu, startRaidBattle, raidBossForWeek, faintActive,
   };
 }

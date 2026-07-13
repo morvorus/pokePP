@@ -111,6 +111,7 @@ const Cloud = {
         name: (score.name || 'เทรนเนอร์').slice(0, 24),
         dex: cap(score.dex, 2000), playtime: cap(score.playtime, 5259600),
         tower: cap(score.tower, 999), caught: cap(score.caught, 9999999),
+        hardcore: cap(score.hardcore, 2000),   // เดกซ์ที่ทำได้ระหว่างเปิดโหมด Hardcore (0 ถ้าไม่เคยเปิด)
         updated_at: new Date().toISOString(),
       };
       if (score.team) row.team = score.team;   // สแนปช็อตทีมสำหรับ Ghost Battle (ถ้ามีคอลัมน์ team)
@@ -160,10 +161,10 @@ const Cloud = {
   // ดึงอันดับสูงสุดตามคอลัมน์ (dex/playtime/tower/caught)
   async topScores(column, limit) {
     if (!this.enabled) return { error: 'cloud ปิดอยู่' };
-    const col = ['dex', 'playtime', 'tower', 'caught'].includes(column) ? column : 'dex';
+    const col = ['dex', 'playtime', 'tower', 'caught', 'hardcore'].includes(column) ? column : 'dex';
     try {
       const { data, error } = await this.client
-        .from('leaderboard').select('name, dex, playtime, tower, caught')
+        .from('leaderboard').select('name, dex, playtime, tower, caught, hardcore')
         .order(col, { ascending: false }).limit(limit || 20);
       if (error) return { error: error.message };
       return { ok: true, rows: data || [], me: this.user ? this.user.id : null };
@@ -237,6 +238,41 @@ const Cloud = {
       if (error) return { error: error.message };
       if (!data) return { error: 'ยกเลิกไม่ได้ (อาจถูกรับไปแล้ว)' };
       return { ok: true, trade: data };
+    } catch (e) { return { error: String(e) }; }
+  },
+
+  // ===== Raid บอสรายสัปดาห์ (ร่วมมือ) — ต้องสร้างตาราง public.raid_contrib ก่อน — ดู CLOUD_SETUP.md =====
+  // ส่งความเสียหายที่ทำได้ในรอบนี้ไปสมทบยอดรวมของสัปดาห์ (บวกเข้ากับที่มีอยู่ ไม่ทับ)
+  async raidAddDamage(weekKey, name, dmg) {
+    if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };
+    if (!(dmg > 0)) return { ok: true, total: 0 };
+    try {
+      const { data: existing, error: selErr } = await this.client
+        .from('raid_contrib').select('damage')
+        .eq('user_id', this.user.id).eq('week_key', weekKey).maybeSingle();
+      if (selErr) return { error: selErr.message };
+      const total = Math.max(0, (existing ? existing.damage : 0) + Math.floor(dmg));
+      const { error } = await this.client.from('raid_contrib').upsert({
+        user_id: this.user.id, week_key: weekKey,
+        name: (name || 'เทรนเนอร์').slice(0, 24), damage: total,
+        updated_at: new Date().toISOString(),
+      });
+      if (error) return { error: error.message };
+      return { ok: true, total };
+    } catch (e) { return { error: String(e) }; }
+  },
+  // ยอดรวมความเสียหายทั้งเซิร์ฟเวอร์ของสัปดาห์นี้ + อันดับผู้ร่วมสมทบสูงสุด
+  async raidTotal(weekKey) {
+    if (!this.enabled) return { error: 'cloud ปิดอยู่' };
+    try {
+      const { data, error } = await this.client
+        .from('raid_contrib').select('name, damage, user_id').eq('week_key', weekKey);
+      if (error) return { error: error.message };
+      const rows = data || [];
+      const total = rows.reduce((s, r) => s + (r.damage || 0), 0);
+      const top = [...rows].sort((a, b) => (b.damage || 0) - (a.damage || 0)).slice(0, 10);
+      const mine = this.user ? rows.find(r => r.user_id === this.user.id) : null;
+      return { ok: true, total, top, mine: mine ? mine.damage : 0, contributors: rows.length };
     } catch (e) { return { error: String(e) }; }
   },
 

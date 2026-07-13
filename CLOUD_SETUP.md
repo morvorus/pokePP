@@ -65,6 +65,24 @@ create policy "trade insert" on public.trades for insert with check (auth.uid() 
 create policy "trade update" on public.trades for update using (status = 'open' or auth.uid() = from_user or auth.uid() = to_user) with check (true);
 -- ลบ: เจ้าของยกเลิกข้อเสนอ open ของตัวเอง
 create policy "trade delete" on public.trades for delete using (auth.uid() = from_user);
+
+-- ===== (ตัวเลือก) เพิ่มคอลัมน์ Hardcore เข้ากระดานจัดอันดับเดิม =====
+-- ⚠️ ต้องรันก่อนใช้งาน ไม่งั้นการส่งสถิติ/โหลดกระดานจัดอันดับ (ทุกแท็บ) จะ error ทันที เพราะโค้ดฝั่งเกมส่งคอลัมน์นี้ไปด้วยเสมอ
+alter table public.leaderboard add column if not exists hardcore int default 0;
+
+-- ===== (ตัวเลือก) ตาราง Raid บอสรายสัปดาห์ (ร่วมมือหลายคน) =====
+create table public.raid_contrib (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  week_key text not null,
+  name text,
+  damage bigint default 0,
+  updated_at timestamptz default now(),
+  primary key (user_id, week_key)
+);
+alter table public.raid_contrib enable row level security;
+create policy "raid public read"  on public.raid_contrib for select using (true);
+create policy "raid own insert" on public.raid_contrib for insert with check (auth.uid() = user_id);
+create policy "raid own update" on public.raid_contrib for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 ```
 
 ## 3. (แนะนำ) ปิดยืนยันอีเมล เพื่อล็อกอินง่ายขึ้น
