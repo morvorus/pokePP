@@ -2536,7 +2536,7 @@ function grantRandomHeld() {
 }
 const HELD_DROP_CHANCE = 0.05;   // 5% ดรอปอุปกรณ์สวมใส่
 // Amulet Coin ดรอปหายากจากบอสหอคอย/บอสประจำเขตเท่านั้น (นอกจากซื้อด้วยเงิน 150000 ที่ร้าน) — คืนข้อความถ้าได้ ไม่งั้นคืนค่าว่าง
-const AMULET_DROP_CHANCE = 0.04;   // 4% ต่อการชนะบอสหอคอย/บอสประจำเขต
+const AMULET_DROP_CHANCE = 0.01;   // 1% ต่อการชนะบอสหอคอย/บอสประจำเขต
 function grantAmuletDrop() {
   if ((state.amulets || 0) >= AMULET_MAX) return '';
   if (Math.random() >= AMULET_DROP_CHANCE) return '';
