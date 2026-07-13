@@ -358,7 +358,6 @@ const BP_SHOP = [
   { id: 'bp_goldegg', name: 'ไข่ทอง', emoji: '🥚', cost: 150, act: () => { state.eggs.push({ kind: 'gold', progressStart: state.totalCaught }); return '🥚 +1 ไข่ทอง'; } },
   { id: 'bp_candy5', name: 'Rare Candy ×5', emoji: '🍬', img: 'rare-candy', cost: 60, act: () => { state.candies = (state.candies || 0) + 5; return '🍬 +5 Rare Candy'; } },
   { id: 'bp_lifeorb', name: 'Life Orb', emoji: '🔮', img: 'life-orb', cost: 100, limit: 2, act: () => { state.heldInv['life-orb'] = (state.heldInv['life-orb'] || 0) + 1; return '🔮 +1 Life Orb'; } },
-  { id: 'bp_amulet', name: 'Amulet Coin', emoji: '🪙', img: 'amulet-coin', cost: 80, act: () => { if ((state.amulets || 0) >= AMULET_MAX) return null; state.amulets = (state.amulets || 0) + 1; return '🪙 +1 Amulet Coin'; } },
 ];
 
 // ค่าคงที่กลไกเสริม
@@ -490,6 +489,16 @@ const ACHIEVEMENTS = [
   { id: 'combo10', ico: '🔥', name: 'ล่าต่อเนื่อง', desc: 'ทำคอมโบจับตัวเดิมถึง ×10', reward: 300, goal: s => (s.bestCombo || 0) >= 10, prog: s => [s.bestCombo || 0, 10] },
   { id: 'combo30', ico: '💥', name: 'เจ้าแห่งคอมโบ', desc: 'ทำคอมโบจับตัวเดิมถึง ×30', reward: 1200, goal: s => (s.bestCombo || 0) >= 30, prog: s => [s.bestCombo || 0, 30] },
   { id: 'firsttrade', ico: '🔄', name: 'มิตรภาพแลกเปลี่ยน', desc: 'เทรดโปเกมอนกับผู้เล่นอื่นสำเร็จครั้งแรก', reward: 300, goal: s => !!s._traded, prog: s => [s._traded ? 1 : 0, 1] },
+  { id: 'hardcorestart', ico: '💀', name: 'ก้าวสู่ Hardcore', desc: 'เปิดโหมด Hardcore ครั้งแรก', reward: 200, goal: s => !!s._hardcoreEverOn, prog: s => [s._hardcoreEverOn ? 1 : 0, 1] },
+  { id: 'hardcoredex20', ico: '💀', name: 'นักผจญภัยสายฮาร์ดคอร์', desc: 'จับครบ 20 ชนิดระหว่างเปิดโหมด Hardcore', reward: 500,
+    goal: s => !!(s.settings && s.settings.hardcoreMode) && speciesOwnedCount() >= 20,
+    prog: s => [(s.settings && s.settings.hardcoreMode) ? speciesOwnedCount() : 0, 20] },
+  { id: 'hardcoredex50', ico: '☠️', name: 'ผู้รอดชีวิต', desc: 'จับครบ 50 ชนิดระหว่างเปิดโหมด Hardcore', reward: 1500,
+    goal: s => !!(s.settings && s.settings.hardcoreMode) && speciesOwnedCount() >= 50,
+    prog: s => [(s.settings && s.settings.hardcoreMode) ? speciesOwnedCount() : 0, 50] },
+  { id: 'raidfirst', ico: '👹', name: 'นักล่า Raid มือใหม่', desc: 'ร่วมโจมตี Raid บอสรายสัปดาห์ครั้งแรก', reward: 200, goal: s => (s.raidTotalDamage || 0) >= 1, prog: s => [Math.min(s.raidTotalDamage || 0, 1), 1] },
+  { id: 'raiddmg20k', ico: '👹', name: 'นักล่า Raid', desc: 'ทำความเสียหายสะสมให้ Raid บอสรวม 20,000', reward: 800, goal: s => (s.raidTotalDamage || 0) >= 20000, prog: s => [s.raidTotalDamage || 0, 20000] },
+  { id: 'raidkill', ico: '🔥', name: 'มือฆ่า Raid บอส', desc: 'ฆ่า Raid บอสได้เองในการโจมตีครั้งเดียว (หายากมาก)', reward: 2000, goal: s => !!s._raidBossKilled, prog: s => [s._raidBossKilled ? 1 : 0, 1] },
 ];
 
 // รางวัลจบเดกซ์ (กดรับเองเมื่อถึงเกณฑ์)
@@ -2862,7 +2871,9 @@ function renderMenu() {
   $('#tFastBattle').onclick = () => { st.fastBattle = !st.fastBattle; save(); renderMenu(); };
   $('#tHardcore').onclick = () => {
     if (!st.hardcoreMode && !confirm('เปิดโหมด Hardcore? มอนที่ HP หมดระหว่างต่อสู้จะถูกปล่อยออกจากคลังถาวร ไม่สามารถเรียกคืนได้')) return;
-    st.hardcoreMode = !st.hardcoreMode; save(); renderMenu();
+    st.hardcoreMode = !st.hardcoreMode;
+    if (st.hardcoreMode) state._hardcoreEverOn = true;
+    save(); renderMenu(); checkAchievements();
     toast(st.hardcoreMode ? '💀 เปิดโหมด Hardcore แล้ว — ระวังให้ดี!' : 'ปิดโหมด Hardcore แล้ว', st.hardcoreMode ? 'bad' : '');
   };
   $('#selSpeed').onchange = e => { st.spawnSpeed = e.target.value; save(); toast('⏱️ ปรับความเร็วแล้ว', 'good'); };
@@ -4343,6 +4354,7 @@ function onFoeDown() {
       const dmgDealt = b.foeMaxHp;
       const bonusCoins = 2000;
       state.coins += bonusCoins;
+      state._raidBossKilled = true;
       gainTrainerXp(150);
       b.victory = { trainerKey: null, emoji: '👹', title: `Raid ${b.foeMon.name}`, coins: bonusCoins, bp: 0, xp: 150, items: '', bonus: `🔥 ฆ่า Raid บอสได้เอง! ส่งความเสียหาย ${dmgDealt.toLocaleString()} เข้ากองกลาง` };
       b.msg = `👹 พิชิต Raid บอส ${b.foeMon.name} ได้เอง! ส่งความเสียหาย ${dmgDealt.toLocaleString()} เข้ากองกลาง +${bonusCoins}🪙`;
@@ -5067,7 +5079,9 @@ function startRaidBattle() {
   $('#battleModal').classList.remove('hidden');
 }
 async function raidSubmitDamage(dmgDealt) {
-  state.raidReadyAt = Date.now() + RAID_CD; save();   // คูลดาวน์นับตอนจบการโจมตี (ไม่ว่าผลจะเป็นยังไง)
+  state.raidReadyAt = Date.now() + RAID_CD;
+  if (dmgDealt > 0) { state.raidTotalDamage = (state.raidTotalDamage || 0) + dmgDealt; checkAchievements(); }
+  save();   // คูลดาวน์นับตอนจบการโจมตี (ไม่ว่าผลจะเป็นยังไง)
   if (!(dmgDealt > 0) || !(window.Cloud && Cloud.enabled) || !Cloud.loggedIn()) return;
   const res = await Cloud.raidAddDamage(weeklyEventKey(), state.playerName || 'เทรนเนอร์', dmgDealt);
   if (res && res.ok) { toast(`👹 ส่งความเสียหายเข้ากองกลาง Raid: +${dmgDealt.toLocaleString()}`, 'good'); if (currentView === 'menu') renderRaid(); }
