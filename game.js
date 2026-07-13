@@ -2474,7 +2474,7 @@ function renderShop() {
     // แลกด้วยเหรียญเช็คอิน (ได้จากล็อกอินรายวัน)
     { cat: 'perm', emoji: '💍', img: 'mega-ring', name: state.hasMegaRing ? 'กำไลเมก้า (มีแล้ว)' : 'กำไลเมก้า', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนเมก้าอีโวลูชัน · แลกด้วยเหรียญเช็คอิน', checkinPrice: MEGA_RING_CHECKIN, act: () => { if (state.hasMegaRing) { toast('มีกำไลเมก้าอยู่แล้ว', ''); return; } if (spendCheckin(MEGA_RING_CHECKIN)) { state.hasMegaRing = true; toast('💍 ได้กำไลเมก้าแล้ว! เมก้าอีโวลูชันได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
     { cat: 'perm', emoji: '⌚', img: 'macho-brace', name: state.hasDynamaxBand ? 'กำไลไดนาแม็กซ์ (มีแล้ว)' : 'กำไลไดนาแม็กซ์', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนไดนาแม็กซ์ · แลกด้วยเหรียญเช็คอิน', checkinPrice: DYNAMAX_BAND_CHECKIN, act: () => { if (state.hasDynamaxBand) { toast('มีกำไลไดนาแม็กซ์อยู่แล้ว', ''); return; } if (spendCheckin(DYNAMAX_BAND_CHECKIN)) { state.hasDynamaxBand = true; toast('⌚ ได้กำไลไดนาแม็กซ์แล้ว! ไดนาแม็กซ์ได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
-    { cat: 'perm', emoji: '🪙', img: 'amulet-coin', name: `Amulet Coin (${state.amulets || 0}/${AMULET_MAX})`, desc: 'เงินที่ได้จากการจับ +5% ต่อชิ้น สูงสุด +50% (ติดตัวถาวร)', price: 150000, act: () => { if ((state.amulets || 0) >= AMULET_MAX) { toast('มี Amulet Coin เต็มแล้ว', ''); return; } if (spend(150000)) { state.amulets = (state.amulets || 0) + 1; toast(`🪙 Amulet Coin +1 (เงิน +${state.amulets * 5}%)`, 'good'); postBuy(); } } },
+    { cat: 'perm', emoji: '🪙', img: 'amulet-coin', name: `Amulet Coin (${state.amulets || 0}/${AMULET_MAX})`, desc: 'เงินที่ได้จากการจับ +5% ต่อชิ้น สูงสุด +50% (ติดตัวถาวร) · หรือลุ้นดรอปหายากจากบอสหอคอย/บอสประจำเขต', price: 150000, act: () => { if ((state.amulets || 0) >= AMULET_MAX) { toast('มี Amulet Coin เต็มแล้ว', ''); return; } if (spend(150000)) { state.amulets = (state.amulets || 0) + 1; toast(`🪙 Amulet Coin +1 (เงิน +${state.amulets * 5}%)`, 'good'); postBuy(); } } },
     { cat: 'perm', emoji: '🎓', img: null, owned: !!state.hasExpShare, name: state.hasExpShare ? 'EXP Share (มีแล้ว)' : 'EXP Share', desc: 'ปลดล็อกครั้งเดียว ถาวร — จับได้ทีนึงแบ่ง XP ให้ทั้งทีม', price: 2500000, act: () => { if (state.hasExpShare) { toast('มี EXP Share อยู่แล้ว', ''); return; } if (spend(2500000)) { state.hasExpShare = true; toast('🎓 ได้ EXP Share! ทั้งทีมได้ XP จากการจับ', 'good'); postBuy(); } } },
     // แลกด้วยเหรียญเช็คอิน 🎟️
     { cat: 'perm', emoji: '🔮', img: 'shiny-charm', name: `Shiny Charm (${state.shinyCharms || 0}/${SHINY_CHARM_MAX})`, desc: `ติดตัวถาวร เพิ่มโอกาส Shiny +${Math.round(SHINY_CHARM_PER * 100)}% ทบต้น · แลกด้วยเหรียญเช็คอิน`, checkinPrice: 50, act: () => { if ((state.shinyCharms || 0) >= SHINY_CHARM_MAX) { toast('มี Shiny Charm ครบแล้ว', ''); return; } if (spendCheckin(50)) { state.shinyCharms = (state.shinyCharms || 0) + 1; toast(`🔮 Shiny Charm ${state.shinyCharms}/${SHINY_CHARM_MAX}`, 'good'); postBuy(); } } },
@@ -2535,6 +2535,14 @@ function grantRandomHeld() {
   return `${HELD_ITEMS[k].emoji} ${HELD_ITEMS[k].name}`;
 }
 const HELD_DROP_CHANCE = 0.05;   // 5% ดรอปอุปกรณ์สวมใส่
+// Amulet Coin ดรอปหายากจากบอสหอคอย/บอสประจำเขตเท่านั้น (นอกจากซื้อด้วยเงิน 150000 ที่ร้าน) — คืนข้อความถ้าได้ ไม่งั้นคืนค่าว่าง
+const AMULET_DROP_CHANCE = 0.04;   // 4% ต่อการชนะบอสหอคอย/บอสประจำเขต
+function grantAmuletDrop() {
+  if ((state.amulets || 0) >= AMULET_MAX) return '';
+  if (Math.random() >= AMULET_DROP_CHANCE) return '';
+  state.amulets = (state.amulets || 0) + 1;
+  return `🪙 Amulet Coin! (เงิน +${state.amulets * 5}%)`;
+}
 function equipHeld(uid, k) {
   const ind = indByUid(uid); if (!ind) return;
   if ((state.heldInv[k] || 0) <= 0) { toast('❌ ไม่มีไอเทมนี้', 'bad'); return; }
@@ -4297,6 +4305,10 @@ function onFoeDown() {
     if (floor % 20 === 0 && Math.random() < HELD_DROP_CHANCE) {   // ทุก 20 ชั้น มีโอกาส 5% ดรอปอุปกรณ์สวมใส่
       const h = grantRandomHeld(); itemMsg = (itemMsg ? itemMsg + ' + ' : '') + '🎽 ' + h;
     }
+    if (b.special) {   // ชั้นบอสเท่านั้น — โอกาสหายากได้ Amulet Coin
+      const amuletMsg = grantAmuletDrop();
+      if (amuletMsg) itemMsg = (itemMsg ? itemMsg + ' + ' : '') + amuletMsg;
+    }
     if (Math.random() < 0.25) { itemMsg = (itemMsg ? itemMsg + ' + ' : '') + grantRandomBall(); }   // 25% ดรอปบอลพิเศษนอกร้าน
     if (floor > (state.tower.bestFloor || 0)) state.tower.bestFloor = floor;
     state.tower.floor = floor + 1;
@@ -4325,8 +4337,9 @@ function onFoeDown() {
       state.coins += reward; state.battlePoints = (state.battlePoints || 0) + bp;
       if (first) state.balls.ultra = (state.balls.ultra || 0) + 3;
       const ballDrop = grantRandomBall();
+      const amuletMsg = grantAmuletDrop();
       gainTrainerXp(100);
-      b.victory = { trainerKey: foeTrainerName(b), emoji: b.gym.emoji, title: b.gym.name, coins: reward, bp, xp: 100, items: (first ? '🟡 Ultra Ball ×3 ' : '') + ballDrop, bonus: first ? '🏅 เหรียญตราประจำเขต!' : 'ชนะซ้ำ — รางวัลลดลง' };
+      b.victory = { trainerKey: foeTrainerName(b), emoji: b.gym.emoji, title: b.gym.name, coins: reward, bp, xp: 100, items: (first ? '🟡 Ultra Ball ×3 ' : '') + ballDrop + (amuletMsg ? ' ' + amuletMsg : ''), bonus: first ? '🏅 เหรียญตราประจำเขต!' : 'ชนะซ้ำ — รางวัลลดลง' };
       b.msg = `🏆 ชนะ${b.gym.name}! +${reward}🪙 +${bp}🎖️BP`;
       logMsg(`🏆 ชนะบอสเขต <b>${b.bossData.region.name}</b>! +${reward}🪙`, 'big');
       playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
@@ -5010,8 +5023,8 @@ function makeRaidFoeDef(mon) {
 let _raidCache = null;   // แคชล่าสุด { total, top, mine, contributors } จากคลาวด์
 function renderRaid() {
   const box = $('#raidBox'); if (!box) return;
-  if (!(window.Cloud && Cloud.enabled)) { box.innerHTML = `<div class="sr-sub">ต้องตั้งค่าคลาวด์ก่อนถึงจะร่วม Raid ได้ (เล่นร่วมมือกับผู้เล่นคนอื่น)</div>`; return; }
-  if (!Cloud.loggedIn()) { box.innerHTML = `<div class="sr-sub">เข้าสู่ระบบก่อน (ส่วน "☁️ บัญชี / เซฟคลาวด์") เพื่อร่วม Raid กับผู้เล่นคนอื่น</div>`; return; }
+  if (!(window.Cloud && Cloud.enabled)) { box.innerHTML = emptyState('👹', 'ต้องตั้งค่าคลาวด์ก่อน', 'Raid เป็นระบบร่วมมือหลายคนผ่านคลาวด์ — ดูวิธีตั้งค่าที่ CLOUD_SETUP.md'); return; }
+  if (!Cloud.loggedIn()) { box.innerHTML = emptyState('👹', 'เข้าสู่ระบบก่อน', 'ไปที่ส่วน "☁️ บัญชี / เซฟคลาวด์" เพื่อเข้าสู่ระบบแล้วร่วม Raid กับผู้เล่นคนอื่น'); return; }
   const boss = raidBossForWeek();
   const left = raidReadyLeft();
   const daysLeft = weeklyEventDaysLeft();
@@ -5424,6 +5437,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     MON_BY_ID, makeIndividual, startBattle, beginSpawn, startTrainerBattle, startBossBattle,
     startMegaLeagueBattle, startGhostBattle, startTowerBattle, startRivalBattle, towerFoeDef,
     pickLegendaryGenWeighted, genOf, onFoeDown, endBattle, throwBall, save, switchView,
-    renderMenu, startRaidBattle, raidBossForWeek, faintActive,
+    renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop,
   };
 }

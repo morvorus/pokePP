@@ -133,6 +133,13 @@ main { flex: 1; padding: 12px; }
 .view.active { display: block; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .view-title { font-size: 18px; margin: 6px 2px 12px; }
+/* หัวข้อหลักของแต่ละหน้า (ไม่ใช่หัวข้อพับในเมนู) — เส้นใต้ไล่สีเป็นลายเซ็นให้จำหมวดได้จากสายตา */
+h2.view-title { position: relative; display: inline-block; padding-bottom: 10px; }
+h2.view-title::after {
+  content: ''; position: absolute; left: 2px; bottom: 0;
+  width: 42px; height: 3px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+}
 
 /* ===== Menu: collapsible sections (พับ/กางได้ ลดการเลื่อนหน้ายาวเกิน) ===== */
 .menu-cat { font-size: 12px; font-weight: 800; letter-spacing: .5px; color: var(--muted); text-transform: uppercase;
