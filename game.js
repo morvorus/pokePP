@@ -2076,34 +2076,57 @@ function renderMap() {
       <span class="wm-label">${r.name}</span>
     </button>`;
   }).join('');
+  const mainLand = 'M70,360 C40,250 150,150 280,180 C380,110 520,140 560,250 C660,230 700,360 630,430 C690,540 540,600 420,575 C300,635 140,590 110,480 C50,455 80,410 70,360 Z';
+  const mysticLand = 'M640,300 C690,230 810,230 860,300 C930,330 920,430 850,455 C820,530 700,510 690,440 C640,410 620,340 640,300 Z';
+  const dragonLand = 'M690,520 C760,495 850,520 860,585 C885,635 800,665 730,640 C680,630 655,555 690,520 Z';
+  // ภูเขาหิมะ (สามเหลี่ยมขาว), ต้นไม้ป่า (พุ่มเขียว), ภูเขาไฟ (กรวยลาวา) วาดตรงจุดธีม
+  const mountains = [[590,180],[615,168],[640,182]].map(([x,y]) => `<path d="M${x - 24},${y + 30} L${x},${y - 14} L${x + 24},${y + 30} Z" fill="#eef4ff" stroke="#b8ccdf" stroke-width="2"/><path d="M${x - 9},${y + 8} L${x},${y - 14} L${x + 9},${y + 8} Z" fill="#fff"/>`).join('');
+  const trees = [[330,440],[352,455],[312,458],[368,436],[340,470]].map(([x,y]) => `<circle cx="${x}" cy="${y}" r="13" fill="#356b2a"/><circle cx="${x}" cy="${y - 6}" r="10" fill="#4a8a3a"/>`).join('');
+  const volcano = `<path d="M520,470 L556,392 L592,470 Z" fill="#6a3326" stroke="#3a1a12" stroke-width="2"/><path d="M540,428 C548,414 564,414 572,428 C566,440 546,440 540,428 Z" fill="#ff7a2a"/><circle cx="556" cy="398" r="7" fill="#ffce4a"/>`;
   wm.innerHTML = `
     <svg class="wm-svg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <radialGradient id="wmOcean" cx="50%" cy="40%" r="80%">
-          <stop offset="0%" stop-color="#1c5f86"/><stop offset="60%" stop-color="#0e3f5e"/><stop offset="100%" stop-color="#08243a"/>
+        <radialGradient id="wmOcean" cx="50%" cy="38%" r="85%">
+          <stop offset="0%" stop-color="#2a7aa8"/><stop offset="55%" stop-color="#12547d"/><stop offset="100%" stop-color="#07223a"/>
         </radialGradient>
         <linearGradient id="wmLand" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#6aa84f"/><stop offset="55%" stop-color="#4a8a3a"/><stop offset="100%" stop-color="#3c6b2f"/>
+          <stop offset="0%" stop-color="#74b657"/><stop offset="55%" stop-color="#4f9440"/><stop offset="100%" stop-color="#3a6b2e"/>
         </linearGradient>
         <linearGradient id="wmMystic" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#6a4aa0"/><stop offset="100%" stop-color="#3a2060"/>
+          <stop offset="0%" stop-color="#7a56b8"/><stop offset="100%" stop-color="#38205e"/>
         </linearGradient>
         <linearGradient id="wmSand" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#e0c07a"/><stop offset="100%" stop-color="#b8934a"/>
+          <stop offset="0%" stop-color="#eccb82"/><stop offset="100%" stop-color="#b8934a"/>
         </linearGradient>
+        <radialGradient id="wmVign" cx="50%" cy="50%" r="72%">
+          <stop offset="60%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".45"/>
+        </radialGradient>
+        <radialGradient id="wmSky" cx="50%" cy="40%" r="70%">
+          <stop offset="0%" stop-color="#bfe6ff"/><stop offset="100%" stop-color="#6fb0e0"/>
+        </radialGradient>
       </defs>
       <rect width="1000" height="640" fill="url(#wmOcean)"/>
-      <ellipse cx="860" cy="400" rx="150" ry="120" fill="#061c30" opacity=".55"/>
-      <path d="M70,360 C40,250 150,150 280,180 C380,110 520,140 560,250 C660,230 700,360 630,430 C690,540 540,600 420,575 C300,635 140,590 110,480 C50,455 80,410 70,360 Z" fill="url(#wmLand)" stroke="#2c4d22" stroke-width="4"/>
-      <path d="M430,780 C400,700 520,690 560,740 L560,640 L420,640 C400,700 410,740 430,780 Z" fill="url(#wmSand)" opacity=".9"/>
+      <ellipse cx="860" cy="400" rx="160" ry="128" fill="#061c30" opacity=".5"/>
+      <!-- ชายฝั่งเรืองน้ำตื้น (เงาน้ำรอบแผ่นดิน) -->
+      <path d="${mainLand}" fill="none" stroke="#8fe0d8" stroke-width="14" opacity=".28"/>
+      <path d="${mysticLand}" fill="none" stroke="#c8a8ff" stroke-width="12" opacity=".25"/>
+      <path d="${dragonLand}" fill="none" stroke="#e0b48a" stroke-width="12" opacity=".22"/>
+      <path d="${mainLand}" fill="url(#wmLand)" stroke="#2c4d22" stroke-width="3"/>
       <path d="M430,560 C470,520 560,520 590,570 C650,560 700,600 660,650 C690,720 560,720 500,690 C440,700 400,610 430,560 Z" fill="url(#wmSand)" stroke="#8a6a34" stroke-width="3"/>
-      <path d="M640,300 C690,230 810,230 860,300 C930,330 920,430 850,455 C820,530 700,510 690,440 C640,410 620,340 640,300 Z" fill="url(#wmMystic)" stroke="#2a1848" stroke-width="4"/>
-      <path d="M690,520 C760,495 850,520 860,585 C885,635 800,665 730,640 C680,630 655,555 690,520 Z" fill="#5a3a2a" stroke="#3a2418" stroke-width="4"/>
-      <ellipse cx="410" cy="90" rx="95" ry="42" fill="#7cc4f0" opacity=".85"/>
-      <ellipse cx="410" cy="96" rx="95" ry="42" fill="none" stroke="#fff" stroke-width="2" opacity=".5"/>
-      <circle cx="930" cy="88" r="52" fill="#1a0a2e" stroke="#7a3aff" stroke-width="3" opacity=".9"/>
-      <circle cx="930" cy="88" r="30" fill="#3a1060" opacity=".8"/>
+      <path d="${mysticLand}" fill="url(#wmMystic)" stroke="#2a1848" stroke-width="3"/>
+      <path d="${dragonLand}" fill="#5a3a2a" stroke="#3a2418" stroke-width="3"/>
+      ${mountains}${trees}${volcano}
+      <!-- เกาะลอยฟ้า -->
+      <ellipse cx="410" cy="94" rx="98" ry="44" fill="#5a3a24"/>
+      <ellipse cx="410" cy="86" rx="98" ry="42" fill="url(#wmSky)"/>
+      <path d="M330,120 C360,150 460,150 490,120 C470,150 350,150 330,120 Z" fill="#4a2f1c" opacity=".7"/>
+      <!-- รอยแยกมิติ (void) มุมขวาบน -->
+      <circle cx="930" cy="82" r="56" fill="#1a0a2e" stroke="#8a4aff" stroke-width="3"/>
+      <circle cx="930" cy="82" r="38" fill="none" stroke="#a86bff" stroke-width="4" opacity=".7"/>
+      <circle cx="930" cy="82" r="20" fill="#3a1060"/>
+      <circle cx="930" cy="82" r="7" fill="#c9a3ff"/>
       ${decor}
+      <rect width="1000" height="640" fill="url(#wmVign)" pointer-events="none"/>
     </svg>
     <div class="wm-pins">${pins}</div>`;
   wm.querySelectorAll('.wm-pin').forEach(el => el.onclick = () => openRegionPopup(el.dataset.region));
