@@ -937,6 +937,24 @@ function showRareAlert(mon, tier, shiny) {
   el._t = setTimeout(() => el.classList.add('hidden'), 6000);
 }
 function hideRareAlert() { $('#rareAlert').classList.add('hidden'); }
+// เอฟเฟคเต็มจอตอนเจอ legendary/shiny — แสงวาบ + รัศมี + ประกายวิ่ง (ข้ามถ้าเปิดลดแอนิเมชัน)
+let _fxTimer = null;
+function playSpawnFx(kind) {
+  if (state.settings && state.settings.reduceMotion) return;
+  const ov = $('#fxOverlay'); if (!ov) return;
+  const isShiny = kind === 'shiny';
+  const rayColor = isShiny ? 'conic-gradient(from 0deg,#ff5d6c,#ffcb05,#47d16c,#3d7dca,#a06bff,#ff5d6c)' : 'conic-gradient(from 0deg,rgba(255,203,5,.9),rgba(255,240,180,.2),rgba(255,203,5,.9),rgba(255,240,180,.2),rgba(255,203,5,.9))';
+  const icon = isShiny ? '✨' : '👑';
+  const sparkles = Array.from({ length: 14 }, (_, i) =>
+    `<span class="fx-spark" style="--a:${(360 / 14) * i}deg;--d:${.15 + (i % 5) * .06}s">${isShiny ? '✨' : '⭐'}</span>`).join('');
+  ov.className = 'fx-overlay ' + (isShiny ? 'fx-shiny' : 'fx-legend');
+  ov.innerHTML = `<div class="fx-rays" style="background:${rayColor}"></div>
+    <div class="fx-flash"></div>
+    <div class="fx-icon">${icon}</div>
+    <div class="fx-sparks">${sparkles}</div>`;
+  clearTimeout(_fxTimer);
+  _fxTimer = setTimeout(() => { ov.className = 'fx-overlay hidden'; ov.innerHTML = ''; }, 1600);
+}
 function applyReduceMotion() {
   document.getElementById('app').classList.toggle('reduce-motion', !!state.settings.reduceMotion);
 }
@@ -1162,7 +1180,7 @@ function scheduleSpawn(delay) {
 function levelFor(tier) {
   const [lo, hi] = TIER_LEVEL[tier] || TIER_LEVEL.common;
   // เอนไปทางเลเวลต่ำมากขึ้น: โปเกมอนเลเวลสูงเจอยากขึ้นชัดเจน (pow สูง = ยิ่งเอนต่ำ)
-  return Math.round(lo + (hi - lo) * Math.pow(Math.random(), 3.4));
+  return Math.round(lo + (hi - lo) * Math.pow(Math.random(), 5));
 }
 // ---------- world: time / weather / event ----------
 function timeOfDay() { const h = new Date().getHours(); return (h >= 6 && h < 18) ? 'day' : 'night'; }
@@ -1423,9 +1441,11 @@ function beginSpawn(mon, shiny, fromFishing) {
     maxHp, hp: maxHp, fishing: !!fromFishing };
   state.seen[mon.id] = true;
   renderSpawn();
-  if (shiny || mon._tier === 'rare' || mon._tier === 'superrare' || mon._tier === 'legendary') {
+  // แจ้งเตือน (ป๊อปอัพ) เฉพาะ superrare ขึ้นไป + shiny · เอฟเฟคเต็มจอเฉพาะ legendary/shiny (ตื่นเต้นสุด)
+  if (shiny || mon._tier === 'superrare' || mon._tier === 'legendary') {
     showRareAlert(mon, mon._tier, shiny);
     logMsg(`${shiny ? '✨' : '⭐'} ${fromFishing ? '🎣 ' : ''}พบ <b>${mon.name}</b> (${shiny ? 'Shiny' : TIER_LABEL[mon._tier]}) Lv.${level}!`, 'big');
+    if (shiny || mon._tier === 'legendary') playSpawnFx(shiny ? 'shiny' : 'legend');
   } else if (fromFishing) {
     logMsg(`🎣 เกี่ยว <b>${mon.name}</b> Lv.${level} ขึ้นมาได้!`, '');
   }
@@ -3438,7 +3458,8 @@ function renderHallOfFame() {
   const byIv = [...state.caught].sort((a, b) => ivPercent(b) - ivPercent(a));
   const topIv = byIv[0];
   const shinies = state.caught.filter(c => c.shiny).sort((a, b) => (b.ts || 0) - (a.ts || 0));
-  const legends = state.caught.filter(c => c.tier === 'legendary').sort((a, b) => ivPercent(b) - ivPercent(a));
+  const goldens = state.caught.filter(c => c.golden).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  const legends = state.caught.filter(c => c.tier === 'legendary' && !c.golden).sort((a, b) => ivPercent(b) - ivPercent(a));
   const oldest = [...state.caught].sort((a, b) => (a.ts || 0) - (b.ts || 0))[0];
   const bestFriend = [...state.caught].sort((a, b) => (b.friend || 0) - (a.friend || 0))[0];
   const ribbons = (state.contest && state.contest.ribbons) || {};
@@ -3453,9 +3474,10 @@ function renderHallOfFame() {
     <div class="stat-grid" style="margin-bottom:10px">
       <div class="stat-tile"><div class="st-num">${legends.length}</div><div class="st-lbl">👑 Legendary</div></div>
       <div class="stat-tile"><div class="st-num">${shinies.length}</div><div class="st-lbl">✨ Shiny</div></div>
+      <div class="stat-tile"><div class="st-num">🏆 ${goldens.length}</div><div class="st-lbl">Golden</div></div>
       <div class="stat-tile"><div class="st-num">${totalRibbons}</div><div class="st-lbl">🎀 ริบบิ้นคอนเทสต์</div></div>
-      <div class="stat-tile"><div class="st-num">${state.tower && state.tower.bestFloor || 0}</div><div class="st-lbl">🗼 ชั้นหอคอยสูงสุด</div></div>
     </div>
+    ${goldens.length ? `<div style="font-size:12px;font-weight:700;margin:0 0 4px;color:#ffd700">🏆 แกลเลอรี Golden (${goldens.length})</div>${galleryRow(goldens, '')}` : ''}
     <div style="font-size:12px;font-weight:700;margin-bottom:4px">💯 IV สูงสุดในคลัง</div>
     ${hofIndRow(topIv, `IV ${ivPercent(topIv)}% · นิสัย ${topIv.nature} · Lv.${topIv.level}`)}
     <div style="font-size:12px;font-weight:700;margin:10px 0 4px">🤝 ตัวที่มิตรภาพดีที่สุด</div>
@@ -5496,6 +5518,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     startMegaLeagueBattle, startGhostBattle, startTowerBattle, startRivalBattle, towerFoeDef,
     pickLegendaryGenWeighted, genOf, onFoeDown, endBattle, throwBall, save, switchView,
     renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop,
-    openIndividualModal, tradeNpc, claimDailyLogin, selectRegion,
+    openIndividualModal, tradeNpc, claimDailyLogin, selectRegion, playSpawnFx, renderHallOfFame,
   };
 }

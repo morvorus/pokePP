@@ -201,9 +201,37 @@ h2.view-title::after {
 }
 @keyframes floaty { 0%,100%{ transform: translateY(0) rotate(0);} 50%{ transform: translateY(-10px) rotate(8deg);} }
 .spawn-card.rare-glow { box-shadow: 0 0 0 2px #7aa7ff, var(--shadow); }
-.spawn-card.legend-glow { box-shadow: 0 0 0 2px var(--accent), 0 0 34px rgba(255,203,5,.4); }
-.spawn-card.shiny-glow { box-shadow: 0 0 0 2px #7ef9ff, 0 0 34px rgba(126,249,255,.5); }
+.spawn-card.legend-glow { box-shadow: 0 0 34px rgba(255,203,5,.45), var(--shadow); }
+.spawn-card.shiny-glow { box-shadow: 0 0 34px rgba(126,249,255,.55), var(--shadow); }
+/* ===== กรอบเรืองแสงวิ่งวนรอบการ์ด (legendary = ทอง, shiny = รุ้ง) — ใช้ @property หมุนมุม conic ให้แสงวิ่ง ไม่เอียงการ์ด ===== */
+@property --brun { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+.spawn-card.legend-glow::before, .spawn-card.shiny-glow::before {
+  content: ''; position: absolute; inset: 0; border-radius: var(--radius); padding: 3px;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  z-index: 4; pointer-events: none; animation: brun 2.2s linear infinite;
+}
+.spawn-card.legend-glow::before { background: conic-gradient(from var(--brun), transparent 0deg 235deg, #ffe27a 290deg, #fff7d6 320deg, #ffcb05 345deg, transparent 360deg); }
+.spawn-card.shiny-glow::before { background: conic-gradient(from var(--brun), #ff5d6c, #ffcb05, #47d16c, #3d7dca, #a06bff, #ff5d6c); }
+@keyframes brun { to { --brun: 360deg; } }
+.reduce-motion .spawn-card.legend-glow::before, .reduce-motion .spawn-card.shiny-glow::before { animation: none; }
 .spawn-inner { position: relative; z-index: 2; }
+
+/* ===== เอฟเฟคเต็มจอตอนเจอ legendary/shiny ===== */
+.fx-overlay { position: fixed; inset: 0; z-index: 70; pointer-events: none; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.fx-overlay.hidden { display: none; }
+.fx-rays { position: absolute; width: 200vmax; height: 200vmax; left: 50%; top: 50%; margin: -100vmax 0 0 -100vmax; opacity: 0; border-radius: 50%;
+  -webkit-mask: repeating-conic-gradient(#000 0deg 6deg, transparent 6deg 14deg); mask: repeating-conic-gradient(#000 0deg 6deg, transparent 6deg 14deg);
+  animation: fxRays 1.6s ease-out forwards; }
+@keyframes fxRays { 0% { opacity: 0; transform: rotate(0) scale(.2); } 25% { opacity: .5; } 100% { opacity: 0; transform: rotate(60deg) scale(1); } }
+.fx-flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, rgba(255,255,255,.9), rgba(255,255,255,0) 55%); opacity: 0; animation: fxFlash 1.6s ease-out forwards; }
+.fx-shiny .fx-flash { background: radial-gradient(circle at 50% 45%, rgba(180,250,255,.9), rgba(126,249,255,0) 55%); }
+@keyframes fxFlash { 0% { opacity: 0; } 12% { opacity: 1; } 40% { opacity: .3; } 100% { opacity: 0; } }
+.fx-icon { position: relative; font-size: 96px; opacity: 0; filter: drop-shadow(0 4px 16px rgba(0,0,0,.5)); animation: fxIcon 1.6s cubic-bezier(.2,1.3,.4,1) forwards; }
+@keyframes fxIcon { 0% { opacity: 0; transform: scale(.3) rotate(-12deg); } 25% { opacity: 1; transform: scale(1.15) rotate(4deg); } 70% { opacity: 1; transform: scale(1) rotate(0); } 100% { opacity: 0; transform: scale(1.05); } }
+.fx-sparks { position: absolute; left: 50%; top: 45%; }
+.fx-spark { position: absolute; font-size: 26px; opacity: 0; animation: fxSpark 1.3s ease-out forwards; animation-delay: var(--d); }
+@keyframes fxSpark { 0% { opacity: 0; transform: rotate(var(--a)) translateY(0) scale(.4); } 30% { opacity: 1; } 100% { opacity: 0; transform: rotate(var(--a)) translateY(-190px) scale(1); } }
 .spawn-top { min-height: 22px; display: flex; justify-content: center; gap: 8px; align-items: center; margin-bottom: 4px; }
 .lv-badge {
   background: rgba(0,0,0,.55); color: #fff; font-weight: 800; font-size: 13px;
