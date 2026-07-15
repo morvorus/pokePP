@@ -271,6 +271,9 @@ h2.view-title::after {
 .tier-superrare { box-shadow: 0 0 0 1.5px rgba(155,89,182,.75), 0 0 10px rgba(155,89,182,.3); }
 .tier-legendary { box-shadow: 0 0 0 1.5px #ffcb05, 0 0 12px rgba(255,203,5,.4); }
 .tier-shiny { box-shadow: 0 0 0 1.5px #7ef9ff, 0 0 14px rgba(126,249,255,.45); }
+/* Golden Pokémon (Dedenne เท่านั้น จาก NPC Swap 1/100000) — ย้อมสีทองด้วย filter เพราะไม่มีสไปรต์จริง */
+.tier-golden { box-shadow: 0 0 0 2px #ffd700, 0 0 18px rgba(255,215,0,.65); }
+.tier-golden img { filter: sepia(1) saturate(6) hue-rotate(-15deg) brightness(1.15) contrast(1.05); }
 
 /* ===== Ball selector ===== */
 .ball-bar { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }

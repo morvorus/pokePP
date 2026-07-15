@@ -81,7 +81,7 @@ function preloadItems() {
     ...CHARM_ORDER.map(k => CHARMS[k].img),
     ...HELD_ORDER.map(k => HELD_ITEMS[k].img),
     ...Object.values(MEGA_FORMS).flatMap(forms => forms.map(f => f.stone)),
-    'rare-candy', 'nugget', 'mega-ring', 'macho-brace', 'shiny-stone', 'comet-shard', 'member-card',
+    'rare-candy', 'nugget', 'mega-ring', 'macho-brace', 'shiny-stone', 'comet-shard', 'member-card', 'eon-ticket',
   ].filter(Boolean);
   names.forEach(n => { const i = new Image(); i.src = ITEM_BASE + n + '.png'; });
 }
@@ -499,6 +499,7 @@ const ACHIEVEMENTS = [
   { id: 'raidfirst', ico: '👹', name: 'นักล่า Raid มือใหม่', desc: 'ร่วมโจมตี Raid บอสรายสัปดาห์ครั้งแรก', reward: 200, goal: s => (s.raidTotalDamage || 0) >= 1, prog: s => [Math.min(s.raidTotalDamage || 0, 1), 1] },
   { id: 'raiddmg20k', ico: '👹', name: 'นักล่า Raid', desc: 'ทำความเสียหายสะสมให้ Raid บอสรวม 20,000', reward: 800, goal: s => (s.raidTotalDamage || 0) >= 20000, prog: s => [s.raidTotalDamage || 0, 20000] },
   { id: 'raidkill', ico: '🔥', name: 'มือฆ่า Raid บอส', desc: 'ฆ่า Raid บอสได้เองในการโจมตีครั้งเดียว (หายากมาก)', reward: 2000, goal: s => !!s._raidBossKilled, prog: s => [s._raidBossKilled ? 1 : 0, 1] },
+  { id: 'goldendedenne', ico: '🏆', name: 'ตัวทองในตำนาน', desc: 'ได้ Golden Dedenne จากการ Swap NPC (โอกาส 1/100000)', reward: 5000, goal: s => !!s._gotGolden, prog: s => [s._gotGolden ? 1 : 0, 1] },
 ];
 
 // รางวัลจบเดกซ์ (กดรับเองเมื่อถึงเกณฑ์)
@@ -957,7 +958,7 @@ function rollGender(id) {
 }
 function genderIcon(g) { return g === 'M' ? '♂️' : g === 'F' ? '♀️' : '⚧'; }
 // คลาสไล่ศักดิ์ความหายาก — ใช้ร่วมกันทุกจุดที่โชว์การ์ดโปเกมอน (คลัง/ทีม/ต่อสู้) ให้สายตาจับหายากได้ทันที
-function tierClass(tier, shiny) { return shiny ? 'tier-shiny' : (tier && tier !== 'common' ? 'tier-' + tier : ''); }
+function tierClass(tier, shiny, golden) { return golden ? 'tier-golden' : shiny ? 'tier-shiny' : (tier && tier !== 'common' ? 'tier-' + tier : ''); }
 // การ์ด empty state มาตรฐาน — ใช้แทนข้อความเปล่าๆ ตรงจุดที่หน้าว่างจริง (ไม่ใช่ error) ให้ดูตั้งใจแทนดูเหมือนบั๊ก
 function emptyState(icon, title, sub) {
   return `<div class="empty-state"><div class="es-ico">${icon}</div><div class="es-title">${title}</div>${sub ? `<div class="es-sub">${sub}</div>` : ''}</div>`;
@@ -1963,10 +1964,16 @@ function checkRegionUnlocks() {
     }
   });
 }
+const REGION_SWITCH_CD = 45000;   // คูลดาวน์เปลี่ยนเขต 45 วิ กันสลับแมพรัวๆ เพื่อรีโรลสปอว์น
 function selectRegion(id) {
   const r = REGION_BY_ID[id];
   if (r.unlock && !state.unlocked[id]) {
     toast(`🔒 ต้องจับให้ครบ ${r.unlock} ชนิดก่อน (ตอนนี้ ${speciesOwnedCount()})`, 'bad'); return;
+  }
+  if (id !== state.region) {
+    const left = (state.regionSwitchReadyAt || 0) - Date.now();
+    if (left > 0) { toast(`⏳ รอเปลี่ยนเขตอีก ${Math.ceil(left / 1000)} วิ`, 'bad'); return; }
+    state.regionSwitchReadyAt = Date.now() + REGION_SWITCH_CD;
   }
   state.region = id; save();
   renderRegionBanner(); clearSpawn(); scheduleSpawn(1500);
@@ -2121,7 +2128,7 @@ function renderBulkList() {
     const m = MON_BY_ID[ind.id];
     const sel = bulkSelected.has(ind.uid);
     const tags = (ind.locked ? '🔒' : '') + (inParty(ind.uid) ? '⭐' : '') + (ind.shiny ? '✨' : '');
-    return `<div class="ind-row bulk-mode${sel ? ' selected' : ''} ${tierClass(ind.tier, ind.shiny)}" data-uid="${ind.uid}">
+    return `<div class="ind-row bulk-mode${sel ? ' selected' : ''} ${tierClass(ind.tier, ind.shiny, ind.golden)}" data-uid="${ind.uid}">
       <div class="ir-check">${sel ? '✓' : ''}</div>
       ${spriteImg(ind.id, ind.shiny)}
       <div class="ir-main">
@@ -2228,10 +2235,10 @@ function indRow(ind) {
   const m = MON_BY_ID[ind.id];
   const b = getBuddy();
   const isBuddy = b && b.uid === ind.uid;
-  return `<div class="ind-row ${tierClass(ind.tier, ind.shiny)}" data-uid="${ind.uid}">
+  return `<div class="ind-row ${tierClass(ind.tier, ind.shiny, ind.golden)}" data-uid="${ind.uid}">
     ${spriteImg(ind.id, ind.shiny)}
     <div class="ir-main">
-      <div class="ir-name">${ind.shiny ? '✨' : ''}${ind.nick ? ind.nick : m.name} ${genderIcon(ind.gender)} ${isBuddy ? '⭐' : ''}</div>
+      <div class="ir-name">${ind.golden ? '🏆' : ind.shiny ? '✨' : ''}${ind.nick ? ind.nick : m.name} ${genderIcon(ind.gender)} ${isBuddy ? '⭐' : ''}</div>
       <div class="ir-sub">Lv.${ind.level} · ${ind.nature}${ind.nick ? ' · ' + m.name : ''}</div>
     </div>
     <div class="ir-iv">IV ${ivPercent(ind)}%</div></div>`;
@@ -2363,7 +2370,7 @@ function openIndividualModal(uid) {
       ${(state.candies > 0 && ind.level < 100) ? `<button class="btn-primary" id="mCandy">🍬 Rare Candy (มี ${state.candies})</button>` : ''}
       <button class="btn-ghost" id="mNick">✏️ ตั้งชื่อเล่น</button>
       <button class="btn-ghost" id="mLock">${ind.locked ? '🔒 ล็อกอยู่' : '🔓 ล็อก'}</button>
-      <button class="btn-primary" id="mTrade" ${ind.locked ? 'disabled' : ''}>🔄 เทรด NPC</button>
+      <button class="btn-primary" id="mTrade" ${(ind.locked || (state.swapTickets || 0) <= 0 || swapReadyLeft() > 0) ? 'disabled' : ''}>🔀 Swap NPC (${state.swapTickets || 0} ตั๋ว)</button>
       <button class="btn-danger" id="mRelease" ${ind.locked ? 'disabled' : ''}>ปล่อย</button>
       <button class="btn-ghost" id="mClose">ปิด</button>
     </div>`;
@@ -2402,29 +2409,51 @@ function openIndividualModal(uid) {
   const gxa = $('[data-attunegx]'); if (gxa) gxa.onclick = () => { attuneGmaxStone(uid); openIndividualModal(uid); };
   const gxb = $('[data-buygx]'); if (gxb) gxb.onclick = () => { buyGmaxStone(gmaxFormFor(ind.id).key, GMAX_STONE_PRICE); openIndividualModal(uid); };
 }
+// เทรดกับ NPC — ต้องใช้ 🔀 ตั๋ว Swap (ดรอปจากกล่องสุ่ม/หอคอย 1%) ได้ตัวใหม่แบบสุ่มล้วนเหมือนออกไปจับเอง
+// (ไม่เกี่ยวกับระดับ/ระดับความหายากของตัวที่เอาไปแลก) โอกาส Shiny 1/6000 (ง่ายกว่าจับปกติ 1/8192)
+// และมีโอกาสจิ๋ว 1/100000 ได้ Golden Dedenne (IV เต็ม 31 ทุกสเตตัส หาได้จากตรงนี้ที่เดียว)
+const SWAP_TRADE_CD = 30000;
+const SWAP_SHINY_CHANCE = 1 / 6000;
+const GOLDEN_DEDENNE_CHANCE = 1 / 100000;
+function swapReadyLeft() { return Math.max(0, (state.swapReadyAt || 0) - Date.now()); }
 function tradeNpc(uid) {
   const idx = state.caught.findIndex(c => c.uid === uid);
   if (idx < 0) return;
   const ind = state.caught[idx];
   if (ind.locked) { toast('🔒 ตัวนี้ถูกล็อกอยู่', 'bad'); return; }
   if (inParty(uid)) { toast('❌ เอาออกจากทีมก่อนเทรด', 'bad'); return; }
-  if (!confirmAction(`เทรด ${MON_BY_ID[ind.id].name} กับ NPC เพื่อสุ่มตัวใหม่? (ตัวเดิมจะหายไป)`)) return;
-  // สุ่มตัวใหม่: ระดับเดียวกันหรือลุ้นอัปเกรด, เลเวลใกล้เคียง
-  let tierIdx = TIER_ORDER.indexOf(ind.tier);
-  if (Math.random() < 0.25 && tierIdx < TIER_ORDER.length - 1) tierIdx++;   // 25% ได้ระดับสูงขึ้น
-  const tier = TIER_ORDER[tierIdx];
-  const pool = MONSTERS.filter(m => m._tier === tier);
-  const mon = pick(pool.length ? pool : MONSTERS);
-  const shiny = Math.random() < SHINY_CHANCE * 2;
-  const level = clamp(ind.level + rand(-3, 3), 1, 100);
+  if ((state.swapTickets || 0) <= 0) { toast('❌ ไม่มีตั๋ว Swap (ดรอปจากกล่องสุ่ม/หอคอย 1%)', 'bad'); return; }
+  const left = swapReadyLeft();
+  if (left > 0) { toast(`⏳ รอเทรด NPC อีก ${Math.ceil(left / 1000)} วิ`, 'bad'); return; }
+  if (!confirmAction(`ใช้ 🔀 ตั๋ว Swap เทรด ${MON_BY_ID[ind.id].name} กับ NPC เพื่อสุ่มตัวใหม่? (ตัวเดิมจะหายไป)`)) return;
+  state.swapTickets--;
+  state.swapReadyAt = Date.now() + SWAP_TRADE_CD;
   state.caught.splice(idx, 1);
   state.party = state.party.filter(u => u !== uid);
   state.buddyUid = state.party[0] || null;
-  const nu = makeIndividual(mon.id, level, mon._tier, shiny);
-  state.caught.push(nu); state.seen[mon.id] = true;
+  let nu, msg, logHtml;
+  if (Math.random() < GOLDEN_DEDENNE_CHANCE) {   // แจ็คพอต Golden Dedenne
+    const level = rand(TIER_LEVEL.legendary[0], TIER_LEVEL.legendary[1]);
+    nu = makeIndividual(702, level, 'legendary', false);
+    nu.golden = true;
+    nu.iv = { hp: 31, atk: 31, def: 31, spatk: 31, spdef: 31, spd: 31 };
+    state._gotGolden = true;
+    msg = `🏆 แจ็คพอต! ได้ <b>Golden Dedenne</b> Lv.${level} IV 100%!!`;
+    logHtml = `🏆 <b>Golden Dedenne</b> ตัวทองปรากฏจากการ Swap!! (1/100000)`;
+  } else {
+    const tier = weightedTier(1);
+    const pool = MONSTERS.filter(m => m._tier === tier);
+    const mon = pick(pool.length ? pool : MONSTERS);
+    const shiny = Math.random() < SWAP_SHINY_CHANCE;
+    const level = rand(TIER_LEVEL[tier][0], TIER_LEVEL[tier][1]);
+    nu = makeIndividual(mon.id, level, tier, shiny);
+    msg = `🔀 Swap ได้ ${shiny ? '✨' : ''}<b>${mon.name}</b> (${TIER_LABEL[tier]}) Lv.${level}!`;
+    logHtml = `🔀 Swap ${MON_BY_ID[ind.id].name} → <b>${shiny ? '✨' : ''}${mon.name}</b> (${TIER_LABEL[tier]})`;
+  }
+  state.caught.push(nu); state.seen[nu.id] = true;
   save(); renderTopbar();
-  toast(`🔄 เทรดได้ ${shiny ? '✨' : ''}<b>${mon.name}</b> (${TIER_LABEL[mon._tier]}) Lv.${level}!`, 'good');
-  logMsg(`🔄 เทรด ${MON_BY_ID[ind.id].name} → <b>${mon.name}</b> (${TIER_LABEL[mon._tier]})`, 'big');
+  toast(msg, 'good');
+  logMsg(logHtml, 'big');
   checkAchievements(); closeModal(); openIndividualModal(nu.uid); renderCurrentView();
 }
 function releaseIndividual(uid) {
@@ -2498,7 +2527,7 @@ function renderShop() {
       <button class="buy-btn${curClass}" data-i="${i}" ${cant ? 'disabled' : ''}>${label}</button></div>`;
   };
   $('#shopGrid').innerHTML =
-    `<div class="dex-stats">💎 ${state.stones || 0} · 🎟️ ${state.fishTokens || 0} เหรียญตกปลา · 🗓️ ${state.checkinCoins || 0} เหรียญเช็คอิน · บอล: ` +
+    `<div class="dex-stats">💎 ${state.stones || 0} · 🎟️ ${state.fishTokens || 0} เหรียญตกปลา · 🗓️ ${state.checkinCoins || 0} เหรียญเช็คอิน · ${itemIcon('🔀', 'eon-ticket', 'price-ico')} ${state.swapTickets || 0} ตั๋ว Swap · บอล: ` +
     BALL_ORDER.map(k => `${itemIcon(BALLS[k].emoji, BALLS[k].img)}${state.balls[k] || 0}`).join(' ') + `</div>` +
     `<div class="shop-cat">${SHOP_CATS[0].label}</div>` + ballsHtml +
     SHOP_CATS.map(c => {
@@ -2542,6 +2571,13 @@ function grantAmuletDrop() {
   if (Math.random() >= AMULET_DROP_CHANCE) return '';
   state.amulets = (state.amulets || 0) + 1;
   return `🪙 Amulet Coin! (เงิน +${state.amulets * 5}%)`;
+}
+// ตั๋ว Swap — ดรอปหายากจากกล่องสุ่ม/หอคอยเท่านั้น ใช้แลกโปเกมอนกับพ่อค้าเร่ (ดูฟังก์ชัน npcSwap)
+const SWAP_TICKET_DROP_CHANCE = 0.01;   // 1% ต่อการเปิดกล่องสุ่ม/ผ่านชั้นหอคอย
+function grantSwapTicketDrop() {
+  if (Math.random() >= SWAP_TICKET_DROP_CHANCE) return '';
+  state.swapTickets = (state.swapTickets || 0) + 1;
+  return `🔀 ตั๋ว Swap!`;
 }
 function equipHeld(uid, k) {
   const ind = indByUid(uid); if (!ind) return;
@@ -2762,6 +2798,7 @@ function renderMenu() {
   $('#profileBox').querySelectorAll('[data-savepreset]').forEach(el => el.onclick = () => savePreset(+el.dataset.savepreset));
   $('#profileBox').querySelectorAll('[data-loadpreset]').forEach(el => el.onclick = () => loadPreset(+el.dataset.loadpreset));
   $('#profileBox').querySelectorAll('[data-delpreset]').forEach(el => el.onclick = () => deletePreset(+el.dataset.delpreset));
+  const btnCheckin = $('#btnCheckin'); if (btnCheckin) btnCheckin.onclick = claimDailyLogin;
   renderHallOfFame();
   renderShinyDex();
   renderBattleGuide();
@@ -3097,22 +3134,28 @@ const LOGIN_CALENDAR = [
   { day: 7, coins: 800, ball: ['ultra', 3], lockbox: 1, checkin: 50 },   // วันที่ 7 ของรอบ — รางวัลใหญ่ ก่อนวนกลับวันที่ 1
 ];
 function loginCycleDay(streak) { return ((Math.max(1, streak) - 1) % 7) + 1; }   // 1-7 วนทุกสัปดาห์ (ไม่รีเซ็ต streak สะสมจริง)
-function applyDailyLogin() {
-  const today = todayStr();
-  if (state.lastLogin === today) return;
-  const y = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  state.streak = (state.lastLogin === y) ? (state.streak || 0) + 1 : 1;
-  state.lastLogin = today;
+// เช็คอิน — เดิมได้อัตโนมัติวันละครั้งตามวันที่ปฏิทิน เปลี่ยนเป็นกดรับเองได้ทุก 12 ชม. (เร็วขึ้น กด 2 ครั้ง/วันได้ถ้าจำได้)
+const CHECKIN_CD = 12 * 3600000;
+const CHECKIN_GRACE = CHECKIN_CD * 3;   // ทิ้งช่วงเกิน 36 ชม. (3 รอบ) สตรีครีเซ็ตกลับวันที่ 1
+function checkinReadyLeft() { return Math.max(0, (state.checkinReadyAt || 0) - Date.now()); }
+function claimDailyLogin() {
+  const left = checkinReadyLeft();
+  if (left > 0) { toast(`⏳ รอเช็คอินรอบถัดไปอีก ${Math.floor(left / 3600000)}ชม ${Math.floor((left % 3600000) / 60000)}น`, 'bad'); return; }
+  const last = state.lastCheckinAt || 0;
+  state.streak = (last && Date.now() - last <= CHECKIN_GRACE) ? (state.streak || 0) + 1 : 1;
+  state.lastCheckinAt = Date.now();
+  state.checkinReadyAt = Date.now() + CHECKIN_CD;
   const cd = LOGIN_CALENDAR[loginCycleDay(state.streak) - 1];
   state.coins += cd.coins;
   state.balls[cd.ball[0]] = (state.balls[cd.ball[0]] || 0) + cd.ball[1];
   if (cd.lockbox) state.lockboxes = (state.lockboxes || 0) + cd.lockbox;
-  if (cd.checkin) state.checkinCoins = (state.checkinCoins || 0) + cd.checkin;   // เหรียญเช็คอิน — แลกกำไลเมก้า/ไดนาแม็กซ์
-  save();
+  if (cd.checkin) state.checkinCoins = (state.checkinCoins || 0) + cd.checkin;   // เหรียญเช็คอิน — แลกกำไลเมก้า/ไดนาแม็กซ์/ไอเทมพิเศษ
+  save(); renderMenu(); renderTopbar();
   const ballTxt = `${cd.ball[1]}${BALLS[cd.ball[0]].emoji}`;
   const lockboxTxt = cd.lockbox ? ` +${cd.lockbox}🎁` : '';
   const ciTxt = cd.checkin ? ` +${cd.checkin}🗓️เช็คอิน` : '';
-  setTimeout(() => toast(`📅 ล็อกอินวันที่ ${state.streak} ติดต่อกัน (วันที่ ${loginCycleDay(state.streak)}/7)! +${cd.coins}🪙 +${ballTxt}${lockboxTxt}${ciTxt}`, 'good'), 600);
+  toast(`📅 เช็คอินสำเร็จ! วันที่ ${loginCycleDay(state.streak)}/7 (สตรีค ${state.streak}) +${cd.coins}🪙 +${ballTxt}${lockboxTxt}${ciTxt}`, 'good');
+  checkAchievements();
 }
 function applyOfflineRewards() {
   const now = Date.now();
@@ -3180,7 +3223,9 @@ function openLockbox() {
   const total = LOCKBOX_REWARDS.reduce((s, r) => s + r.w, 0);
   let roll = Math.random() * total, chosen = LOCKBOX_REWARDS[0];
   for (const r of LOCKBOX_REWARDS) { if ((roll -= r.w) < 0) { chosen = r; break; } }
-  const desc = chosen.act();
+  let desc = chosen.act();
+  const swapMsg = grantSwapTicketDrop();
+  if (swapMsg) desc += ` + ${swapMsg}`;
   save(); renderTopbar(); renderMenu(); renderBallBar();
   toast(`🎁 เปิดกล่องได้: <b>${desc}</b>!`, 'good');
   logMsg(`🎁 เปิดกล่องสุ่มได้ <b>${desc}</b>`, 'big');
@@ -3237,7 +3282,7 @@ function renderProfile() {
   const legendN = state.caught.filter(c => c.tier === 'legendary').length;
   const playH = Math.floor((state.playSec || 0) / 3600), playM = Math.floor(((state.playSec || 0) % 3600) / 60);
   const partyStrip = state.party.length
-    ? `<div class="party-strip">${partyMembers().map((ind, i) => `<div class="party-mini${i === 0 ? ' lead' : ''} ${tierClass(ind.tier, ind.shiny)}" data-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}<span class="pm-lv">L${ind.level}</span></div>`).join('')}</div>`
+    ? `<div class="party-strip">${partyMembers().map((ind, i) => `<div class="party-mini${i === 0 ? ' lead' : ''} ${tierClass(ind.tier, ind.shiny, ind.golden)}" data-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}<span class="pm-lv">L${ind.level}</span></div>`).join('')}</div>`
     : '<div class="sr-sub" style="margin-top:6px">ยังไม่มีทีม — ตั้ง Buddy/เข้าทีมจากคลัง</div>';
   const prevXp = Math.pow(tl - 1, 2) * 60;
   const xpPct = clamp(Math.round(((state.trainerXp || 0) - prevXp) / Math.max(1, nextXp - prevXp) * 100), 0, 100);
@@ -3257,6 +3302,7 @@ function renderProfile() {
     ${readyStatusHtml()}
     <div style="margin-top:8px;font-size:12px;font-weight:700">📅 ปฏิทินล็อกอิน (วนทุก 7 วัน) · 🗓️ เหรียญเช็คอิน: <b style="color:#ffd76b">${state.checkinCoins || 0}</b></div>
     ${loginCalendarHtml()}
+    ${(() => { const left = checkinReadyLeft(); return `<button class="claim-btn${left > 0 ? ' done' : ''}" id="btnCheckin" style="width:100%;margin-top:6px" ${left > 0 ? 'disabled' : ''}>${left > 0 ? `⏳ รอ ${Math.floor(left / 3600000)}ชม ${Math.floor((left % 3600000) / 60000)}น` : '📅 กดรับเช็คอินวันนี้!'}</button>`; })()}
     <div class="stat-grid">
       <div class="stat-tile"><div class="st-num">${speciesOwnedCount()}/${MONSTERS.length}</div><div class="st-lbl">📖 เดกซ์ (${dexPct}%)</div></div>
       <div class="stat-tile"><div class="st-num">${state.totalCaught}</div><div class="st-lbl">🎯 จับรวม</div></div>
@@ -3319,7 +3365,7 @@ function deletePreset(slot) {
 function hofIndRow(ind, sub) {
   if (!ind) return '';
   const m = MON_BY_ID[ind.id];
-  return `<div class="ind-row ${tierClass(ind.tier, ind.shiny)}" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}
+  return `<div class="ind-row ${tierClass(ind.tier, ind.shiny, ind.golden)}" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}
     <div class="ir-main"><div class="ir-name">${ind.shiny ? '✨' : ''}${ind.nick || m.name}</div>
     <div class="ir-sub">${sub}</div></div></div>`;
 }
@@ -3400,7 +3446,7 @@ function renderHallOfFame() {
   const galleryRow = (list, emptyMsg) => list.length
     ? `<div class="dex-grid">` + list.slice(0, 12).map(ind => {
         const m = MON_BY_ID[ind.id];
-        return `<div class="dex-cell ${tierClass(ind.tier, ind.shiny)}" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}<div class="dname">${ind.nick || m.name}</div><div class="dnum">IV ${ivPercent(ind)}%</div></div>`;
+        return `<div class="dex-cell ${tierClass(ind.tier, ind.shiny, ind.golden)}" data-hof-uid="${ind.uid}">${spriteImg(ind.id, ind.shiny)}<div class="dname">${ind.nick || m.name}</div><div class="dnum">IV ${ivPercent(ind)}%</div></div>`;
       }).join('') + `</div>`
     : `<div class="sr-sub">${emptyMsg}</div>`;
   box.innerHTML = `
@@ -3758,7 +3804,7 @@ function renderBattle() {
 
   const teamStrip = b.team.map((t, i) => {
     const fainted = t.hp <= 0;
-    return `<div class="team-chip${i === b.activeIdx ? ' active' : ''}${fainted ? ' fainted' : ''} ${tierClass(t.ind.tier, t.ind.shiny)}" data-sw="${i}" title="${MON_BY_ID[t.ind.id].name} HP ${Math.ceil(t.hp)}/${t.maxHp}">
+    return `<div class="team-chip${i === b.activeIdx ? ' active' : ''}${fainted ? ' fainted' : ''} ${tierClass(t.ind.tier, t.ind.shiny, t.ind.golden)}" data-sw="${i}" title="${MON_BY_ID[t.ind.id].name} HP ${Math.ceil(t.hp)}/${t.maxHp}">
       ${spriteImg(t.ind.id, t.ind.shiny)}<span class="tc-hp">${Math.ceil(t.hp)}</span></div>`;
   }).join('');
 
@@ -4309,6 +4355,8 @@ function onFoeDown() {
       const amuletMsg = grantAmuletDrop();
       if (amuletMsg) itemMsg = (itemMsg ? itemMsg + ' + ' : '') + amuletMsg;
     }
+    const swapMsg = grantSwapTicketDrop();   // ทุกชั้น — โอกาสหายากได้ตั๋ว Swap
+    if (swapMsg) itemMsg = (itemMsg ? itemMsg + ' + ' : '') + swapMsg;
     if (Math.random() < 0.25) { itemMsg = (itemMsg ? itemMsg + ' + ' : '') + grantRandomBall(); }   // 25% ดรอปบอลพิเศษนอกร้าน
     if (floor > (state.tower.bestFloor || 0)) state.tower.bestFloor = floor;
     state.tower.floor = floor + 1;
@@ -4666,6 +4714,16 @@ function renderRival() {
 function updateRivalCd() {
   if (!$('#rivalBox') || currentView !== 'menu') return;
   renderRival();
+}
+function updateCheckinCd() {
+  const btn = $('#btnCheckin'); if (!btn || currentView !== 'menu') return;
+  const left = checkinReadyLeft();
+  if (left > 0) {
+    btn.disabled = true; btn.classList.add('done');
+    btn.textContent = `⏳ รอ ${Math.floor(left / 3600000)}ชม ${Math.floor((left % 3600000) / 60000)}น`;
+  } else if (btn.disabled) {
+    btn.disabled = false; btn.classList.remove('done'); btn.textContent = '📅 กดรับเช็คอินวันนี้!';
+  }
 }
 // ================================================================
 //  MEGA LEAGUE — บอสร่างเมก้า สุ่ม 5 ตัว/สัปดาห์ · ชนะได้หินเมก้าของบอสนั้น
@@ -5364,7 +5422,6 @@ function updateCloudStatus() {
 function init() {
   load();
   applyOfflineRewards();   // ต้องอ่าน lastSeen เก่าก่อน save ใดๆ
-  applyDailyLogin();
   checkWeeklyEvent();       // แจ้งอีเวนต์ประจำสัปดาห์ถ้าเข้าสัปดาห์ใหม่
   ensureDailyQuests();
   fillDexFilter();
@@ -5418,6 +5475,7 @@ function init() {
   tryTriggerRandomEvent();   // เช็คทันทีตอนเปิดเกมด้วย (มีโอกาสเกิดตั้งแต่แรก)
   setInterval(updateMerchantCd, 1000);
   setInterval(updateRivalCd, 1000);
+  setInterval(updateCheckinCd, 1000);
   applyReduceMotion();
   window.addEventListener('beforeunload', () => { state.lastSeen = Date.now(); save(); });
 
@@ -5438,5 +5496,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     startMegaLeagueBattle, startGhostBattle, startTowerBattle, startRivalBattle, towerFoeDef,
     pickLegendaryGenWeighted, genOf, onFoeDown, endBattle, throwBall, save, switchView,
     renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop,
+    openIndividualModal, tradeNpc, claimDailyLogin, selectRegion,
   };
 }
