@@ -3935,14 +3935,6 @@ function renderVictory(b) {
 }
 function renderBattle() {
   const b = battleState; if (!b) return;
-  // พื้นหลังฉากต่อสู้ (battle background เกมจริง) — หรี่เข้มให้อ่าน UI ง่าย ทำให้ดูเหมือนเกมจริง
-  const bx = $('#battleBox');
-  if (bx) {
-    const bg = REGION_BATTLE_BG[state.region];
-    bx.style.background = bg
-      ? `linear-gradient(180deg, rgba(10,14,30,.74), rgba(8,10,22,.86)), url('${SHOWDOWN_FX}${bg}') center/cover no-repeat`
-      : '';
-  }
   if (b.showIntro) { renderBattleIntro(b); return; }
   if (b.over && b.victory) { renderVictory(b); return; }
   const active = b.team[b.activeIdx];
@@ -3990,23 +3982,31 @@ function renderBattle() {
   const specialBadge = view.special ? `<span class="badge" style="background:linear-gradient(90deg,#ff6b6b,#ffcb05)">${active.mega ? '💎 MEGA' : '💥 G-MAX'}</span>` : (active.dynamax ? `<span class="badge" style="background:#e23b4e">💥 DYNAMAX ${active.dynamax.turnsLeft}T</span>` : '');
   const foeSpecialBadge = b.special ? `<span class="badge" style="background:${b.special === 'mega' ? 'linear-gradient(90deg,#8e5bff,#5a2ba8)' : b.special === 'gmax' ? 'linear-gradient(90deg,#ff6b6b,#c1122e)' : '#555'}">${b.special === 'mega' ? '💎 MEGA' : b.special === 'gmax' ? '💥 G-MAX' : '⭐ ELITE'}</span>` : '';
 
+  const bbg = REGION_BATTLE_BG[state.region];
+  const sceneBg = bbg
+    ? `background:linear-gradient(180deg,rgba(10,14,30,.12),rgba(8,10,22,.42)),url('${SHOWDOWN_FX}${bbg}') center/cover no-repeat`
+    : 'background:linear-gradient(180deg,#3b6b8a,#1a2f4a)';
+  const playerSprite = view.special ? spriteImg(view.spriteId, active.ind.shiny) : backSpriteImg(active.ind.id, active.ind.shiny);
+  const foeTag = b.mode === 'trainer' ? `<span class="bt-foe-dots">${b.foeQueue.map((_, i) => `<span class="fd${i < b.foeIdx ? ' down' : i === b.foeIdx ? ' cur' : ''}"></span>`).join('')}</span>`
+    : b.mode === 'tower' ? `<span class="bt-scene-tag">🗼 ชั้น ${b.floorNow}${b.special ? ' · บอส!' : ''}</span>`
+    : b.isBoss ? `<span class="bt-scene-tag">👑 บอสเขต</span>` : '';
   $('#battleBox').innerHTML = `
     ${curWeather.boost && curWeather.boost.length ? `<div style="font-size:11px;color:#9fd3ff;font-weight:700;text-align:center;margin-bottom:4px">${curWeather.emoji} ${curWeather.name} — ท่าธาตุ ${curWeather.boost.join('/')} แรงขึ้น ×1.2${curWeather.dotImmune ? ` · ธาตุอื่นโดนซัดทุกเทิร์น (ยกเว้น ${curWeather.dotImmune.join('/')})` : ''}</div>` : ''}
-    <div class="battle-arena">
-      <div class="bt-side foe">
-        ${b.mode === 'trainer' ? `<div class="bt-foe-trainer">${trainerImg(foeTr, 'bt-trainer')}<span>${b.gym.emoji} ${b.gym.name}</span><span class="bt-foe-dots">${b.foeQueue.map((_, i) => `<span class="fd${i < b.foeIdx ? ' down' : i === b.foeIdx ? ' cur' : ''}"></span>`).join('')}</span></div>` : ''}
-        ${b.isBoss ? `<div class="bt-foe-trainer">${trainerImg(foeTr, 'bt-trainer')}<span>👑 บอสประจำเขต</span></div>` : ''}
-        ${b.mode === 'tower' ? `<div style="font-size:11px;color:#ffd76b;font-weight:700">🗼 ชั้น ${b.floorNow}${b.special ? ' · บอส!' : ''} · สูงสุด ${state.tower.bestFloor || 0}</div>` : ''}
-        <div class="bt-head"><span>${b.isBoss ? '👑 ' : ''}${foeName} Lv.${b.foeLevel} ${statusBadge(b.foe.status)} ${foeSpecialBadge}${b.foeHeld ? ` <span class="badge" style="background:#3a3a55" title="${HELD_ITEMS[b.foeHeld].desc}">${HELD_ITEMS[b.foeHeld].emoji} ${HELD_ITEMS[b.foeHeld].name}</span>` : ''} ${abilityBadge(foeAbility)} ${foeTypes.map(t => `<span class="badge t-${t}" style="font-size:9px;padding:1px 6px">${t}</span>`).join('')}</span>${spriteImg(foeSpriteId, false)}</div>
+    <div class="bt-scene" style="${sceneBg}">
+      ${(b.mode === 'trainer' || b.isBoss) ? `<div class="bt-scene-trainer">${trainerImg(foeTr, 'bt-trainer')}</div>` : ''}
+      <div class="bt-hpbox foe-box">
+        <div class="bt-hpname">${b.isBoss ? '👑 ' : ''}${foeName} <span class="bt-lv">Lv.${b.foeLevel}</span> ${statusBadge(b.foe.status)}${foeSpecialBadge} ${foeTag}</div>
         <div class="bt-hpbar"><div class="${hpCls(b.foeHp, b.foeMaxHp)}" style="width:${foePct}%"></div></div>
-        <div class="hp-txt" style="text-align:left">HP ${Math.ceil(b.foeHp)}/${b.foeMaxHp}</div>
-        <div style="text-align:left;margin-top:2px">${stageBadges(b.foe.stages)}</div>
+        <div class="bt-hpfoot"><span>${foeTypes.map(t => `<span class="badge t-${t}" style="font-size:8px;padding:1px 5px">${t}</span>`).join('')}${abilityBadge(foeAbility)}${b.foeHeld ? ` <span class="badge" style="background:#3a3a55;font-size:8px;padding:1px 5px" title="${HELD_ITEMS[b.foeHeld].desc}">${HELD_ITEMS[b.foeHeld].emoji}</span>` : ''}</span><span>${Math.ceil(b.foeHp)}/${b.foeMaxHp}</span></div>
+        ${stageBadges(b.foe.stages) ? `<div class="bt-stages">${stageBadges(b.foe.stages)}</div>` : ''}
       </div>
-      <div class="bt-side me">
-        <div class="bt-head">${spriteImg(view.spriteId, view.special ? false : active.ind.shiny)}<span>${view.name} Lv.${active.ind.level} ${genderIcon(active.ind.gender)} ${statusBadge(active.status)} ${specialBadge} ${abilityBadge(myAbility)}</span></div>
+      <div class="bt-side foe bt-mon-foe"><div class="bt-scene-plat"></div><div class="bt-head">${spriteImg(foeSpriteId, false)}</div></div>
+      <div class="bt-side me bt-mon-me"><div class="bt-scene-plat"></div><div class="bt-head">${playerSprite}</div></div>
+      <div class="bt-hpbox me-box">
+        <div class="bt-hpname">${view.name} <span class="bt-lv">Lv.${active.ind.level}</span> ${genderIcon(active.ind.gender)} ${statusBadge(active.status)}${specialBadge}</div>
         <div class="bt-hpbar"><div class="${hpCls(active.hp, active.maxHp)}" style="width:${myPct}%"></div></div>
-        <div class="hp-txt" style="text-align:right">HP ${Math.ceil(active.hp)}/${active.maxHp}</div>
-        <div style="text-align:right;margin-top:2px">${stageBadges(active.stages)}</div>
+        <div class="bt-hpfoot"><span>${abilityBadge(myAbility)}</span><span>${Math.ceil(active.hp)}/${active.maxHp}</span></div>
+        ${stageBadges(active.stages) ? `<div class="bt-stages">${stageBadges(active.stages)}</div>` : ''}
       </div>
     </div>
     <div class="team-strip">${teamStrip}</div>
