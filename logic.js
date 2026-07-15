@@ -118,14 +118,14 @@ export function damageCore(atkMon, atkStats, atkLevel, defMon, defStats, move, h
   if (opts.defAbility && opts.defAbility.immuneType === moveType) eff = 0;   // Levitate ฯลฯ
   const isStab = atkMon.types.includes(moveType);
   let stab = isStab ? 1.5 : 1;
-  if (isStab && opts.atkAbility && opts.atkAbility.name === 'Adaptability') stab = 2;
+  if (isStab && opts.atkAbility && opts.atkAbility.fx === 'adaptability') stab = 2;
   if (opts.atkAbility && opts.atkAbility.boostType === moveType && opts.atkHpRatio != null && opts.atkHpRatio <= 1 / 3) power *= 1.5;
-  if (physical && opts.atkAbility && opts.atkAbility.name === 'Guts' && opts.atkHasStatus) A = Math.floor(A * 1.5);
+  if (physical && opts.atkAbility && opts.atkAbility.fx === 'guts' && opts.atkHasStatus) A = Math.floor(A * 1.5);
   const crit = critRand < (held === 'scope-lens' ? 4 / 16 : 1 / 16);
   let dmg = (((2 * atkLevel / 5 + 2) * power * A / Math.max(1, D)) / 50 + 2);
   dmg = dmg * stab * eff * (0.85 + rollRand * 0.15) * (crit ? 1.5 : 1) * (weatherBoost ? 1.2 : 1);
   if (held === 'life-orb') dmg *= 1.3;
   if (held === 'expert-belt' && eff > 1) dmg *= 1.2;
-  if (opts.defAbility && opts.defAbility.name === 'Multiscale' && opts.defHpRatio != null && opts.defHpRatio >= 1) dmg *= 0.5;
+  if (opts.defAbility && opts.defAbility.fx === 'multiscale' && opts.defHpRatio != null && opts.defHpRatio >= 1) dmg *= 0.5;
   return { dmg: Math.max(1, Math.floor(dmg)), eff, crit, weather: weatherBoost };
 }
