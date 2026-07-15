@@ -31,7 +31,22 @@ const SP = {
   artS:  id => `${SP_BASE}/other/official-artwork/shiny/${id}.png`,   // ภาพนิ่งสี shiny
   png:   id => `${SP_BASE}/${id}.png`,
   pngS:  id => `${SP_BASE}/shiny/${id}.png`,                          // png สี shiny
+  // ===== ภาพด้านหลัง (สำหรับโปเกมอนฝั่งเรา หันหลังให้ผู้เล่นแบบเกมจริง) =====
+  backGif:  id => `${SP_BASE}/other/showdown/back/${id}.gif`,
+  backGifS: id => `${SP_BASE}/other/showdown/back/shiny/${id}.gif`,
+  backAnim: id => `${SP_BASE}/versions/generation-v/black-white/animated/back/${id}.gif`,
+  backAnimS:id => `${SP_BASE}/versions/generation-v/black-white/animated/back/shiny/${id}.gif`,
+  back:  id => `${SP_BASE}/back/${id}.png`,
+  backS: id => `${SP_BASE}/back/shiny/${id}.png`,
 };
+// ลำดับภาพด้านหลัง — showdown back (ขยับ) → gen5 back (ขยับ) → png back (นิ่ง)
+function backSpriteImg(id, shiny, cls) {
+  const chain = shiny
+    ? [SP.backGifS(id), (id <= 649 ? SP.backAnimS(id) : null), SP.backS(id), SP.pngS(id)]
+    : [SP.backGif(id), (id <= 649 ? SP.backAnim(id) : null), SP.back(id), SP.png(id)];
+  const list = chain.filter(Boolean);
+  return `<img class="${cls || ''}" loading="lazy" src="${list[0]}" data-fb="${list.slice(1).join('|')}" onerror="__sf(this)" alt="">`;
+}
 // ลำดับรูปที่จะลอง — เอา "showdown" (สไปรต์ขยับแบบ PokeMeow) เป็นหลัก
 // ถ้าไม่มี ค่อยลอง gen5 ขยับ (ตัวเก่า) แล้วค่อยภาพนิ่ง (artwork)
 function spriteChain(id, shiny) {
@@ -1352,7 +1367,8 @@ function doSpawn() {
   const r = region();
   const we = currentWorldEvent();
   const berryLuck = consumeBerryLuck();   // เบอร์รี่: เพิ่มโอกาสเจอตัวหายากสำหรับสปอว์นนี้ (ไม่ใช่โอกาสจับ)
-  const luck = r.boost + (isEventActive() ? 1 : 0) + (we ? 1 : 0) + berryLuck;
+  // อัตราความหายากเท่ากันทุกแมพ (ไม่มีโบนัสประจำเขต) — แต่ละแมพต่างกันแค่ "ธาตุ" ที่ออก (r._pool กรองตามธาตุเขต)
+  const luck = (isEventActive() ? 1 : 0) + (we ? 1 : 0) + berryLuck;
   let mon;
   // ชั้น1: เจอเทพเท่ากันทุกแมพ 1/666 (มีอีเวนต์ = 1/500) แล้วสุ่มว่าเป็นเทพเจนไหน (เจน 9 ยากสุด)
   const inEvent = isEventActive() || !!we;
@@ -1757,10 +1773,24 @@ function mascotDecoHtml(ids) {
   return (ids || []).map((id, i) =>
     `<span class="deco-mon" style="left:${6 + i * 23}%;top:${8 + (i % 3) * 24}%;animation-delay:${i * .7}s">${spriteImg(id, false)}</span>`).join('');
 }
+// วาดฝั่งเรา (โปเกมอนหันหลัง + เทรนเนอร์ยืนข้างหลัง) — คงอยู่เสมอ ไม่ขึ้นกับสปอว์นป่า
+function renderBuddyScene() {
+  const wrap = $('#buddyBackWrap'); if (!wrap) return;
+  const b = getBuddy();
+  const tr = $('#trainerBack');
+  if (b) {
+    wrap.innerHTML = backSpriteImg(b.id, b.shiny, 'buddy-mon');
+    if (tr) { tr.src = TRAINER_SP_BASE + TRAINER_SPRITES.player + '.png'; tr.classList.remove('ts-hide'); tr.onerror = () => tr.classList.add('ts-hide'); }
+  } else {
+    wrap.innerHTML = '';
+    if (tr) tr.classList.add('ts-hide');
+  }
+}
 function renderSpawn() {
   const card = $('#spawnCard');
   card.classList.remove('rare-glow', 'legend-glow', 'shiny-glow');
   const battleBtn = $('#battleBtn');
+  renderBuddyScene();
   if (!currentSpawn) {
     card.classList.add('empty');
     $('#spawnTop').innerHTML = '';
@@ -2008,18 +2038,15 @@ function selectRegion(id) {
   state.region = id; save();
   renderRegionBanner(); clearSpawn(); scheduleSpawn(1500);
   switchView('home');
+  summonBuddyFx();   // เทรนเนอร์เรียกโปเกมอนออกมาตอนเข้าเขต
   toast(`${r.emoji} เดินทางสู่ <b>${r.name}</b>`, 'good');
 }
-
-// % โอกาสเจอแต่ละระดับของเขต (ตามระบบ PokeMeow — ใช้แสดงในแผนที่)
-function regionRates(r) {
-  const luck = r.boost;
-  const superrare = 3 + luck * 3;
-  const rare = 27 + luck * 5;
-  const uncommon = 30;
-  const common = Math.max(0, 100 - superrare - rare - uncommon);
-  const legendary = LEGENDARY_CHANCE * (1 + r.boost * 0.6) * 100;
-  return { common, uncommon, rare, superrare, legendary };
+// เอฟเฟคเรียกโปเกมอนฝั่งเราเด้งออกมา (ตอนเข้าเขต) — เด้งบอลจากเทรนเนอร์แล้วบัดดี้ปรากฏ
+function summonBuddyFx() {
+  if (state.settings && state.settings.reduceMotion) return;
+  const wrap = $('#buddyBackWrap'); if (!wrap || !getBuddy()) return;
+  wrap.classList.remove('summon'); void wrap.offsetWidth; wrap.classList.add('summon');
+  setTimeout(() => wrap.classList.remove('summon'), 600);
 }
 
 // ================================================================
@@ -2087,17 +2114,16 @@ function openRegionPopup(id) {
   const owned = speciesOwnedCount();
   const locked = r.unlock && !state.unlocked[id];
   const beaten = state.badges[id];
-  const rt = regionRates(r);
-  const rates = TIER_ORDER.filter(t => r._byTier[t] && r._byTier[t].length)
-    .map(t => `<span class="mc-rate rarity-${t}">${TIER_EMOJI[t]} ${TIER_LABEL[t]} ${rt[t] < 1 ? rt[t].toFixed(2) : rt[t].toFixed(t === 'superrare' ? 1 : 0)}%</span>`).join('');
+  // อัตราความหายากเท่ากันทุกแมพ — โชว์แค่ "ธาตุที่พบในเขตนี้" (จุดต่างของแต่ละแมพ) ไม่โชว์เปอร์เซ็นต์
+  const typeChips = r.types.map(t => `<span class="badge t-${t}">${TYPE_EMOJI[t] || ''} ${t}</span>`).join('');
   $('#modalBox').innerHTML = `
     <div style="height:96px;border-radius:14px;background:${regionBgCss(r)};background-size:cover;display:flex;align-items:flex-end;padding:8px 12px;margin-bottom:10px;position:relative;overflow:hidden">
       <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.1),rgba(0,0,0,.6))"></div>
       <div style="position:relative;font-size:20px;font-weight:900;color:#fff;text-shadow:0 2px 6px #000">${r.emoji} ${r.name}${beaten ? ' 🏅' : ''}</div>
     </div>
     <div class="sr-sub" style="text-align:left;margin-bottom:8px">${r.desc}</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:4px">เลเวลป่า Lv.${r.lvl[0]}–${r.lvl[1]}</div>
-    <div class="mc-rates" style="justify-content:center;margin-bottom:12px">${rates}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:4px">เลเวลป่า Lv.${r.lvl[0]}–${r.lvl[1]} · ธาตุที่พบบ่อยในเขตนี้:</div>
+    <div class="tags" style="justify-content:center;margin-bottom:12px">${typeChips}</div>
     ${locked
       ? `<div class="empty-state" style="padding:14px"><div class="es-ico">🔒</div><div class="es-title">ยังปลดล็อกไม่ได้</div><div class="es-sub">จับให้ครบ ${r.unlock} ชนิดก่อน (ตอนนี้ ${owned}/${r.unlock})</div></div>
          <div class="modal-actions"><button class="btn-ghost" id="rpClose">ปิด</button></div>`

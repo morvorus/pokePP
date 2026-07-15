@@ -60,9 +60,19 @@
         <div class="deco" id="spawnDeco"></div>
         <div class="spawn-inner">
           <div class="spawn-top" id="spawnTop"></div>
-          <div id="spawnSpriteWrap" class="sprite-wrap">
+          <div id="battleScene" class="battle-scene">
+            <div class="scene-foe">
+              <div class="scene-plat foe-plat"></div>
+              <div id="spawnSpriteWrap" class="sprite-wrap foe-mon">
+                <img id="spawnSprite" alt="wild monster" />
+              </div>
+            </div>
+            <div class="scene-me">
+              <div class="scene-plat me-plat"></div>
+              <img id="trainerBack" class="scene-trainer ts-hide" alt="" />
+              <div id="buddyBackWrap" class="scene-buddy"></div>
+            </div>
             <div id="throwBall" class="throw-ball hidden">🔴</div>
-            <img id="spawnSprite" alt="wild monster" />
           </div>
           <div id="spawnTags" class="tags"></div>
           <div id="wildHp" class="wild-hp"></div>

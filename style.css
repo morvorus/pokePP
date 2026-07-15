@@ -237,40 +237,53 @@ h2.view-title::after {
   background: rgba(0,0,0,.55); color: #fff; font-weight: 800; font-size: 13px;
   padding: 3px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.2);
 }
-.sprite-wrap { height: 150px; display: flex; align-items: center; justify-content: center; position: relative; }
-.sprite-wrap img {
-  max-height: 150px; max-width: 62%; image-rendering: pixelated;
-  filter: drop-shadow(0 8px 10px rgba(0,0,0,.5)); animation: bob 2s ease-in-out infinite;
-}
-.spawn-card.empty .sprite-wrap img { display: none; }
-.sprite-wrap img.wobble { animation: wobble .5s ease; }
-@keyframes bob { 0%,100%{ transform: translateY(0);} 50%{ transform: translateY(-8px);} }
-@keyframes wobble { 0%,100%{ transform: rotate(0);} 25%{ transform: rotate(-12deg);} 75%{ transform: rotate(12deg);} }
+/* ===== ฉากต่อสู้แบบเกมจริง: เรา(หันหลัง)ซ้ายล่าง + เทรนเนอร์ · ป่าขวาบน ===== */
+.battle-scene { position: relative; height: 200px; }
+.scene-foe { position: absolute; top: 6px; right: 4%; width: 132px; height: 122px; }
+.scene-me  { position: absolute; bottom: 0; left: 2%; width: 156px; height: 132px; }
+.scene-plat { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(22,64,26,.6), rgba(0,0,0,.12) 62%, transparent 74%); }
+.foe-plat { width: 120px; height: 26px; }
+.me-plat  { width: 146px; height: 30px; }
+.sprite-wrap { position: relative; }
+.foe-mon { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); height: 102px; display: flex; align-items: flex-end; justify-content: center; }
+.foe-mon img { max-height: 102px; max-width: 122px; image-rendering: pixelated; filter: drop-shadow(0 6px 7px rgba(0,0,0,.5)); animation: bob 2s ease-in-out infinite; }
+.scene-buddy { position: absolute; bottom: 14px; left: 46%; transform: translateX(-50%); height: 116px; display: flex; align-items: flex-end; justify-content: center; }
+.scene-buddy img { max-height: 116px; max-width: 138px; image-rendering: pixelated; filter: drop-shadow(0 6px 7px rgba(0,0,0,.5)); animation: bobBack 2.6s ease-in-out infinite; }
+.scene-trainer { position: absolute; bottom: 18px; left: -4px; height: 78px; image-rendering: pixelated; filter: drop-shadow(0 4px 5px rgba(0,0,0,.5)); z-index: 1; }
+.scene-trainer.ts-hide { display: none; }
+.spawn-card.empty .scene-foe { visibility: hidden; }
+@keyframes bob { 0%,100%{ transform: translateX(-50%) translateY(0);} 50%{ transform: translateX(-50%) translateY(-7px);} }
+@keyframes bobBack { 0%,100%{ transform: translateX(-50%) translateY(0);} 50%{ transform: translateX(-50%) translateY(-5px);} }
+.reduce-motion .foe-mon img, .reduce-motion .scene-buddy img { animation: none; }
 .throw-ball {
-  position: absolute; bottom: 0; left: 50%; font-size: 34px; z-index: 3;
-  transform: translateX(-50%);
+  position: absolute; left: 22%; bottom: 24px; font-size: 30px; z-index: 6;
 }
+.throw-ball .tb-img { width: 40px; height: 40px; }
 .throw-ball.hidden { display: none; }
-.throw-ball.animate { animation: toss .6s ease forwards; }
-@keyframes toss {
-  0% { bottom: -20px; transform: translateX(-50%) scale(.6);}
-  60% { bottom: 90px; transform: translateX(-50%) scale(1) rotate(360deg);}
-  100% { bottom: 70px; transform: translateX(-50%) scale(1) rotate(540deg);}
+.throw-ball.animate { animation: tossArc .6s ease-in forwards; }
+@keyframes tossArc {
+  0% { left: 22%; bottom: 24px; transform: scale(.6) rotate(0);}
+  60% { left: 64%; bottom: 128px; transform: scale(1) rotate(360deg);}
+  100% { left: 76%; bottom: 92px; transform: scale(1) rotate(540deg);}
 }
-.throw-ball.shake { bottom: 70px; animation: ballshake .42s ease-in-out 3; }
+.throw-ball.shake { left: 76%; bottom: 92px; animation: ballshake .42s ease-in-out 3; }
 @keyframes ballshake {
-  0%,100% { transform: translateX(-50%) rotate(0); }
-  25% { transform: translateX(-58%) rotate(-26deg); }
-  75% { transform: translateX(-42%) rotate(26deg); }
+  0%,100% { transform: rotate(0); }
+  25% { transform: translateX(-6px) rotate(-26deg); }
+  75% { transform: translateX(6px) rotate(26deg); }
 }
-/* shiny sparkle บนตัวที่ปรากฏ */
-.spawn-card.shiny-glow .sprite-wrap::after {
-  content: '✨'; position: absolute; top: 8px; left: 50%; font-size: 22px;
+/* แอนิเมชันเรียกโปเกมอนออกจากบอลตอนเข้าเขต */
+.scene-buddy.summon img { animation: summonPop .5s cubic-bezier(.2,1.4,.4,1); }
+@keyframes summonPop { 0% { opacity: 0; transform: translateX(-50%) scale(.2);} 60% { opacity: 1; transform: translateX(-50%) scale(1.12);} 100% { transform: translateX(-50%) scale(1);} }
+/* shiny sparkle บนตัวป่าที่ปรากฏ */
+.spawn-card.shiny-glow .foe-mon::after {
+  content: '✨'; position: absolute; top: 0; left: 50%; font-size: 20px;
   animation: sparkle 1.3s ease-in-out infinite; pointer-events: none;
 }
 @keyframes sparkle {
-  0%,100% { opacity: .25; transform: translate(-34px, 4px) scale(.8); }
-  50% { opacity: 1; transform: translate(30px, 16px) scale(1.25); }
+  0%,100% { opacity: .25; transform: translate(-28px, 4px) scale(.8); }
+  50% { opacity: 1; transform: translate(26px, 14px) scale(1.2); }
 }
 .empty-msg { color: var(--muted); padding: 40px 0; font-size: 15px; position: relative; z-index: 2; }
 .hint { min-height: 0; }
