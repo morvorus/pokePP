@@ -646,6 +646,20 @@ function regionBgCss(r) {
   if (!r.bgImg) return r.bg;
   return `linear-gradient(180deg, rgba(10,12,26,.1), rgba(10,12,26,.28)), url('${r.bgImg}') center/cover no-repeat, ${r.bg}`;
 }
+// ===== ฉากพื้นหลังการต่อสู้แบบเกมจริง (Pokémon Showdown battle backgrounds) — โหลดได้จริง ตรวจแล้ว =====
+const SHOWDOWN_FX = 'https://play.pokemonshowdown.com/fx/';
+const REGION_BATTLE_BG = {
+  plains: 'bg-meadow.png', forest: 'bg-forest.png', sea: 'bg-beach.png', cave: 'bg-dampcave.png',
+  volcano: 'bg-volcanocave.png', power: 'bg-city.png', desert: 'bg-desert.png', swamp: 'bg-river.png',
+  snow: 'bg-mountain.png', deepsea: 'bg-deepsea.png', mystic: 'bg-earthycave.png', ruins: 'bg-earthycave.png',
+  sky: 'bg-mountain.png', dragon: 'bg-volcanocave.png', crystal: 'bg-icecave.png', void: 'bg-space.jpg',
+};
+// พื้นหลังฉากล่า/สู้ — ใช้ battle background เกมจริงถ้ามีแมป (ล่างมืดนิดให้ตัวเด่น) ไม่งั้น fallback ภาพเขตเดิม
+function sceneBgCss(r) {
+  const bg = REGION_BATTLE_BG[r.id];
+  if (!bg) return regionBgCss(r);
+  return `linear-gradient(180deg, rgba(10,12,26,.05) 40%, rgba(10,12,26,.35) 100%), url('${SHOWDOWN_FX}${bg}') center/cover no-repeat, ${r.bg}`;
+}
 
 // ================================================================
 //  data prep
@@ -1749,7 +1763,7 @@ function renderRegionBanner() {
   const wkChip = ` · <b style="color:#c9a3ff" title="${wk.desc} · เหรียญ ×${WEEKLY_COIN_MULT} · เลเจนดารี ×${WEEKLY_LEG_MULT} ทั้งสัปดาห์ (เหลือ ${weeklyEventDaysLeft()} วัน)">📅 ${wk.emoji} ${wk.name}</b>`;
   $('#rbLvl').innerHTML = `${timeIco} · ${w.emoji}${w.name}${wkChip}${ev}${safari}`;
   const card = $('#spawnCard');
-  card.style.background = regionBgCss(r);
+  card.style.background = sceneBgCss(r);
   card.classList.toggle('night', timeOfDay() === 'night');
   renderBoostStrip();
 
@@ -1773,18 +1787,11 @@ function mascotDecoHtml(ids) {
   return (ids || []).map((id, i) =>
     `<span class="deco-mon" style="left:${6 + i * 23}%;top:${8 + (i % 3) * 24}%;animation-delay:${i * .7}s">${spriteImg(id, false)}</span>`).join('');
 }
-// วาดฝั่งเรา (โปเกมอนหันหลัง + เทรนเนอร์ยืนข้างหลัง) — คงอยู่เสมอ ไม่ขึ้นกับสปอว์นป่า
+// วาดฝั่งเรา (โปเกมอนหันหลังยืนบนพื้น) — คงอยู่เสมอ ไม่ขึ้นกับสปอว์นป่า
 function renderBuddyScene() {
   const wrap = $('#buddyBackWrap'); if (!wrap) return;
   const b = getBuddy();
-  const tr = $('#trainerBack');
-  if (b) {
-    wrap.innerHTML = backSpriteImg(b.id, b.shiny, 'buddy-mon');
-    if (tr) { tr.src = TRAINER_SP_BASE + TRAINER_SPRITES.player + '.png'; tr.classList.remove('ts-hide'); tr.onerror = () => tr.classList.add('ts-hide'); }
-  } else {
-    wrap.innerHTML = '';
-    if (tr) tr.classList.add('ts-hide');
-  }
+  wrap.innerHTML = b ? backSpriteImg(b.id, b.shiny, 'buddy-mon') : '';
 }
 function renderSpawn() {
   const card = $('#spawnCard');
@@ -3928,6 +3935,14 @@ function renderVictory(b) {
 }
 function renderBattle() {
   const b = battleState; if (!b) return;
+  // พื้นหลังฉากต่อสู้ (battle background เกมจริง) — หรี่เข้มให้อ่าน UI ง่าย ทำให้ดูเหมือนเกมจริง
+  const bx = $('#battleBox');
+  if (bx) {
+    const bg = REGION_BATTLE_BG[state.region];
+    bx.style.background = bg
+      ? `linear-gradient(180deg, rgba(10,14,30,.74), rgba(8,10,22,.86)), url('${SHOWDOWN_FX}${bg}') center/cover no-repeat`
+      : '';
+  }
   if (b.showIntro) { renderBattleIntro(b); return; }
   if (b.over && b.victory) { renderVictory(b); return; }
   const active = b.team[b.activeIdx];
