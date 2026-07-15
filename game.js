@@ -613,6 +613,16 @@ const REGIONS = [
     bg: 'linear-gradient(180deg,#1a0a2e 0%,#2a1050 45%,#05030f 100%)',
     desc: 'ขอบสุดของโลก มิติบิดเบี้ยว โอกาสเจอเทพสูงสุด', unlock: 80 },
 ];
+// ตำแหน่งบนแผนที่โลก (% ของกล่องแผนที่) + ธีมภูมิประเทศ (ตกแต่งเฉพาะจุดให้ตรงชื่อเขต) — สร้างขึ้นเอง ไม่อิงของจริง
+const WORLD_POS = {
+  plains:  { x: 24, y: 58 }, forest:  { x: 35, y: 71 }, sea:     { x: 10, y: 42 },
+  cave:    { x: 45, y: 54 }, volcano: { x: 55, y: 69 }, power:   { x: 31, y: 43 },
+  desert:  { x: 47, y: 85 }, swamp:   { x: 17, y: 80 }, snow:    { x: 61, y: 27 },
+  deepsea: { x: 86, y: 60 }, mystic:  { x: 72, y: 47 }, ruins:   { x: 53, y: 39 },
+  sky:     { x: 41, y: 13 }, dragon:  { x: 76, y: 79 }, crystal: { x: 89, y: 37 },
+  void:    { x: 93, y: 13 },
+};
+REGIONS.forEach(r => { const p = WORLD_POS[r.id]; if (p) { r.wx = p.x; r.wy = p.y; } });
 const REGION_BY_ID = {};
 REGIONS.forEach(r => { REGION_BY_ID[r.id] = r; });
 // รวมภาพพื้นหลังจริง (bgImg) กับ gradient เดิม (bg) เป็น CSS background เดียว
@@ -2015,37 +2025,91 @@ function regionRates(r) {
 // ================================================================
 //  MAP view
 // ================================================================
+// ===== แผนที่โลกแฟนตาซี (สร้างขึ้นเอง) — ทุกเขตเป็นหมุดบนแผ่นดินเดียว ตำแหน่งตรงกับธีมชื่อเขต =====
+// ตกแต่งภูมิประเทศเฉพาะจุด (อีโมจิจางๆ) ให้แต่ละที่มีเอกลักษณ์ เช่น รังมังกรมีกระดูกมังกร ยอดเขาหิมะมีภูเขา
+const WORLD_DECOR = [
+  { x: 41, y: 6, e: '☁️', s: 30 }, { x: 48, y: 18, e: '☁️', s: 22 }, { x: 34, y: 16, e: '☁️', s: 20 },
+  { x: 61, y: 19, e: '⛰️', s: 30 }, { x: 66, y: 23, e: '❄️', s: 20 }, { x: 56, y: 22, e: '🏔️', s: 26 },
+  { x: 55, y: 62, e: '🌋', s: 20 }, { x: 47, y: 92, e: '🌵', s: 26 }, { x: 53, y: 90, e: '🌵', s: 18 },
+  { x: 76, y: 71, e: '🦴', s: 30 }, { x: 82, y: 82, e: '🦴', s: 22 }, { x: 70, y: 84, e: '🐉', s: 20 },
+  { x: 17, y: 72, e: '🌿', s: 24 }, { x: 89, y: 30, e: '💠', s: 26 }, { x: 93, y: 6, e: '🌀', s: 30 },
+  { x: 86, y: 68, e: '🌊', s: 24 }, { x: 6, y: 33, e: '🐚', s: 20 }, { x: 53, y: 33, e: '🏛️', s: 24 },
+  { x: 72, y: 40, e: '🔮', s: 22 }, { x: 35, y: 64, e: '🌳', s: 24 }, { x: 45, y: 48, e: '🕳️', s: 22 },
+];
 function renderMap() {
+  const wm = $('#worldMap'); if (!wm) return;
   const owned = speciesOwnedCount();
-  $('#mapGrid').innerHTML = REGIONS.map(r => {
+  const decor = WORLD_DECOR.map(d => `<text x="${d.x * 10}" y="${d.y * 6.4}" font-size="${d.s}" text-anchor="middle" opacity=".5">${d.e}</text>`).join('');
+  const pins = REGIONS.map(r => {
     const locked = r.unlock && !state.unlocked[r.id];
     const active = state.region === r.id;
-    const rt = regionRates(r);
-    const rates = TIER_ORDER.filter(t => r._byTier[t] && r._byTier[t].length)
-      .map(t => `<span class="mc-rate rarity-${t}">${TIER_EMOJI[t]} ${TIER_LABEL[t]} ${rt[t] < 1 ? rt[t].toFixed(2) : rt[t].toFixed(t === 'superrare' ? 1 : 0)}%</span>`).join('');
     const beaten = state.badges[r.id];
-    return `<div class="map-card${active ? ' active-region' : ''}${locked ? ' locked' : ''}" style="background:${regionBgCss(r)}">
-      <div class="mc-deco">${mascotDecoHtml(r.mascots)}</div>
-      ${beaten ? '<div class="mc-badge">🏅</div>' : ''}
-      <div class="mc-body">
-        <div class="mc-name" data-go="${r.id}">${r.emoji} ${r.name}</div>
-        <div class="mc-lvl">${r.desc}</div>
-        <div class="mc-rates">${rates}</div>
-        ${!locked ? `<button class="boss-btn" data-boss="${r.id}">${beaten ? '⚔️ ท้าบอสอีกครั้ง' : '⚔️ ท้าบอสประจำเขต'}</button>` : ''}
-      </div>
-      ${locked ? `<div class="lock-ov"><div class="lk">🔒</div>จับให้ครบ ${r.unlock} ชนิด<br>(${owned}/${r.unlock})</div>` : ''}
-    </div>`;
+    return `<button class="wm-pin${active ? ' active' : ''}${locked ? ' locked' : ''}" style="left:${r.wx}%;top:${r.wy}%" data-region="${r.id}">
+      <span class="wm-dot t-${r.types[0]}">${locked ? '🔒' : r.emoji}${beaten ? '<span class="wm-badge">🏅</span>' : ''}</span>
+      <span class="wm-label">${r.name}</span>
+    </button>`;
   }).join('');
-  $('#mapGrid').querySelectorAll('.map-card').forEach(el => {
-    const locked = el.classList.contains('locked');
-    el.onclick = e => {
-      const bossBtn = e.target.closest('[data-boss]');
-      if (bossBtn) { e.stopPropagation(); startBossBattle(bossBtn.dataset.boss); return; }
-      if (locked) { const id = el.querySelector('[data-go]'); selectRegion(id ? id.dataset.go : state.region); return; }
-      const go = el.querySelector('[data-go]');
-      if (go) selectRegion(go.dataset.go);
-    };
-  });
+  wm.innerHTML = `
+    <svg class="wm-svg" viewBox="0 0 1000 640" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <radialGradient id="wmOcean" cx="50%" cy="40%" r="80%">
+          <stop offset="0%" stop-color="#1c5f86"/><stop offset="60%" stop-color="#0e3f5e"/><stop offset="100%" stop-color="#08243a"/>
+        </radialGradient>
+        <linearGradient id="wmLand" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#6aa84f"/><stop offset="55%" stop-color="#4a8a3a"/><stop offset="100%" stop-color="#3c6b2f"/>
+        </linearGradient>
+        <linearGradient id="wmMystic" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#6a4aa0"/><stop offset="100%" stop-color="#3a2060"/>
+        </linearGradient>
+        <linearGradient id="wmSand" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#e0c07a"/><stop offset="100%" stop-color="#b8934a"/>
+        </linearGradient>
+      </defs>
+      <rect width="1000" height="640" fill="url(#wmOcean)"/>
+      <ellipse cx="860" cy="400" rx="150" ry="120" fill="#061c30" opacity=".55"/>
+      <path d="M70,360 C40,250 150,150 280,180 C380,110 520,140 560,250 C660,230 700,360 630,430 C690,540 540,600 420,575 C300,635 140,590 110,480 C50,455 80,410 70,360 Z" fill="url(#wmLand)" stroke="#2c4d22" stroke-width="4"/>
+      <path d="M430,780 C400,700 520,690 560,740 L560,640 L420,640 C400,700 410,740 430,780 Z" fill="url(#wmSand)" opacity=".9"/>
+      <path d="M430,560 C470,520 560,520 590,570 C650,560 700,600 660,650 C690,720 560,720 500,690 C440,700 400,610 430,560 Z" fill="url(#wmSand)" stroke="#8a6a34" stroke-width="3"/>
+      <path d="M640,300 C690,230 810,230 860,300 C930,330 920,430 850,455 C820,530 700,510 690,440 C640,410 620,340 640,300 Z" fill="url(#wmMystic)" stroke="#2a1848" stroke-width="4"/>
+      <path d="M690,520 C760,495 850,520 860,585 C885,635 800,665 730,640 C680,630 655,555 690,520 Z" fill="#5a3a2a" stroke="#3a2418" stroke-width="4"/>
+      <ellipse cx="410" cy="90" rx="95" ry="42" fill="#7cc4f0" opacity=".85"/>
+      <ellipse cx="410" cy="96" rx="95" ry="42" fill="none" stroke="#fff" stroke-width="2" opacity=".5"/>
+      <circle cx="930" cy="88" r="52" fill="#1a0a2e" stroke="#7a3aff" stroke-width="3" opacity=".9"/>
+      <circle cx="930" cy="88" r="30" fill="#3a1060" opacity=".8"/>
+      ${decor}
+    </svg>
+    <div class="wm-pins">${pins}</div>`;
+  wm.querySelectorAll('.wm-pin').forEach(el => el.onclick = () => openRegionPopup(el.dataset.region));
+}
+// ป๊อปอัพรายละเอียดเขต — กดจากหมุดบนแผนที่โลก มีข้อมูล/อัตราเจอ/ปุ่มเข้าล่า+ท้าบอส
+function openRegionPopup(id) {
+  const r = REGION_BY_ID[id]; if (!r) return;
+  const owned = speciesOwnedCount();
+  const locked = r.unlock && !state.unlocked[id];
+  const beaten = state.badges[id];
+  const rt = regionRates(r);
+  const rates = TIER_ORDER.filter(t => r._byTier[t] && r._byTier[t].length)
+    .map(t => `<span class="mc-rate rarity-${t}">${TIER_EMOJI[t]} ${TIER_LABEL[t]} ${rt[t] < 1 ? rt[t].toFixed(2) : rt[t].toFixed(t === 'superrare' ? 1 : 0)}%</span>`).join('');
+  $('#modalBox').innerHTML = `
+    <div style="height:96px;border-radius:14px;background:${regionBgCss(r)};background-size:cover;display:flex;align-items:flex-end;padding:8px 12px;margin-bottom:10px;position:relative;overflow:hidden">
+      <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.1),rgba(0,0,0,.6))"></div>
+      <div style="position:relative;font-size:20px;font-weight:900;color:#fff;text-shadow:0 2px 6px #000">${r.emoji} ${r.name}${beaten ? ' 🏅' : ''}</div>
+    </div>
+    <div class="sr-sub" style="text-align:left;margin-bottom:8px">${r.desc}</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:4px">เลเวลป่า Lv.${r.lvl[0]}–${r.lvl[1]}</div>
+    <div class="mc-rates" style="justify-content:center;margin-bottom:12px">${rates}</div>
+    ${locked
+      ? `<div class="empty-state" style="padding:14px"><div class="es-ico">🔒</div><div class="es-title">ยังปลดล็อกไม่ได้</div><div class="es-sub">จับให้ครบ ${r.unlock} ชนิดก่อน (ตอนนี้ ${owned}/${r.unlock})</div></div>
+         <div class="modal-actions"><button class="btn-ghost" id="rpClose">ปิด</button></div>`
+      : `<div class="modal-actions">
+           <button class="btn-primary" id="rpEnter">🎯 เข้าล่าในเขตนี้</button>
+           <button class="btn-primary" id="rpBoss" style="background:var(--btn-primary-grad)">⚔️ ${beaten ? 'ท้าบอสอีกครั้ง' : 'ท้าบอสประจำเขต'}</button>
+           <button class="btn-ghost" id="rpClose">ปิด</button>
+         </div>`}`;
+  openModal();
+  $('#rpClose').onclick = closeModal;
+  const en = $('#rpEnter'); if (en) en.onclick = () => { closeModal(); selectRegion(id); };
+  const bo = $('#rpBoss'); if (bo) bo.onclick = () => { closeModal(); startBossBattle(id); };
 }
 
 // ================================================================
