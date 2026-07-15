@@ -723,6 +723,10 @@ h2.view-title::after {
 .move-btn:disabled { cursor: not-allowed; }
 .move-btn b { font-size: 11px; opacity: .9; }
 .move-btn .mv-acc { display: block; font-size: 9px; font-weight: 600; opacity: .75; margin-top: 2px; }
+.move-btn .mv-type { display: inline-block; font-size: 9px; font-weight: 800; background: rgba(0,0,0,.35); border-radius: 999px; padding: 1px 7px; margin-bottom: 3px; }
+.move-grid.z-armed .move-btn { box-shadow: 0 0 0 2px #00d4e0, 0 0 12px rgba(0,212,224,.6); animation: zGlow 1s ease-in-out infinite; }
+@keyframes zGlow { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
+.reduce-motion .move-grid.z-armed .move-btn { animation: none; }
 .move-btn.pp-low { box-shadow: inset 0 0 0 2px rgba(255,215,107,.6); }
 .move-btn.pp-empty { opacity: .4; filter: grayscale(.6); cursor: not-allowed; }
 .move-btn.struggle-btn { grid-column: 1 / -1; background: linear-gradient(180deg,#9a5a5a,#6a3a3a); }

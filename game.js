@@ -134,8 +134,14 @@ const TYPE_EMOJI = {
   rock: '🪨', ghost: '👻', dragon: '🐉', dark: '🌑', steel: '⚙️', fairy: '🧚',
 };
 const TIER_EMOJI = { common: '⚪', uncommon: '🟢', rare: '🔵', superrare: '🟣', legendary: '🟡' };
+// ชื่อธาตุภาษาไทย (บางคนดูสีแล้วแยกธาตุไม่ออก เลยโชว์ชื่อกำกับด้วย)
+const TYPE_TH = {
+  normal: 'ปกติ', fire: 'ไฟ', water: 'น้ำ', electric: 'ไฟฟ้า', grass: 'พืช', ice: 'น้ำแข็ง',
+  fighting: 'ต่อสู้', poison: 'พิษ', ground: 'ดิน', flying: 'บิน', psychic: 'จิต', bug: 'แมลง',
+  rock: 'หิน', ghost: 'ผี', dragon: 'มังกร', dark: 'มืด', steel: 'เหล็ก', fairy: 'แฟรี่',
+};
 function typeBadges(types) {
-  return types.map(t => `<span class="badge t-${t}">${TYPE_EMOJI[t] || ''} ${t}</span>`).join('');
+  return types.map(t => `<span class="badge t-${t}">${TYPE_EMOJI[t] || ''} ${TYPE_TH[t] || t}</span>`).join('');
 }
 
 // น้ำหนักการสุ่มระดับ ตาม "rarityBoost" ของเขต
@@ -320,7 +326,15 @@ const MEGA_FORMS = {
 // ราคาหินเมก้าในร้าน (แพงมาก — ต้องซื้อ/แลกเองทั้งหมด ไม่มีทางได้ฟรี ให้การวิวัฒนาการเมก้ารู้สึกคุ้มค่า)
 const MEGA_STONE_PRICE = 7000;
 const MEGA_RING_PRICE = 15000;   // (เดิม) — ปัจจุบันแลกด้วยเหรียญเช็คอินแทน
-const MEGA_RING_CHECKIN = 150, DYNAMAX_BAND_CHECKIN = 300;   // ราคาแลกด้วยเหรียญเช็คอิน
+const MEGA_RING_CHECKIN = 150, DYNAMAX_BAND_CHECKIN = 300, Z_RING_CHECKIN = 200;   // ราคาแลกด้วยเหรียญเช็คอิน
+// Z-Move ประจำธาตุ (ชื่อจริงจากเกม) — ปลดปล่อยครั้งเดียวต่อการต่อสู้ ดาเมจมหาศาล เข้าเป้าเสมอ
+const Z_MOVES = {
+  normal: 'Breakneck Blitz', fire: 'Inferno Overwhelming', water: 'Hydro Vortex', electric: 'Gigavolt Havoc',
+  grass: 'Bloom Doom', ice: 'Subzero Slammer', fighting: 'All-Out Pummeling', poison: 'Acid Downpour',
+  ground: 'Tectonic Rage', flying: 'Supersonic Skystrike', psychic: 'Shattered Psyche', bug: 'Savage Spin-Out',
+  rock: 'Continental Crush', ghost: 'Never-Ending Nightmare', dragon: 'Devastating Drake', dark: 'Black Hole Eclipse',
+  steel: 'Corkscrew Crash', fairy: 'Twinkle Tackle',
+};
 
 // ===== Gigantamax — สายพันธุ์ที่มีร่าง G-Max จริง (spriteId จาก PokeAPI) =====
 const GMAX_FORMS = {
@@ -490,6 +504,8 @@ const ACHIEVEMENTS = [
   { id: 'firstgmax', ico: '💥', name: 'ยักษ์ตัวจริง', desc: 'ไดนาแม็กซ์เป็นร่าง G-Max จริงครั้งแรก', reward: 600, goal: s => !!s._gmaxed, prog: s => [s._gmaxed ? 1 : 0, 1] },
   { id: 'gotmegaring', ico: '💍', name: 'พร้อมเมก้า', desc: 'ปลดล็อกกำไลเมก้า', reward: 300, goal: s => !!s.hasMegaRing, prog: s => [s.hasMegaRing ? 1 : 0, 1] },
   { id: 'gotdynamaxband', ico: '⌚', name: 'พร้อมไดนาแม็กซ์', desc: 'ปลดล็อกกำไลไดนาแม็กซ์', reward: 300, goal: s => !!s.hasDynamaxBand, prog: s => [s.hasDynamaxBand ? 1 : 0, 1] },
+  { id: 'gotzring', ico: '💠', name: 'พลัง Z', desc: 'ปลดล็อก Z-Ring', reward: 300, goal: s => !!s.hasZRing, prog: s => [s.hasZRing ? 1 : 0, 1] },
+  { id: 'firstzmove', ico: '⚡', name: 'ปลดปล่อยพลัง Z', desc: 'ใช้ Z-Move ครั้งแรก', reward: 400, goal: s => !!s._usedZMove, prog: s => [s._usedZMove ? 1 : 0, 1] },
   { id: 'firstribbon', ico: '🎀', name: 'นักประกวดมือใหม่', desc: 'ชนะที่ 1 คอนเทสต์ครั้งแรก', reward: 250, goal: s => !!s._contestWon, prog: s => [s._contestWon ? 1 : 0, 1] },
   { id: 'allribbons', ico: '🏵️', name: 'จอมประกวด', desc: 'ชนะที่ 1 ครบทั้ง 5 หมวดคอนเทสต์', reward: 1000,
     goal: s => CONTEST_CATEGORIES.every(c => ((s.contest && s.contest.ribbons && s.contest.ribbons[c.id]) || 0) > 0),
@@ -790,6 +806,7 @@ function newSave() {
     hasMegaRing: false,  // กำไลเมก้า — ปลดล็อกครั้งเดียว จำเป็นก่อนเมก้าอีโวลูชันได้
     gmaxStoneInv: {},    // คลังหินปลุกพลัง G-Max ที่ยังไม่ได้แนบ {speciesKey:count}
     hasDynamaxBand: false, // กำไลไดนาแม็กซ์ — ปลดล็อกครั้งเดียว จำเป็นก่อนไดนาแม็กซ์ได้
+    hasZRing: false,     // Z-Ring — ปลดล็อกครั้งเดียว ใช้ Z-Move ได้ในการต่อสู้ (ครั้งเดียว/สู้)
     maxEnergy: 0,        // พลังงานไดนาแม็กซ์ (ใช้ครั้งละ 1 ในการต่อสู้)
     gymsBeaten: {},      // {gymId:true} ยิมที่ชนะแล้ว
     battlePoints: 0,     // BP จากชนะยิม/บอส ใช้แลกของใน BP Shop
@@ -2644,6 +2661,7 @@ function renderShop() {
     // แลกด้วยเหรียญเช็คอิน (ได้จากล็อกอินรายวัน)
     { cat: 'perm', emoji: '💍', img: 'mega-ring', name: state.hasMegaRing ? 'กำไลเมก้า (มีแล้ว)' : 'กำไลเมก้า', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนเมก้าอีโวลูชัน · แลกด้วยเหรียญเช็คอิน', checkinPrice: MEGA_RING_CHECKIN, act: () => { if (state.hasMegaRing) { toast('มีกำไลเมก้าอยู่แล้ว', ''); return; } if (spendCheckin(MEGA_RING_CHECKIN)) { state.hasMegaRing = true; toast('💍 ได้กำไลเมก้าแล้ว! เมก้าอีโวลูชันได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
     { cat: 'perm', emoji: '⌚', img: 'macho-brace', name: state.hasDynamaxBand ? 'กำไลไดนาแม็กซ์ (มีแล้ว)' : 'กำไลไดนาแม็กซ์', desc: 'ปลดล็อกครั้งเดียว ถาวร — จำเป็นก่อนไดนาแม็กซ์ · แลกด้วยเหรียญเช็คอิน', checkinPrice: DYNAMAX_BAND_CHECKIN, act: () => { if (state.hasDynamaxBand) { toast('มีกำไลไดนาแม็กซ์อยู่แล้ว', ''); return; } if (spendCheckin(DYNAMAX_BAND_CHECKIN)) { state.hasDynamaxBand = true; toast('⌚ ได้กำไลไดนาแม็กซ์แล้ว! ไดนาแม็กซ์ได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
+    { cat: 'perm', emoji: '💠', img: 'z-ring', name: state.hasZRing ? 'Z-Ring (มีแล้ว)' : 'Z-Ring', desc: 'ปลดล็อกครั้งเดียว ถาวร — ปลดปล่อย Z-Move พลังมหาศาลครั้งเดียวต่อการต่อสู้ · แลกด้วยเหรียญเช็คอิน', checkinPrice: Z_RING_CHECKIN, act: () => { if (state.hasZRing) { toast('มี Z-Ring อยู่แล้ว', ''); return; } if (spendCheckin(Z_RING_CHECKIN)) { state.hasZRing = true; toast('💠 ได้ Z-Ring! ปลดปล่อย Z-Move ได้ในการต่อสู้', 'good'); postBuy(); checkAchievements(); } } },
     { cat: 'perm', emoji: '🪙', img: 'amulet-coin', name: `Amulet Coin (${state.amulets || 0}/${AMULET_MAX})`, desc: 'เงินที่ได้จากการจับ +5% ต่อชิ้น สูงสุด +50% (ติดตัวถาวร) · หรือลุ้นดรอปหายากจากบอสหอคอย/บอสประจำเขต', price: 150000, act: () => { if ((state.amulets || 0) >= AMULET_MAX) { toast('มี Amulet Coin เต็มแล้ว', ''); return; } if (spend(150000)) { state.amulets = (state.amulets || 0) + 1; toast(`🪙 Amulet Coin +1 (เงิน +${state.amulets * 5}%)`, 'good'); postBuy(); } } },
     { cat: 'perm', emoji: '🎓', img: null, owned: !!state.hasExpShare, name: state.hasExpShare ? 'EXP Share (มีแล้ว)' : 'EXP Share', desc: 'ปลดล็อกครั้งเดียว ถาวร — จับได้ทีนึงแบ่ง XP ให้ทั้งทีม', price: 2500000, act: () => { if (state.hasExpShare) { toast('มี EXP Share อยู่แล้ว', ''); return; } if (spend(2500000)) { state.hasExpShare = true; toast('🎓 ได้ EXP Share! ทั้งทีมได้ XP จากการจับ', 'good'); postBuy(); } } },
     // แลกด้วยเหรียญเช็คอิน 🎟️
@@ -2658,7 +2676,7 @@ function renderShop() {
   const renderItem = (it, i) => {
     const isTok = it.tokenPrice != null;
     const isCheckin = it.checkinPrice != null;
-    const owned = it.owned || (it.img === 'mega-ring' && state.hasMegaRing) || (it.img === 'macho-brace' && state.hasDynamaxBand);
+    const owned = it.owned || (it.img === 'mega-ring' && state.hasMegaRing) || (it.img === 'macho-brace' && state.hasDynamaxBand) || (it.img === 'z-ring' && state.hasZRing);
     const cant = owned || (isCheckin ? (state.checkinCoins || 0) < it.checkinPrice : isTok ? (state.fishTokens || 0) < it.tokenPrice : state.coins < it.price);
     const label = owned ? 'มีแล้ว' : (isCheckin ? `${it.checkinPrice} 🗓️เช็คอิน` : isTok ? `${it.tokenPrice}🎟️` : `${it.price}${itemIcon('🪙', 'nugget', 'price-ico')}`);
     const curClass = isCheckin ? ' cur-checkin' : isTok ? ' cur-token' : '';
@@ -3970,12 +3988,13 @@ function renderBattle() {
       const ppMax = active.ppMax[i] == null ? movePP(mv.pow) : active.ppMax[i];
       const noPP = pp <= 0;
       const ppCls = noPP ? ' pp-empty' : (pp <= ppMax * 0.25 ? ' pp-low' : '');
-      return `<button class="move-btn t-${mv.type}${ppCls}" data-mv="${i}" ${noPP ? 'disabled' : ''} title="${mv.priority > 0 ? 'ท่า Priority — โจมตีก่อนเสมอ' : ''}">${mv.name}${prio} <b>${mv.pow}</b>${tag}${wBoost}<span class="mv-acc">🎯${mv.acc}% · PP ${pp}/${ppMax}</span></button>`;
+      return `<button class="move-btn t-${mv.type}${ppCls}" data-mv="${i}" ${noPP ? 'disabled' : ''} title="ธาตุ${TYPE_TH[mv.type] || mv.type}${mv.priority > 0 ? ' · ท่า Priority โจมตีก่อนเสมอ' : ''}"><span class="mv-type">${TYPE_EMOJI[mv.type] || ''} ${TYPE_TH[mv.type] || mv.type}</span>${mv.name}${prio} <b>${mv.pow}</b>${tag}${wBoost}<span class="mv-acc">🎯${mv.acc}% · PP ${pp}/${ppMax}</span></button>`;
     }).join('');
   }
 
   const canMega = state.hasMegaRing && !b.usedMega && !active.mega && !!(megaFormsFor(active.ind.id) || []).find(f => f.key === active.ind.megaKey);
   const canDynamax = state.hasDynamaxBand && !b.usedDynamax && !active.dynamax;   // ใช้แค่กำไลไดนาแม็กซ์ (ไม่ต้องใช้พลังงานแล้ว)
+  const canZ = state.hasZRing && !b.usedZ;   // Z-Move ครั้งเดียวต่อการต่อสู้
   const specialBadge = view.special ? `<span class="badge" style="background:linear-gradient(90deg,#ff6b6b,#ffcb05)">${active.mega ? '💎 MEGA' : '💥 G-MAX'}</span>` : (active.dynamax ? `<span class="badge" style="background:#e23b4e">💥 DYNAMAX ${active.dynamax.turnsLeft}T</span>` : '');
   const foeSpecialBadge = b.special ? `<span class="badge" style="background:${b.special === 'mega' ? 'linear-gradient(90deg,#8e5bff,#5a2ba8)' : b.special === 'gmax' ? 'linear-gradient(90deg,#ff6b6b,#c1122e)' : '#555'}">${b.special === 'mega' ? '💎 MEGA' : b.special === 'gmax' ? '💥 G-MAX' : '⭐ ELITE'}</span>` : '';
 
@@ -3994,13 +4013,13 @@ function renderBattle() {
       <div class="bt-hpbox foe-box">
         <div class="bt-hpname">${b.isBoss ? '👑 ' : ''}${foeName} <span class="bt-lv">Lv.${b.foeLevel}</span> ${statusBadge(b.foe.status)}${foeSpecialBadge} ${foeTag}</div>
         <div class="bt-hpbar"><div class="${hpCls(b.foeHp, b.foeMaxHp)}" style="width:${foePct}%"></div></div>
-        <div class="bt-hpfoot"><span>${foeTypes.map(t => `<span class="badge t-${t}" style="font-size:8px;padding:1px 5px">${t}</span>`).join('')}${abilityBadge(foeAbility)}${b.foeHeld ? ` <span class="badge" style="background:#3a3a55;font-size:8px;padding:1px 5px" title="${HELD_ITEMS[b.foeHeld].desc}">${HELD_ITEMS[b.foeHeld].emoji}</span>` : ''}</span><span>${Math.ceil(b.foeHp)}/${b.foeMaxHp}</span></div>
+        <div class="bt-hpfoot"><span>${foeTypes.map(t => `<span class="badge t-${t}" style="font-size:8px;padding:1px 5px">${TYPE_EMOJI[t] || ''} ${TYPE_TH[t] || t}</span>`).join('')}${abilityBadge(foeAbility)}${b.foeHeld ? ` <span class="badge" style="background:#3a3a55;font-size:8px;padding:1px 5px" title="${HELD_ITEMS[b.foeHeld].desc}">${HELD_ITEMS[b.foeHeld].emoji}</span>` : ''}</span><span>${Math.ceil(b.foeHp)}/${b.foeMaxHp}</span></div>
         ${stageBadges(b.foe.stages) ? `<div class="bt-stages">${stageBadges(b.foe.stages)}</div>` : ''}
       </div>
       <div class="bt-side foe bt-mon-foe"><div class="bt-scene-plat"></div><div class="bt-head">${spriteImg(foeSpriteId, false)}</div></div>
       <div class="bt-side me bt-mon-me"><div class="bt-scene-plat"></div><div class="bt-head">${playerSprite}</div></div>
       <div class="bt-hpbox me-box">
-        <div class="bt-hpname">${view.name} <span class="bt-lv">Lv.${active.ind.level}</span> ${genderIcon(active.ind.gender)} ${statusBadge(active.status)}${specialBadge}</div>
+        <div class="bt-hpname">${view.name} <span class="bt-lv">Lv.${active.ind.level}</span> ${genderIcon(active.ind.gender)} ${statusBadge(active.status)}${specialBadge} ${view.types.map(t => `<span class="badge t-${t}" style="font-size:8px;padding:1px 5px">${TYPE_EMOJI[t] || ''} ${TYPE_TH[t] || t}</span>`).join('')}</div>
         <div class="bt-hpbar"><div class="${hpCls(active.hp, active.maxHp)}" style="width:${myPct}%"></div></div>
         <div class="bt-hpfoot"><span>${abilityBadge(myAbility)}</span><span>${Math.ceil(active.hp)}/${active.maxHp}</span></div>
         ${stageBadges(active.stages) ? `<div class="bt-stages">${stageBadges(active.stages)}</div>` : ''}
@@ -4012,11 +4031,13 @@ function renderBattle() {
       ? (b.towerCleared
           ? `<div class="bt-actions"><button class="bt-flee" id="btTowerNext" style="background:linear-gradient(180deg,#47d16c,#1f8a44);color:#fff">🗼 ปีนต่อ (ชั้น ${state.tower.floor})</button><button class="bt-flee" id="btDone">หยุดพัก</button></div>`
           : `<div class="bt-actions"><button class="bt-flee" id="btDone">ปิด</button></div>`)
-      : `${(canMega || canDynamax) ? `<div class="bt-actions" style="margin-bottom:6px">
+      : `${(canMega || canDynamax || canZ) ? `<div class="bt-actions" style="margin-bottom:6px">
            ${canMega ? `<button class="bt-flee" id="btMega" ${battleBusy ? 'disabled' : ''} style="background:linear-gradient(180deg,#8e5bff,#5a2ba8);color:#fff">💎 เมก้าอีโวลูชัน</button>` : ''}
            ${canDynamax ? `<button class="bt-flee" id="btDynamax" ${battleBusy ? 'disabled' : ''} style="background:linear-gradient(180deg,#ff6b6b,#c1122e);color:#fff">💥 ไดนาแม็กซ์</button>` : ''}
+           ${canZ ? `<button class="bt-flee" id="btZ" ${battleBusy ? 'disabled' : ''} style="background:${b.zArmed ? 'linear-gradient(180deg,#ffcb05,#e0a800);color:#3a2c00' : 'linear-gradient(180deg,#00d4e0,#0891b2);color:#fff'}">${b.zArmed ? '✖ ยกเลิก Z' : '⚡ Z-Move'}</button>` : ''}
          </div>` : ''}
-         <div class="move-grid${battleBusy ? ' move-grid-busy' : ''}">${moveBtns}</div>
+         ${b.zArmed ? `<div class="sr-sub" style="text-align:center;color:#ffd76b;margin-bottom:4px">⚡ เลือกท่าโจมตีเพื่อปลดปล่อย Z-Move!</div>` : ''}
+         <div class="move-grid${battleBusy ? ' move-grid-busy' : ''}${b.zArmed ? ' z-armed' : ''}">${moveBtns}</div>
          <div class="bt-actions"><button class="bt-flee" id="btFlee" ${battleBusy ? 'disabled' : ''}>${b.isBoss ? 'ยอมแพ้' : (b.mode === 'tower' ? 'ล่าถอย (คูลดาวน์ 12 ชม.)' : 'หนี')}</button></div>`}`;
 
   if (b.over) {
@@ -4029,8 +4050,15 @@ function renderBattle() {
     $('#battleBox').querySelectorAll('.team-chip[data-sw]').forEach(el => el.onclick = battleBusy ? null : () => battleSwitch(+el.dataset.sw));
     const mgBtn = $('#btMega'); if (mgBtn) mgBtn.onclick = battleMegaEvolve;
     const dyBtn = $('#btDynamax'); if (dyBtn) dyBtn.onclick = battleDynamax;
+    const zBtn = $('#btZ'); if (zBtn) zBtn.onclick = battleArmZ;
   }
   applyBattleFx(b);
+}
+// สลับโหมด Z — กดแล้วเลือกท่าโจมตี ท่าจะกลายเป็น Z-Move ของธาตุนั้น (ครั้งเดียวต่อการต่อสู้)
+function battleArmZ() {
+  const b = battleState; if (!b || b.over || b.usedZ || battleBusy) return;
+  b.zArmed = !b.zArmed;
+  renderBattle();
 }
 // เอฟเฟกต์ต่อสู้: สั่น/แฟลชสไปรต์ + ตัวเลขดาเมจลอย (อ่านจาก b._fx ที่ตั้งไว้ตอนคำนวณดาเมจ)
 function applyBattleFx(b) {
@@ -4340,8 +4368,16 @@ function battleAttack(moveIdx) {
   const mon = MON_BY_ID[active.ind.id];
   const view = activeMonView(active);
   const isStruggle = moveIdx === -1;
-  const mv = isStruggle ? STRUGGLE_MOVE : (getMoves(active.ind.id)[moveIdx] || getMoves(active.ind.id)[0]);
+  let mv = isStruggle ? STRUGGLE_MOVE : (getMoves(active.ind.id)[moveIdx] || getMoves(active.ind.id)[0]);
   b.msg = '';
+  // Z-Move: ถ้าติดอาวุธ Z ไว้ ท่าโจมตีนี้จะกลายเป็น Z-Move ของธาตุนั้น (พลังมหาศาล เข้าเป้าเสมอ ครั้งเดียว/สู้)
+  if (b.zArmed && !isStruggle && mv && mv.pow > 0) {
+    const zName = Z_MOVES[mv.type] || 'Z-Move';
+    mv = { ...mv, name: zName, pow: Math.max(120, Math.round(mv.pow * 1.8)), acc: 999, isZ: true };
+    b.usedZ = true; b.zArmed = false; state._usedZMove = true;
+    b.msg += `⚡ Z-POWER! ${view.name} ปลดปล่อย <b>${zName}</b>! · `;
+    playSfx('rare');
+  }
   const gate = canAct(active);
   if (gate.note) b.msg += `${mon.name} ${gate.note} · `;
   const wasDynamaxed = !!active.dynamax;   // เช็คก่อน tick เพื่อใช้คำนวณโบนัสดาเมจของเทิร์นนี้
@@ -5038,7 +5074,7 @@ function towerContinueClimb() {
   applyTowerFoeToBattle(b, def, floor);
   b.over = false; b.towerCleared = false; b.lost = false;
   b.activeIdx = b.team.findIndex(t => t.hp > 0);
-  b.usedMega = false; b.usedDynamax = false;   // ขึ้นชั้นใหม่ = ใช้เมก้า/ไดนาแม็กซ์ได้อีกครั้ง
+  b.usedMega = false; b.usedDynamax = false; b.usedZ = false; b.zArmed = false;   // ขึ้นชั้นใหม่ = ใช้เมก้า/ไดนาแม็กซ์/Z ได้อีกครั้ง
   b.msg = `🗼 ชั้น ${floor}${def.isBossFloor ? ' (บอส!)' : ''} — ${b.foeDisplayName} Lv.${b.foeLevel} ท้าดวล!`;
   b.msg += applyIntimidate('foe', b);   // ศัตรูใหม่ทุกชั้นเสมอ
   if (b.activeIdx !== prevActiveIdx) b.msg += applyIntimidate('player', b);   // สลับตัวจริงเท่านั้นถึงเรียก Intimidate ฝั่งเรา
