@@ -7,6 +7,7 @@ import { MONSTERS } from './monsters-data.js';
 import { SPECIES_ABILITY, ABILITY_DEFS, HIDDEN_ABILITY } from './abilities-data.js';
 import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations, statStageMult, comboMult, xpToTier, tierForRating, xpForLevel, levelFromXp, tmPrice, ivRerollPrice, ivPercentOf, contestBaseScore, rivalBaseScore } from './logic.js';
 import { TIER_LABEL, TIER_ORDER, TIER_EMOJI, TIER_LEVEL, TIER_WEIGHTS, TYPE_EMOJI, TYPE_TH, WEATHERS, NIGHT_BOOST, DAY_BOOST, Z_MOVES, PVP_TIERS } from './content.js';
+import { bus } from './bus.js';
 
 // cloud.js (classic script) รันก่อนโมดูลนี้และตั้ง window.Cloud ไว้ — ผูกเป็น const ให้อ้าง Cloud ในสโคปโมดูลได้
 const Cloud = window.Cloud;
@@ -3048,7 +3049,7 @@ function claimWeeklyQuest() {
   if (!q || q.claimed || q.progress < q.target) return;
   q.claimed = true;
   grantReward({ coins: q.rewardCoins, ball: q.rewardBall, lockbox: q.rewardLockbox });   // ผ่านตัวแจกรางวัลกลาง
-  save(); renderTopbar(); renderQuests(); renderBallBar();
+  save(); renderQuests();   // currency:changed จาก grantReward รีเฟรช topbar/ballbar ให้เอง
   const [bk, bn] = q.rewardBall;
   toast(`🎁 รับรางวัลอีเวนต์: +${q.rewardCoins}🪙 +${bn}${BALLS[bk].emoji}${q.rewardLockbox ? ' +🎁' : ''}`, 'good');
   playSfx('rare');
@@ -3085,7 +3086,7 @@ function claimQuest(key) {
   q.claimed = true;
   grantReward({ coins: q.rewardCoins, ball: q.rewardBall });   // ผ่านตัวแจกรางวัลกลาง
   addPassXp(20);   // เคลียร์เควสรายวัน → XP บัตรฤดูกาล
-  save(); renderTopbar(); renderQuests(); renderBallBar();
+  save(); renderQuests();   // currency:changed จาก grantReward รีเฟรช topbar/ballbar ให้เอง
   const [bk, bn] = q.rewardBall;
   toast(`🎁 รับรางวัล: +${q.rewardCoins}🪙 +${bn}${BALLS[bk].emoji} · บัตร +20 XP`, 'good');
 }
@@ -3113,6 +3114,7 @@ function grantReward(r) {
   if (r.lockbox) state.lockboxes = (state.lockboxes || 0) + r.lockbox;
   if (r.stone) state.stones = (state.stones || 0) + r.stone;
   if (r.candy) state.candies = (state.candies || 0) + r.candy;
+  bus.emit('currency:changed');   // ชั้น UI (renderTopbar/renderBallBar) อัปเดตเองผ่าน bus
 }
 function rewardText(r) {
   const p = [];
@@ -3145,7 +3147,7 @@ function claimPassTier(i, prem) {
   if (claimed[i]) return;
   const r = passReward(i, prem);
   grantReward(r); claimed[i] = true;
-  save(); renderTopbar(); renderBallBar(); renderSeasonPass();
+  save(); renderSeasonPass();   // currency:changed จาก grantReward รีเฟรช topbar/ballbar ให้เอง
   toast(`🎫 รับรางวัลบัตรระดับ ${i + 1}: +${rewardText(r)}`, 'good'); playSfx('rare');
 }
 function buyPassPremium() {
@@ -3189,7 +3191,7 @@ function claimResearch(key) {
   q.claimed = true;
   if (q.reward) grantReward(q.reward);
   addPassXp(q.xp);
-  save(); renderTopbar(); renderBallBar(); renderQuests();
+  save(); renderQuests();   // currency:changed จาก grantReward รีเฟรช topbar/ballbar ให้เอง
   toast(`🔬 เควสวิจัยสำเร็จ! บัตร +${q.xp} XP${q.reward ? ' · +' + rewardText(q.reward) : ''}`, 'good'); playSfx('rare');
 }
 function renderSeasonPass() {
@@ -4108,7 +4110,7 @@ function claimStarter(key) {
   } else {
     toast(`🎁 รับรางวัลมือใหม่: +${rewardText(g.reward)}`, 'good');
   }
-  save(); renderTopbar(); renderBallBar(); renderStarter();
+  save(); renderStarter();   // currency:changed จาก grantReward รีเฟรช topbar/ballbar ให้เอง
 }
 function renderStarter() {
   const box = $('#starterBox'); if (!box) return;
@@ -6138,8 +6140,13 @@ function updateCloudStatus() {
 // ================================================================
 //  INIT
 // ================================================================
+// ผูก event bus → ชั้น UI (subscribe ที่เดียว) ให้ระบบ emit แทนเรียก render ตรงๆ
+function wireBus() {
+  bus.on('currency:changed', () => { renderTopbar(); renderBallBar(); });   // เงิน/บอล/BP/เหรียญ เปลี่ยน
+}
 function init() {
   load();
+  wireBus();
   applyOfflineRewards();   // ต้องอ่าน lastSeen เก่าก่อน save ใดๆ
   checkWeeklyEvent();       // แจ้งอีเวนต์ประจำสัปดาห์ถ้าเข้าสัปดาห์ใหม่
   ensureDailyQuests();
