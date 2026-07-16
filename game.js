@@ -5,7 +5,7 @@
 'use strict';
 import { MONSTERS } from './monsters-data.js';
 import { SPECIES_ABILITY, ABILITY_DEFS, HIDDEN_ABILITY } from './abilities-data.js';
-import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations } from './logic.js';
+import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations, statStageMult, comboMult, xpToTier, tierForRating } from './logic.js';
 import { TIER_LABEL, TIER_ORDER, TIER_EMOJI, TIER_LEVEL, TIER_WEIGHTS, TYPE_EMOJI, TYPE_TH, WEATHERS, NIGHT_BOOST, DAY_BOOST, Z_MOVES, PVP_TIERS } from './content.js';
 
 // cloud.js (classic script) รันก่อนโมดูลนี้และตั้ง window.Cloud ไว้ — ผูกเป็น const ให้อ้าง Cloud ในสโคปโมดูลได้
@@ -1355,17 +1355,11 @@ function updateCatchCombo(monId, wasShiny) {
     toast(`🔥 คอมโบ ${MON_BY_ID[monId].name} ×${cc.count}! โอกาส Shiny เพิ่มขึ้น`, 'good');
   }
 }
-// ตัวคูณ shiny จากคอมโบ (มีผลเฉพาะสายพันธุ์ที่กำลังคอมโบอยู่)
+// ตัวคูณ shiny จากคอมโบ (มีผลเฉพาะสายพันธุ์ที่กำลังคอมโบอยู่) — คณิตอยู่ที่ comboMult ใน logic.js
 function comboShinyBoost(monId) {
   const c = state.catchCombo;
   if (!c || c.id !== monId || !c.count) return 1;
-  const n = c.count;
-  // ปรับให้ Shiny ยังหายากคุ้มการหา — คอมโบเป็นรางวัลของคนตั้งใจล่าตัวเดิมจริงๆ (ต้อง 30 ตัวถึงได้ ×5)
-  if (n >= 30) return 5;
-  if (n >= 20) return 3.5;
-  if (n >= 10) return 2.2;
-  if (n >= 5) return 1.5;
-  return 1 + n * 0.08;
+  return comboMult(c.count);
 }
 function shinyMultiplier() {
   let m = 1;
@@ -3137,7 +3131,7 @@ function ensurePassSeason() {
   if (state.passSeason === key) return;
   state.passSeason = key; state.passXp = 0; state.passPrem = false; state.passClaim = {}; state.passClaimP = {};
 }
-function passTierIndex() { return Math.min(PASS_TIER_COUNT, Math.floor((state.passXp || 0) / PASS_XP_PER_TIER)); }
+function passTierIndex() { return xpToTier(state.passXp, PASS_XP_PER_TIER, PASS_TIER_COUNT); }
 function addPassXp(n) {
   ensurePassSeason();
   state.passXp = (state.passXp || 0) + n;
@@ -4152,11 +4146,7 @@ function weatherBoosted(moveType) {   // ธาตุที่ได้บูส
   const w = WEATHERS[getWeather(state.region)];
   return !!(w && w.boost && w.boost.includes(moveType));
 }
-// ===== Stat Stages (-6..+6) แบบเกมจริง — ท่าบางท่ามีผลข้างเคียงปรับสเตตัสขึ้น/ลงชั่วคราวในแมตช์ =====
-function statStageMult(stage) {
-  stage = clamp(stage || 0, -6, 6);
-  return stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage);
-}
+// ===== Stat Stages (-6..+6) แบบเกมจริง — statStageMult ย้ายไป logic.js แล้ว (import ด้านบน) =====
 function statsWithStages(stats, stages) {   // คืนสเตตัสชุดใหม่ที่คูณด้วย stage แล้ว (ไม่แก้ของเดิม)
   if (!stages) return stats;
   const out = {};
@@ -5854,8 +5844,8 @@ async function raidSubmitDamage(dmgDealt) {
 // ================================================================
 //  GHOST BATTLE — สู้กับทีมของผู้เล่นคนอื่นแบบ AI (async PvP) + จัดอันดับตามฤดูกาล
 // ================================================================
-// PVP_TIERS ย้ายไป content.js แล้ว (import ด้านบน)
-function pvpTier(r) { return PVP_TIERS.find(t => (r || 0) >= t.min) || PVP_TIERS[PVP_TIERS.length - 1]; }
+// PVP_TIERS ย้ายไป content.js แล้ว · tierForRating เป็น logic บริสุทธิ์ใน logic.js
+function pvpTier(r) { return tierForRating(r, PVP_TIERS); }
 function pvpSeasonKey() { const n = new Date(); return `${n.getUTCFullYear()}-${String(n.getUTCMonth() + 1).padStart(2, '0')}`; }
 // เริ่มฤดูกาลใหม่ (รายเดือน) — แจกรางวัลตามแรงก์ที่ได้ แล้วรีเซ็ตคะแนนกลับ 1000
 function ensurePvpSeason() {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { clamp, typeEffect, movePP, tierOf, isoWeekNumber, UB_LEGENDARY_IDS,
-  catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations } from './logic.js';
+  catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations,
+  statStageMult, comboMult, xpToTier, tierForRating } from './logic.js';
 
 describe('clamp', () => {
   it('จำกัดค่าอยู่ในช่วง', () => {
@@ -155,6 +156,73 @@ describe('damageCore (แกนดาเมจ)', () => {
       { type: 'ground', pow: 100 }, null, { defAbility: { immuneType: 'ground' } }, false, 0.5, 0.99);
     expect(r.eff).toBe(0);
     expect(r.dmg).toBe(1);
+  });
+});
+
+describe('statStageMult (ตัวคูณ stat stage)', () => {
+  it('stage 0 = ×1', () => { expect(statStageMult(0)).toBe(1); });
+  it('บวกเพิ่มขึ้น: +1 = ×1.5, +2 = ×2, +6 = ×4', () => {
+    expect(statStageMult(1)).toBe(1.5);
+    expect(statStageMult(2)).toBe(2);
+    expect(statStageMult(6)).toBe(4);
+  });
+  it('ลบลดลง: -1 = ×2/3, -2 = ×0.5, -6 = ×0.25', () => {
+    expect(statStageMult(-1)).toBeCloseTo(2 / 3);
+    expect(statStageMult(-2)).toBe(0.5);
+    expect(statStageMult(-6)).toBe(0.25);
+  });
+  it('จำกัดขอบเขต -6..+6 (เกินถือว่าตัน)', () => {
+    expect(statStageMult(99)).toBe(statStageMult(6));
+    expect(statStageMult(-99)).toBe(statStageMult(-6));
+  });
+});
+
+describe('comboMult (ตัวคูณ shiny จากคอมโบ)', () => {
+  it('คอมโบน้อยเพิ่มทีละนิด', () => {
+    expect(comboMult(0)).toBe(1);
+    expect(comboMult(1)).toBeCloseTo(1.08);
+    expect(comboMult(4)).toBeCloseTo(1.32);
+  });
+  it('ขั้นบันไดที่ 5/10/20/30', () => {
+    expect(comboMult(5)).toBe(1.5);
+    expect(comboMult(10)).toBe(2.2);
+    expect(comboMult(20)).toBe(3.5);
+    expect(comboMult(30)).toBe(5);
+  });
+  it('เกิน 30 ตันที่ ×5', () => { expect(comboMult(999)).toBe(5); });
+  it('ไม่ลดลงเมื่อคอมโบเพิ่ม (monotonic)', () => {
+    for (let n = 1; n < 40; n++) expect(comboMult(n)).toBeGreaterThanOrEqual(comboMult(n - 1));
+  });
+});
+
+describe('xpToTier (XP → ระดับบัตร)', () => {
+  it('หารลงตาม perTier', () => {
+    expect(xpToTier(0, 120, 20)).toBe(0);
+    expect(xpToTier(119, 120, 20)).toBe(0);
+    expect(xpToTier(120, 120, 20)).toBe(1);
+    expect(xpToTier(650, 120, 20)).toBe(5);
+  });
+  it('จำกัดไม่เกิน max', () => {
+    expect(xpToTier(999999, 120, 20)).toBe(20);
+  });
+  it('xp ว่าง/undefined ถือเป็น 0', () => {
+    expect(xpToTier(undefined, 120, 20)).toBe(0);
+  });
+});
+
+describe('tierForRating (คะแนน → แรงก์)', () => {
+  const tiers = [
+    { min: 2000, name: 'Master' }, { min: 1500, name: 'Platinum' },
+    { min: 1050, name: 'Silver' }, { min: 0, name: 'Bronze' },
+  ];
+  it('คืนแรงก์แรกที่คะแนนถึง min', () => {
+    expect(tierForRating(2100, tiers).name).toBe('Master');
+    expect(tierForRating(1500, tiers).name).toBe('Platinum');
+    expect(tierForRating(1049, tiers).name).toBe('Bronze');
+  });
+  it('คะแนน 0/undefined = แรงก์ต่ำสุด', () => {
+    expect(tierForRating(0, tiers).name).toBe('Bronze');
+    expect(tierForRating(undefined, tiers).name).toBe('Bronze');
   });
 });
 

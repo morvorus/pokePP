@@ -106,6 +106,32 @@ export function runMigrations(save, targetVersion, migrations) {
   return save;
 }
 
+// ตัวคูณสเตตัสจาก stat stage (-6..+6) แบบเกมจริง
+export function statStageMult(stage) {
+  stage = clamp(stage || 0, -6, 6);
+  return stage >= 0 ? (2 + stage) / 2 : 2 / (2 - stage);
+}
+
+// ตัวคูณโอกาส Shiny จากคอมโบจับตัวเดิมต่อเนื่อง (ยิ่งต่อยาวยิ่งดัน)
+export function comboMult(n) {
+  n = n || 0;
+  if (n >= 30) return 5;
+  if (n >= 20) return 3.5;
+  if (n >= 10) return 2.2;
+  if (n >= 5) return 1.5;
+  return 1 + n * 0.08;
+}
+
+// แปลง XP สะสม → ระดับ (บัตรฤดูกาล) จำกัดไม่เกิน max
+export function xpToTier(xp, perTier, max) {
+  return Math.min(max, Math.floor((xp || 0) / perTier));
+}
+
+// หาแรงก์จากคะแนน (tiers เรียงจากมากไปน้อยด้วย min) — คืน tier แรกที่ rating ถึง min
+export function tierForRating(rating, tiers) {
+  return tiers.find(t => (rating || 0) >= t.min) || tiers[tiers.length - 1];
+}
+
 // แกนคำนวณดาเมจ (pure) — รับความสุ่ม (rollRand/critRand) + weatherBoost เข้ามา เพื่อให้ deterministic ทดสอบได้
 export function damageCore(atkMon, atkStats, atkLevel, defMon, defStats, move, held, opts, weatherBoost, rollRand, critRand) {
   opts = opts || {};
