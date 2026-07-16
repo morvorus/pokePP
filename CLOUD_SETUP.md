@@ -71,6 +71,27 @@ create policy "trade delete" on public.trades for delete using (auth.uid() = fro
 alter table public.leaderboard add column if not exists hardcore int default 0;
 alter table public.leaderboard add column if not exists pvp int default 1000;   -- คะแนน PvP จัดอันดับตามฤดูกาล
 
+-- ===== (แนะนำ) 🛡️ กันโกงพื้นฐาน server-side — บีบค่าให้สมเหตุสมผลก่อนบันทึกเสมอ =====
+-- ผู้เล่นที่ดัดแปลงโค้ดฝั่ง client จะยัดค่าเวอร์ๆ ขึ้นกระดานไม่ได้ (ค่าถูก clamp อัตโนมัติ ไม่ error)
+-- หมายเหตุ: ตรรกะเกมยังอยู่ฝั่ง client — นี่คือ "กันค่าที่เป็นไปไม่ได้" ไม่ใช่กันโกงสมบูรณ์
+-- รันหลัง alter คอลัมน์ด้านบนแล้ว (ฟังก์ชันอ้างถึง hardcore/pvp)
+create or replace function public.lb_sanitize() returns trigger
+language plpgsql as $$
+begin
+  new.dex      := greatest(0, least(coalesce(new.dex, 0),      2000));
+  new.playtime := greatest(0, least(coalesce(new.playtime, 0), 5259600));   -- ~60 วัน (วินาที)
+  new.tower    := greatest(0, least(coalesce(new.tower, 0),    999));
+  new.caught   := greatest(0, least(coalesce(new.caught, 0),   9999999));
+  new.hardcore := greatest(0, least(coalesce(new.hardcore, 0), 2000));
+  new.pvp      := greatest(0, least(coalesce(new.pvp, 1000),   5000));
+  new.name     := left(coalesce(new.name, ''), 24);
+  return new;
+end;
+$$;
+drop trigger if exists lb_sanitize_trg on public.leaderboard;
+create trigger lb_sanitize_trg before insert or update on public.leaderboard
+  for each row execute function public.lb_sanitize();
+
 -- ===== (ตัวเลือก) ตาราง Raid บอสรายสัปดาห์ (ร่วมมือหลายคน) =====
 create table public.raid_contrib (
   user_id uuid not null references auth.users(id) on delete cascade,
