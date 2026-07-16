@@ -1,5 +1,5 @@
 /* PokePP service worker — network-first สำหรับโค้ด (freshness), cache-first สำหรับข้อมูล/ไอคอน */
-const CACHE = 'pokepp-v13';
+const CACHE = 'pokepp-v14';
 const SHELL = [
   './', './index.html', './style.css', './game.js', './cloud.js',
   './logic.js', './monsters-data.js', './abilities-data.js', './manifest.json', './icon.svg',

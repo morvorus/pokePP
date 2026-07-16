@@ -872,6 +872,8 @@ function newSave() {
     fishShopStock: [],   // สต็อกแผ่นสกิลในร้านตกปลา (10 ชิ้น รีทุก 3 วัน)
     fishShopResetAt: 0,
     pvpRating: 1000, pvpPeak: 1000, pvpSeason: '', pvpWins: 0, pvpLosses: 0,   // PvP จัดอันดับตามฤดูกาล
+    passSeason: '', passXp: 0, passPrem: false, passClaim: {}, passClaimP: {},   // Season Pass (บัตรฤดูกาล) — ฟรี+พรีเมียม
+    research: [], researchDate: '',   // Field Research เควสรายวันป้อน XP เข้า Season Pass
     quests: [], questDate: '',
     achievements: {},    // {achId:true} รับรางวัลแล้ว
     settings: { sound: true, music: false, spawnSpeed: 'normal',
@@ -3053,6 +3055,8 @@ function updateQuestProgress(mon, tier) {
     if (hit) { q.progress++; ch = true; }
   }
   if (advanceWeeklyQuest(mon, tier, null)) ch = true;
+  if (advanceResearch(mon, tier, null)) ch = true;
+  addPassXp(2);   // เก็บ XP บัตรฤดูกาลเล็กน้อยทุกครั้งที่จับ
   if (ch) save();
 }
 function bumpQuest(type) {   // เพิ่มความคืบหน้าเควสประเภทที่ไม่เกี่ยวกับการจับ (ชนะ/ตกปลา/คอนเทสต์/วิวัฒนาการ)
@@ -3062,6 +3066,8 @@ function bumpQuest(type) {   // เพิ่มความคืบหน้า
     if (q.type === type) { q.progress++; ch = true; }
   }
   if (advanceWeeklyQuest(null, null, type)) ch = true;
+  if (advanceResearch(null, null, type)) ch = true;
+  if (type === 'winBattle' || type === 'fishCatch') addPassXp(3);
   if (ch) save();
 }
 function claimQuest(key) {
@@ -3069,11 +3075,162 @@ function claimQuest(key) {
   if (!q || q.claimed || q.progress < q.target) return;
   q.claimed = true; state.coins += q.rewardCoins;
   const [bk, bn] = q.rewardBall; state.balls[bk] = (state.balls[bk] || 0) + bn;
+  addPassXp(20);   // เคลียร์เควสรายวัน → XP บัตรฤดูกาล
   save(); renderTopbar(); renderQuests(); renderBallBar();
-  toast(`🎁 รับรางวัล: +${q.rewardCoins}🪙 +${bn}${BALLS[bk].emoji}`, 'good');
+  toast(`🎁 รับรางวัล: +${q.rewardCoins}🪙 +${bn}${BALLS[bk].emoji} · บัตร +20 XP`, 'good');
+}
+
+// ================================================================
+//  SEASON PASS (บัตรฤดูกาล) + FIELD RESEARCH (เควสรายวันป้อน XP)
+// ================================================================
+const PASS_XP_PER_TIER = 120;
+const PASS_TIER_COUNT = 20;
+const PASS_PREMIUM_COST = 200;   // ปลดล็อกแทร็คพรีเมียมด้วย BP (เป็นบ่อทิ้ง BP)
+// รางวัลแต่ละระดับ — ฟรีทุกคน / พรีเมียมต้องปลดล็อก (ดีกว่ามาก)
+function passReward(i, prem) {
+  const t = i + 1, ms = t % 5 === 0;   // ระดับหมุด (5/10/15/20) รางวัลใหญ่
+  if (!prem) return ms ? { coins: 800 * (t / 5), lockbox: 1, ball: ['ultra', 2] } : { coins: 200 + t * 40, ball: ['great', 3] };
+  if (t === PASS_TIER_COUNT) return { coins: 30000, stone: 2, tokens: 30, bp: 40, candy: 2 };
+  return ms ? { coins: 2500 * (t / 5), tokens: 15, ball: ['ultra', 3], candy: 1 } : { coins: 500 + t * 70, tokens: 5, bp: 5 };
+}
+function grantPassReward(r) {
+  if (r.coins) state.coins += r.coins;
+  if (r.bp) state.battlePoints = (state.battlePoints || 0) + r.bp;
+  if (r.tokens) state.fishTokens = (state.fishTokens || 0) + r.tokens;
+  if (r.ball) { const [k, n] = r.ball; state.balls[k] = (state.balls[k] || 0) + n; }
+  if (r.lockbox) state.lockboxes = (state.lockboxes || 0) + r.lockbox;
+  if (r.stone) state.stones = (state.stones || 0) + r.stone;
+  if (r.candy) state.candies = (state.candies || 0) + r.candy;
+}
+function passRewardText(r) {
+  const p = [];
+  if (r.coins) p.push(`${r.coins >= 1000 ? (r.coins / 1000) + 'k' : r.coins}🪙`);
+  if (r.bp) p.push(`${r.bp}🎖️`);
+  if (r.tokens) p.push(`${r.tokens}🎟️`);
+  if (r.ball) p.push(`${r.ball[1]}${BALLS[r.ball[0]].emoji}`);
+  if (r.lockbox) p.push(`${r.lockbox}🎁`);
+  if (r.stone) p.push(`${r.stone}💎`);
+  if (r.candy) p.push(`${r.candy}🍬`);
+  return p.join(' ');
+}
+function ensurePassSeason() {
+  if (!state.passClaim) state.passClaim = {};
+  if (!state.passClaimP) state.passClaimP = {};
+  const key = pvpSeasonKey();   // ใช้คีย์ฤดูกาลรายเดือนเดียวกับ PvP
+  if (state.passSeason === key) return;
+  state.passSeason = key; state.passXp = 0; state.passPrem = false; state.passClaim = {}; state.passClaimP = {};
+}
+function passTierIndex() { return Math.min(PASS_TIER_COUNT, Math.floor((state.passXp || 0) / PASS_XP_PER_TIER)); }
+function addPassXp(n) {
+  ensurePassSeason();
+  state.passXp = (state.passXp || 0) + n;
+}
+function claimPassTier(i, prem) {
+  ensurePassSeason();
+  if (i >= passTierIndex()) { toast('ยังไม่ถึงระดับนี้', 'bad'); return; }
+  if (prem && !state.passPrem) { toast('ต้องปลดล็อกแทร็คพรีเมียมก่อน', 'bad'); return; }
+  const claimed = prem ? state.passClaimP : state.passClaim;
+  if (claimed[i]) return;
+  const r = passReward(i, prem);
+  grantPassReward(r); claimed[i] = true;
+  save(); renderTopbar(); renderBallBar(); renderSeasonPass();
+  toast(`🎫 รับรางวัลบัตรระดับ ${i + 1}: +${passRewardText(r)}`, 'good'); playSfx('rare');
+}
+function buyPassPremium() {
+  ensurePassSeason();
+  if (state.passPrem) return;
+  if ((state.battlePoints || 0) < PASS_PREMIUM_COST) { toast(`ต้องมี ${PASS_PREMIUM_COST}🎖️ BP`, 'bad'); return; }
+  state.battlePoints -= PASS_PREMIUM_COST; state.passPrem = true;
+  save(); renderTopbar(); renderSeasonPass();
+  toast('⭐ ปลดล็อกบัตรพรีเมียม! รับรางวัลพรีเมียมย้อนหลังได้เลย', 'good'); playSfx('rare');
+}
+const RESEARCH_DEFS = [
+  { type: 'catchAny', gen: () => { const n = rand(6, 12); return { target: n, name: `จับโปเกมอน ${n} ตัว`, xp: 40, reward: { coins: 200 } }; } },
+  { type: 'catchType', gen: () => { const t = pick(ALL_TYPES), n = rand(3, 6); return { typeName: t, target: n, name: `จับธาตุ ${t} ${n} ตัว`, xp: 55, reward: { ball: ['great', 3] } }; } },
+  { type: 'catchRare', gen: () => { const n = rand(2, 4); return { target: n, name: `จับ Rare ขึ้นไป ${n} ตัว`, xp: 70, reward: { ball: ['ultra', 1] } }; } },
+  { type: 'winBattle', gen: () => { const n = rand(2, 5); return { target: n, name: `ชนะการต่อสู้ ${n} ครั้ง`, xp: 55, reward: { coins: 300 } }; } },
+  { type: 'fishCatch', gen: () => { const n = rand(2, 5); return { target: n, name: `ตกปลาได้ ${n} ตัว`, xp: 50, reward: { tokens: 8 } }; } },
+];
+function makeResearch() {
+  return pickN(RESEARCH_DEFS, 4).map((def, i) => ({ key: 'r' + (i + 1), type: def.type, progress: 0, claimed: false, ...def.gen() }));
+}
+function ensureResearch() {
+  if (state.researchDate !== todayStr() || !(state.research || []).length) {
+    state.research = makeResearch(); state.researchDate = todayStr(); save();
+  }
+}
+function advanceResearch(mon, tier, type) {
+  ensureResearch();
+  let ch = false;
+  for (const q of state.research) {
+    if (q.claimed || q.progress >= q.target) continue;
+    let hit = false;
+    if (mon) hit = q.type === 'catchAny' || (q.type === 'catchType' && mon.types.includes(q.typeName)) || (q.type === 'catchRare' && ['rare', 'superrare', 'legendary'].includes(tier));
+    else if (type) hit = q.type === type;
+    if (hit) { q.progress++; ch = true; }
+  }
+  return ch;
+}
+function claimResearch(key) {
+  const q = (state.research || []).find(x => x.key === key);
+  if (!q || q.claimed || q.progress < q.target) return;
+  q.claimed = true;
+  if (q.reward) grantPassReward(q.reward);
+  addPassXp(q.xp);
+  save(); renderTopbar(); renderBallBar(); renderQuests();
+  toast(`🔬 เควสวิจัยสำเร็จ! บัตร +${q.xp} XP${q.reward ? ' · +' + passRewardText(q.reward) : ''}`, 'good'); playSfx('rare');
+}
+function renderSeasonPass() {
+  const box = $('#seasonPassBox'); if (!box) return;
+  ensurePassSeason();
+  const tier = passTierIndex(), xp = state.passXp || 0;
+  const intoTier = xp - tier * PASS_XP_PER_TIER;
+  const pct = tier >= PASS_TIER_COUNT ? 100 : clamp(intoTier / PASS_XP_PER_TIER * 100, 0, 100);
+  const cols = [];
+  for (let i = 0; i < PASS_TIER_COUNT; i++) {
+    const unlocked = i < tier;
+    const fr = passReward(i, false), pr = passReward(i, true);
+    const fClaimed = state.passClaim[i], pClaimed = state.passClaimP[i];
+    const fBtn = fClaimed ? `<div class="pass-cell got">✓</div>` : `<button class="pass-cell free${unlocked ? ' can' : ''}" data-passfree="${i}" ${unlocked ? '' : 'disabled'}>${passRewardText(fr)}</button>`;
+    const pBtn = pClaimed ? `<div class="pass-cell got">✓</div>` : `<button class="pass-cell prem${unlocked && state.passPrem ? ' can' : ''}" data-passprem="${i}" ${unlocked && state.passPrem ? '' : 'disabled'}>${passRewardText(pr)}</button>`;
+    cols.push(`<div class="pass-col${i === tier ? ' now' : ''}"><div class="pass-tnum">${i + 1}</div>${fBtn}${pBtn}</div>`);
+  }
+  const premBtn = state.passPrem
+    ? `<span class="pass-prem-on">⭐ พรีเมียมปลดล็อกแล้ว</span>`
+    : `<button class="buy-btn" id="passBuyPrem" ${(state.battlePoints || 0) < PASS_PREMIUM_COST ? 'disabled' : ''}>⭐ ปลดล็อกพรีเมียม ${PASS_PREMIUM_COST}🎖️</button>`;
+  box.innerHTML = `
+    <div class="pass-head">
+      <div><div class="pass-title">🎫 บัตรฤดูกาล · ${state.passSeason}</div>
+        <div class="pass-sub">ระดับ ${tier}/${PASS_TIER_COUNT} · ${tier >= PASS_TIER_COUNT ? 'สูงสุดแล้ว!' : `อีก ${PASS_XP_PER_TIER - intoTier} XP ถึงระดับต่อไป`}</div></div>
+      ${premBtn}
+    </div>
+    <div class="quest-bar" style="margin:6px 0"><div class="quest-fill" style="width:${pct}%;background:linear-gradient(90deg,#ffd76b,#ff9d3d)"></div></div>
+    <div class="pass-legend"><span>🆓 ฟรี</span><span>⭐ พรีเมียม</span> · ทำ Field Research ด้านล่างเพื่อเก็บ XP</div>
+    <div class="pass-track">${cols.join('')}</div>`;
+  const bp = $('#passBuyPrem'); if (bp) bp.onclick = buyPassPremium;
+  box.querySelectorAll('[data-passfree]').forEach(b => b.onclick = () => claimPassTier(+b.dataset.passfree, false));
+  box.querySelectorAll('[data-passprem]').forEach(b => b.onclick = () => claimPassTier(+b.dataset.passprem, true));
+}
+function renderResearch() {
+  const box = $('#researchBox'); if (!box) return;
+  ensureResearch();
+  box.innerHTML = `<div class="research-head">🔬 Field Research · รีเซ็ตทุกวัน · เก็บ XP เข้าบัตรฤดูกาล</div>` +
+    state.research.map(q => {
+      const done = q.progress >= q.target, pct = clamp(q.progress / q.target * 100, 0, 100);
+      return `<div class="quest">
+        <div class="quest-top"><div class="quest-name">${q.name}</div>
+          <div class="quest-reward">🎫+${q.xp}XP${q.reward ? ' · ' + passRewardText(q.reward) : ''}</div></div>
+        <div class="quest-bar"><div class="quest-fill" style="width:${pct}%;background:linear-gradient(90deg,#7ec8ff,#3d7dca)"></div></div>
+        <div class="quest-foot"><span>${Math.min(q.progress, q.target)}/${q.target}</span>
+          <button class="claim-btn${q.claimed ? ' done' : ''}" data-rkey="${q.key}" ${(!done || q.claimed) ? 'disabled' : ''}>${q.claimed ? 'รับแล้ว ✓' : 'รับ XP'}</button>
+        </div></div>`;
+    }).join('');
+  box.querySelectorAll('.claim-btn[data-rkey]').forEach(btn => btn.onclick = () => claimResearch(btn.dataset.rkey));
 }
 function renderQuests() {
   ensureDailyQuests();
+  renderSeasonPass();
+  renderResearch();
   $('#questReset').textContent = `รีเซ็ตทุกวัน · วันนี้ ${state.questDate}`;
   renderWeeklyQuest();
   $('#questList').innerHTML = state.quests.map(q => {
