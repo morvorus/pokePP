@@ -1603,13 +1603,59 @@ function fish() {
     playSpawnFx('legend');
     save(); renderTopbar(); updateFishBtn(); return;
   }
-  const catchP = 0.5 + rod * 0.06 + ((state.fishItems && state.fishItems.lure) ? 0.12 : 0);   // เบ็ดดี/ไอเทม lure = ติดง่ายขึ้น
+  save(); renderTopbar(); updateFishBtn();
+  // มินิเกมจับจังหวะ — กดตอนปลากินเบ็ด ยิ่งไวยิ่งได้โบนัส (ปิดอัตโนมัติถ้าเปิดโหมดลดแอนิเมชัน)
+  if (state.settings && state.settings.reduceMotion) resolveFish('good');
+  else startFishMinigame();
+}
+// คุณภาพการจับจังหวะ → โบนัสโอกาสติด + luck ของสปอว์นที่ตกได้
+const FISH_QUALITY = {
+  perfect: { c: 0.28, l: 2, m: '🎯 เพอร์เฟกต์!' },
+  good: { c: 0.14, l: 1, m: '👍 จังหวะดี!' },
+  ok: { c: 0.0, l: 0, m: '🎣 พอใช้' },
+  miss: { c: -0.35, l: 0, m: '💨 ปลาหลุด!' },
+  early: { c: -0.5, l: 0, m: '⚠️ กดเร็วไป ปลาหนี!' },
+};
+let _fishTimers = [];
+function clearFishTimers() { _fishTimers.forEach(clearTimeout); _fishTimers = []; }
+function startFishMinigame() {
+  clearFishTimers();
+  const ov = document.createElement('div');
+  ov.className = 'fish-mini';
+  ov.innerHTML = `<div class="fm-card">
+      <div class="fm-water">🎣</div>
+      <div class="fm-msg" id="fmMsg">เหวี่ยงเบ็ดลงน้ำ... รอปลากินเบ็ด</div>
+      <button class="fm-tap" id="fmTap" hidden>❗ กด!</button>
+      <div class="fm-hint" id="fmHint">อย่าเพิ่งกด — รอจนขึ้น "กด!"</div>
+    </div>`;
+  document.body.appendChild(ov);
+  const msg = ov.querySelector('#fmMsg'), tap = ov.querySelector('#fmTap'), hint = ov.querySelector('#fmHint');
+  let biteAt = 0, done = false;
+  const finish = q => { if (done) return; done = true; clearFishTimers(); ov.remove(); resolveFish(q); };
+  const onEarly = e => { if (biteAt || done) return; e.preventDefault(); finish('early'); };
+  ov.addEventListener('pointerdown', onEarly);
+  _fishTimers.push(setTimeout(() => {
+    biteAt = performance.now();
+    ov.removeEventListener('pointerdown', onEarly);
+    ov.classList.add('bite');
+    msg.textContent = 'ปลากินเบ็ดแล้ว! กดเร็ว!';
+    hint.textContent = '';
+    tap.hidden = false;
+    tap.onclick = () => { const rt = performance.now() - biteAt; finish(rt < 350 ? 'perfect' : rt < 750 ? 'good' : 'ok'); };
+    _fishTimers.push(setTimeout(() => finish('miss'), 1500));   // หน้าต่างตอบสนอง 1.5 วิ
+  }, rand(1000, 3000)));
+  _fishTimers.push(setTimeout(() => finish('miss'), 12000));   // กันค้าง
+}
+function resolveFish(quality) {
+  const q = FISH_QUALITY[quality] || FISH_QUALITY.ok;
+  const rod = state.rods || 1;
+  const catchP = clamp(0.5 + rod * 0.06 + ((state.fishItems && state.fishItems.lure) ? 0.12 : 0) + q.c, 0.02, 0.98);
   const roll = Math.random();
   if (roll < catchP) {
     clearTimeout(spawnTimer);
-    const luck = (isEventActive() ? 1 : 0) + Math.floor(rod / 2) + ((state.fishItems && state.fishItems.rare) ? 1 : 0);
+    const luck = (isEventActive() ? 1 : 0) + Math.floor(rod / 2) + ((state.fishItems && state.fishItems.rare) ? 1 : 0) + q.l;
     let mon;
-    const legChance = (1 / 700) * (1 + rod * 0.25) + ((state.fishItems && state.fishItems.rare) ? 0.001 : 0);
+    const legChance = (1 / 700) * (1 + rod * 0.25) * (quality === 'perfect' ? 1.6 : 1) + ((state.fishItems && state.fishItems.rare) ? 0.001 : 0);
     if (FISH_LEG.length && Math.random() < legChance) mon = pick(FISH_LEG);   // เทพน้ำ/ทะเล
     else {
       let ti = TIER_ORDER.indexOf(rollRarity(luck));
@@ -1619,14 +1665,15 @@ function fish() {
     }
     const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier() * comboShinyBoost(mon.id);
     beginSpawn(mon, shiny, true);
-    toast('🎣 มีบางอย่างกินเบ็ด!', 'good');
+    toast(`${q.m} มีบางอย่างกินเบ็ด!`, 'good');
   } else if (roll < catchP + 0.3) {
-    const tok = rand(1, 3) + Math.floor(rod / 2), coins = rand(10, 40);
+    const bonusTok = quality === 'perfect' ? 2 : quality === 'good' ? 1 : 0;
+    const tok = rand(1, 3) + Math.floor(rod / 2) + bonusTok, coins = rand(10, 40);
     state.fishTokens = (state.fishTokens || 0) + tok; state.coins += coins;
-    toast(`🎣 ได้ 🪙${coins} + 🎟️${tok} เหรียญตกปลา`, 'good');
+    toast(`${q.m} ได้ 🪙${coins} + 🎟️${tok} เหรียญตกปลา`, 'good');
     logMsg(`🎣 ตกปลาได้ 🪙${coins} + 🎟️${tok} เหรียญตกปลา`, '');
   } else {
-    toast('🎣 ไม่มีอะไรกินเบ็ด...', '');
+    toast(`${q.m} ไม่มีอะไรกินเบ็ด...`, '');
   }
   save(); renderTopbar(); updateFishBtn();
 }
