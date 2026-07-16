@@ -1387,8 +1387,14 @@ function comboShinyBoost(monId) {
   return comboMult(c.count);
 }
 // ===== Live-Ops: คอนฟิกอีเวนต์สดจากคลาวด์ (แก้ในแดชบอร์ด Supabase ได้เลย ไม่ต้อง deploy) =====
-const LIVE_DEFAULTS = { message: '', messageUntil: 0, eventEmoji: '📣', shinyMult: 1, xpMult: 1, coinMult: 1 };
+const LIVE_DEFAULTS = { message: '', messageUntil: 0, eventEmoji: '📣', shinyMult: 1, xpMult: 1, coinMult: 1, theme: '' };
+const EVENT_THEMES = ['halloween', 'xmas', 'sakura', 'gold', 'ocean'];
 let liveConfig = { ...LIVE_DEFAULTS };
+// ธีมอีเวนต์: เปลี่ยนสี accent ทั้งเกมตามอีเวนต์สด (ตั้งจากแดชบอร์ด)
+function applyLiveTheme() {
+  const t = (liveConfig.theme || '').trim();
+  document.documentElement.dataset.event = EVENT_THEMES.includes(t) ? t : '';
+}
 // ตัวคูณจากอีเวนต์สด — clamp กันค่าเพี้ยน (ป้องกันเชิงลึกแม้จะแก้ได้แค่แอดมิน)
 function liveShinyMult() { return clamp(+liveConfig.shinyMult || 1, 0.1, 10); }
 function liveXpMult() { return clamp(+liveConfig.xpMult || 1, 1, 5); }
@@ -1406,6 +1412,7 @@ async function refreshLiveConfig() {
     const cfg = await Cloud.getLiveConfig();
     liveConfig = { ...LIVE_DEFAULTS, ...(cfg || {}) };
     renderLiveBanner();
+    applyLiveTheme();
   } catch (e) { /* ใช้ค่าเริ่มต้นต่อไป */ }
 }
 function renderLiveBanner() {
@@ -6339,7 +6346,7 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     pickLegendaryGenWeighted, genOf, onFoeDown, endBattle, throwBall, save, switchView,
     renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop, abilityFor,
     openIndividualModal, tradeNpc, claimDailyLogin, selectRegion, playSpawnFx, renderHallOfFame,
-    get liveConfig() { return liveConfig; }, set liveConfig(v) { liveConfig = { ...LIVE_DEFAULTS, ...v }; renderLiveBanner(); },
+    get liveConfig() { return liveConfig; }, set liveConfig(v) { liveConfig = { ...LIVE_DEFAULTS, ...v }; renderLiveBanner(); applyLiveTheme(); },
     shinyMultiplier, liveXpMult, liveCoinMult, celebrate,
   };
 }

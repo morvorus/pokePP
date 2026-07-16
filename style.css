@@ -898,6 +898,14 @@ h2.view-title::after {
 @keyframes vtOut { to { opacity: 0; transform: translateY(-5px); } }
 @keyframes vtIn { from { opacity: 0; transform: translateY(9px); } }
 
+/* ===== ธีมอีเวนต์ (Live-Ops) — เปลี่ยนสี accent ทั้งเกม ===== */
+:root[data-event="halloween"] { --accent: #ff8a1e; --accent2: #6b2fb3; }
+:root[data-event="xmas"]      { --accent: #ff5c5c; --accent2: #2fa85a; }
+:root[data-event="sakura"]    { --accent: #ff9ec7; --accent2: #c47ad6; }
+:root[data-event="gold"]      { --accent: #ffd24a; --accent2: #b8862b; }
+:root[data-event="ocean"]     { --accent: #43d0e6; --accent2: #2f7fd6; }
+:root[data-event] body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 130px; pointer-events: none; z-index: 0; opacity: .4; background: radial-gradient(80% 100% at 50% 0%, var(--accent), transparent 72%); transition: opacity .4s; }
+
 /* ===== Live-Ops banner (ประกาศ/อีเวนต์สดจากคลาวด์) ===== */
 .live-banner { background: linear-gradient(90deg,rgba(255,203,5,.22),rgba(61,125,202,.18)); border: 1px solid rgba(255,203,5,.4); border-radius: var(--btn-radius); padding: 8px 12px; margin-bottom: var(--sp-2); font-size: 12.5px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px; box-shadow: var(--shadow-sm); }
 .live-banner .lb-emoji { font-size: 18px; }
