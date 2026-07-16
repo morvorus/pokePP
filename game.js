@@ -2887,15 +2887,19 @@ function renderShop() {
   document.querySelectorAll('[data-shoptab]').forEach(b => b.onclick = () => setShopTab(b.dataset.shoptab));
   setShopTab(_shopTab);
 }
-let _shopTab = 'main';
 const SHOP_PANELS = { main: '#shopGrid', bp: '#bpShopBox', fish: '#fishShopBox' };
+let _shopTab = (() => { try { return SHOP_PANELS[localStorage.getItem('pp_shopTab')] ? localStorage.getItem('pp_shopTab') : 'main'; } catch { return 'main'; } })();
 function setShopTab(tab) {
   if (!SHOP_PANELS[tab]) tab = 'main';
   _shopTab = tab;
+  try { localStorage.setItem('pp_shopTab', tab); } catch { /* private mode */ }
   document.querySelectorAll('[data-shoptab]').forEach(b => b.classList.toggle('active', b.dataset.shoptab === tab));
-  Object.entries(SHOP_PANELS).forEach(([k, sel]) => { const el = $(sel); if (el) el.hidden = (k !== tab); });
   if (tab === 'bp') renderBpShop();
   else if (tab === 'fish') renderFishShop();
+  Object.entries(SHOP_PANELS).forEach(([k, sel]) => { const el = $(sel); if (el) el.hidden = (k !== tab); });
+  const active = $(SHOP_PANELS[tab]);   // เอฟเฟกต์เปลี่ยนหน้า (fade + เลื่อนขึ้นบน)
+  if (active) { active.classList.remove('shop-page'); void active.offsetWidth; active.classList.add('shop-page'); }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function spendTokens(n) { if ((state.fishTokens || 0) < n) { toast('❌ เหรียญตกปลาไม่พอ', 'bad'); return false; } state.fishTokens -= n; return true; }
 function spendCheckin(n) { if ((state.checkinCoins || 0) < n) { toast('❌ เหรียญเช็คอินไม่พอ (ได้จากล็อกอินรายวัน)', 'bad'); return false; } state.checkinCoins -= n; return true; }
