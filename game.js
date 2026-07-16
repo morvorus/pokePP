@@ -2884,6 +2884,18 @@ function renderShop() {
     const qty = (state.shopQty && state.shopQty[k]) || 1;
     addBalls(k, qty, BALLS[k].price * qty);
   });
+  document.querySelectorAll('[data-shoptab]').forEach(b => b.onclick = () => setShopTab(b.dataset.shoptab));
+  setShopTab(_shopTab);
+}
+let _shopTab = 'main';
+const SHOP_PANELS = { main: '#shopGrid', bp: '#bpShopBox', fish: '#fishShopBox' };
+function setShopTab(tab) {
+  if (!SHOP_PANELS[tab]) tab = 'main';
+  _shopTab = tab;
+  document.querySelectorAll('[data-shoptab]').forEach(b => b.classList.toggle('active', b.dataset.shoptab === tab));
+  Object.entries(SHOP_PANELS).forEach(([k, sel]) => { const el = $(sel); if (el) el.hidden = (k !== tab); });
+  if (tab === 'bp') renderBpShop();
+  else if (tab === 'fish') renderFishShop();
 }
 function spendTokens(n) { if ((state.fishTokens || 0) < n) { toast('❌ เหรียญตกปลาไม่พอ', 'bad'); return false; } state.fishTokens -= n; return true; }
 function spendCheckin(n) { if ((state.checkinCoins || 0) < n) { toast('❌ เหรียญเช็คอินไม่พอ (ได้จากล็อกอินรายวัน)', 'bad'); return false; } state.checkinCoins -= n; return true; }
@@ -3150,8 +3162,6 @@ function renderMenu() {
   renderTower();
   renderMegaLeague();
   renderGyms();
-  renderBpShop();
-  renderFishShop();
   renderCharms();
   renderDexRewards();
   const done = ACHIEVEMENTS.filter(a => state.achievements[a.id]).length;

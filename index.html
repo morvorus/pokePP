@@ -114,7 +114,14 @@
     <!-- SHOP -->
     <section class="view" id="view-shop">
       <h2 class="view-title">🏪 ร้านค้า</h2>
+      <div class="lb-tabs" id="shopTabs">
+        <button class="lb-tab active" data-shoptab="main">🏪 ร้านหลัก</button>
+        <button class="lb-tab" data-shoptab="bp">🎖️ BP Shop</button>
+        <button class="lb-tab" data-shoptab="fish">🎣 ตกปลา & สกิล</button>
+      </div>
       <div id="shopGrid" class="shop-grid"></div>
+      <div id="bpShopBox" class="shop-grid" hidden></div>
+      <div id="fishShopBox" class="shop-grid" hidden></div>
     </section>
 
     <!-- QUESTS -->
@@ -200,14 +207,6 @@
       <details class="menu-sec">
         <summary class="view-title">🤖 Catchbot & 🎁 กล่องสุ่ม</summary>
         <div id="idleBox"></div>
-      </details>
-      <details class="menu-sec">
-        <summary class="view-title">🎖️ BP Shop</summary>
-        <div id="bpShopBox" class="shop-grid"></div>
-      </details>
-      <details class="menu-sec">
-        <summary class="view-title">🎣 ร้านตกปลา & แผ่นสกิล</summary>
-        <div id="fishShopBox" class="shop-grid"></div>
       </details>
       <details class="menu-sec">
         <summary class="view-title">🔮 ไอเทมบูสต์ (Charms)</summary>
