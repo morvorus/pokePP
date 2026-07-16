@@ -8,6 +8,7 @@ import { SPECIES_ABILITY, ABILITY_DEFS, HIDDEN_ABILITY } from './abilities-data.
 import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations, statStageMult, comboMult, xpToTier, tierForRating, xpForLevel, levelFromXp, tmPrice, ivRerollPrice, ivPercentOf, contestBaseScore, rivalBaseScore } from './logic.js';
 import { TIER_LABEL, TIER_ORDER, TIER_EMOJI, TIER_LEVEL, TIER_WEIGHTS, TYPE_EMOJI, TYPE_TH, WEATHERS, NIGHT_BOOST, DAY_BOOST, Z_MOVES, PVP_TIERS } from './content.js';
 import { bus } from './bus.js';
+import { startFishMinigame } from './fish-minigame.js';
 
 // cloud.js (classic script) รันก่อนโมดูลนี้และตั้ง window.Cloud ไว้ — ผูกเป็น const ให้อ้าง Cloud ในสโคปโมดูลได้
 const Cloud = window.Cloud;
@@ -1562,7 +1563,7 @@ function fish() {
   save(); renderTopbar(); updateFishBtn();
   // มินิเกมจับจังหวะ — กดตอนปลากินเบ็ด ยิ่งไวยิ่งได้โบนัส (ปิดอัตโนมัติถ้าเปิดโหมดลดแอนิเมชัน)
   if (state.settings && state.settings.reduceMotion) resolveFish('good');
-  else startFishMinigame();
+  else startFishMinigame(resolveFish);   // โมดูลจับจังหวะ → callback มาคิดผลที่ resolveFish
 }
 // คุณภาพการจับจังหวะ → โบนัสโอกาสติด + luck ของสปอว์นที่ตกได้
 const FISH_QUALITY = {
@@ -1572,36 +1573,7 @@ const FISH_QUALITY = {
   miss: { c: -0.35, l: 0, m: '💨 ปลาหลุด!' },
   early: { c: -0.5, l: 0, m: '⚠️ กดเร็วไป ปลาหนี!' },
 };
-let _fishTimers = [];
-function clearFishTimers() { _fishTimers.forEach(clearTimeout); _fishTimers = []; }
-function startFishMinigame() {
-  clearFishTimers();
-  const ov = document.createElement('div');
-  ov.className = 'fish-mini';
-  ov.innerHTML = `<div class="fm-card">
-      <div class="fm-water">🎣</div>
-      <div class="fm-msg" id="fmMsg">เหวี่ยงเบ็ดลงน้ำ... รอปลากินเบ็ด</div>
-      <button class="fm-tap" id="fmTap" hidden>❗ กด!</button>
-      <div class="fm-hint" id="fmHint">อย่าเพิ่งกด — รอจนขึ้น "กด!"</div>
-    </div>`;
-  document.body.appendChild(ov);
-  const msg = ov.querySelector('#fmMsg'), tap = ov.querySelector('#fmTap'), hint = ov.querySelector('#fmHint');
-  let biteAt = 0, done = false;
-  const finish = q => { if (done) return; done = true; clearFishTimers(); ov.remove(); resolveFish(q); };
-  const onEarly = e => { if (biteAt || done) return; e.preventDefault(); finish('early'); };
-  ov.addEventListener('pointerdown', onEarly);
-  _fishTimers.push(setTimeout(() => {
-    biteAt = performance.now();
-    ov.removeEventListener('pointerdown', onEarly);
-    ov.classList.add('bite');
-    msg.textContent = 'ปลากินเบ็ดแล้ว! กดเร็ว!';
-    hint.textContent = '';
-    tap.hidden = false;
-    tap.onclick = () => { const rt = performance.now() - biteAt; finish(rt < 350 ? 'perfect' : rt < 750 ? 'good' : 'ok'); };
-    _fishTimers.push(setTimeout(() => finish('miss'), 1500));   // หน้าต่างตอบสนอง 1.5 วิ
-  }, rand(1000, 3000)));
-  _fishTimers.push(setTimeout(() => finish('miss'), 12000));   // กันค้าง
-}
+// startFishMinigame ย้ายไป fish-minigame.js (โมดูล UI self-contained) — เรียกพร้อม callback resolveFish
 function resolveFish(quality) {
   starterTick('firstFish');
   const q = FISH_QUALITY[quality] || FISH_QUALITY.ok;
