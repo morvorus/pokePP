@@ -446,12 +446,33 @@ const TYPE_MOVES = {
   steel: [{ name: 'Iron Head', pow: 80, acc: 100 }, { name: 'Flash Cannon', pow: 90, acc: 100 }, { name: 'Meteor Mash', pow: 90, acc: 90 }, { name: 'Steel Wing', pow: 65, acc: 90 }, { name: 'Iron Tail', pow: 75, acc: 75 }, { name: 'Gyro Ball', pow: 80, acc: 100 }],
   fairy: [{ name: 'Moonblast', pow: 95, acc: 100 }, { name: 'Dazzling Gleam', pow: 80, acc: 100 }, { name: 'Play Rough', pow: 90, acc: 90 }, { name: 'Draining Kiss', pow: 60, acc: 100 }, { name: 'Fairy Wind', pow: 40, acc: 100 }, { name: 'Disarming Voice', pow: 40, acc: 100 }],
 };
+// ท่าหายาก 1 ท่า/ธาตุ (ดรอปจาก World Boss/หอคอย ผ่าน TM) — แรงกว่าท่าปกติมาก
+const RARE_MOVES = {
+  normal: { name: 'Boomburst', pow: 140, acc: 100 }, fire: { name: 'Eruption', pow: 150, acc: 100 }, water: { name: 'Water Spout', pow: 150, acc: 100 },
+  electric: { name: 'Bolt Strike', pow: 130, acc: 85 }, grass: { name: 'Frenzy Plant', pow: 150, acc: 90 }, ice: { name: 'Glaciate', pow: 120, acc: 95 },
+  fighting: { name: 'Meteor Assault', pow: 150, acc: 100 }, poison: { name: 'Gunk Storm', pow: 130, acc: 85 }, ground: { name: 'Precipice Blades', pow: 120, acc: 85 },
+  flying: { name: 'Oblivion Wing', pow: 120, acc: 100 }, psychic: { name: 'Psycho Boost', pow: 140, acc: 90 }, bug: { name: 'Savage Horn', pow: 130, acc: 90 },
+  rock: { name: 'Diamond Storm', pow: 130, acc: 95 }, ghost: { name: 'Astral Barrage', pow: 120, acc: 100 }, dragon: { name: 'Roar of Time', pow: 150, acc: 90 },
+  dark: { name: 'Fiery Wrath', pow: 130, acc: 100 }, steel: { name: 'Doom Desire', pow: 140, acc: 100 }, fairy: { name: 'Light of Ruin', pow: 140, acc: 90 },
+};
+// ทุกท่า (ชื่อ→ข้อมูล) — สำหรับ custom moveset + แผ่นสกิล (TM)
+const MOVE_BY_NAME = {};
+Object.keys(TYPE_MOVES).forEach(t => TYPE_MOVES[t].forEach(mv => { MOVE_BY_NAME[mv.name] = { type: t, name: mv.name, pow: mv.pow, acc: mv.acc, priority: mv.priority || 0 }; }));
+Object.keys(RARE_MOVES).forEach(t => { const mv = RARE_MOVES[t]; MOVE_BY_NAME[mv.name] = { type: t, name: mv.name, pow: mv.pow, acc: mv.acc, priority: 0, rare: true }; });
+MOVE_BY_NAME['Quick Attack'] = { type: 'normal', name: 'Quick Attack', pow: 40, acc: 100, priority: 1 };
+// รายชื่อท่าปกติทั้งหมด (สำหรับสุ่มสต็อกร้านแผ่นสกิล)
+const ALL_TM_NAMES = Object.keys(TYPE_MOVES).flatMap(t => TYPE_MOVES[t].map(mv => mv.name)).filter(n => n !== 'Quick Attack');
 function hashIdx(seedStr, len) {   // hash คงที่ (ไม่สุ่มใหม่ทุกครั้ง) เพื่อให้ moveset ของแต่ละตัวเดิมเสมอ
   let h = 0;
   for (let i = 0; i < seedStr.length; i++) h = (h * 31 + seedStr.charCodeAt(i)) >>> 0;
   return h % len;
 }
-function getMoves(id) {
+function getMoves(id, ind) {
+  // ถ้าตั้ง custom moveset ไว้ ใช้ท่าที่เลือก
+  if (ind && ind.moves && ind.moves.length) {
+    const list = ind.moves.map(n => MOVE_BY_NAME[n]).filter(Boolean).slice(0, 4);
+    if (list.length) return list;
+  }
   const m = MON_BY_ID[id];
   const moves = [];
   m.types.forEach((t, ti) => {
@@ -466,6 +487,15 @@ function getMoves(id) {
   moves.push({ type: 'normal', name: 'Quick Attack', pow: 40, acc: 100, priority: 1 });   // ท่าติดตัว — priority โจมตีก่อนเสมอ
   const seen = new Set();
   return moves.filter(mv => { if (seen.has(mv.name)) return false; seen.add(mv.name); return true; }).slice(0, 4);
+}
+// ท่าที่ตัวนี้เรียนได้ (ท่าธาตุของสายพันธุ์ + TM ที่ผู้เล่นมีและธาตุตรงกัน + rare TM ที่ธาตุตรง)
+function learnableMoves(ind) {
+  const m = MON_BY_ID[ind.id];
+  const map = new Map();
+  m.types.forEach(t => TYPE_MOVES[t].forEach(mv => map.set(mv.name, MOVE_BY_NAME[mv.name])));
+  map.set('Quick Attack', MOVE_BY_NAME['Quick Attack']);
+  Object.keys(state.learnedTMs || {}).forEach(n => { const mv = MOVE_BY_NAME[n]; if (mv && m.types.includes(mv.type)) map.set(n, mv); });
+  return [...map.values()];
 }
 // movePP ย้ายไป logic.js แล้ว (import ด้านบน)
 const STRUGGLE_MOVE = { type: 'normal', name: 'ดิ้นรน', pow: 50, acc: 100, priority: 0, struggle: true };
@@ -838,6 +868,9 @@ function newSave() {
     rods: 0,             // ระดับเบ็ดตกปลา (0=ยังไม่มี, 1-5)
     fishItems: {},       // ไอเทมช่วยตกปลา { lure:true, rare:true }
     goldenSeaUntil: 0,   // เวลาสิ้นสุดอีเวนต์ทะเลทองคำ
+    learnedTMs: {},      // {moveName:true} แผ่นสกิลที่เรียนแล้ว (สอนให้ตัวที่ธาตุตรงได้)
+    fishShopStock: [],   // สต็อกแผ่นสกิลในร้านตกปลา (10 ชิ้น รีทุก 3 วัน)
+    fishShopResetAt: 0,
     quests: [], questDate: '',
     achievements: {},    // {achId:true} รับรางวัลแล้ว
     settings: { sound: true, music: false, spawnSpeed: 'normal',
@@ -2575,6 +2608,48 @@ function openIvRerollModal(uid) {
     openIvRerollModal(uid);
   };
 }
+// ===== จัดท่าเอง (custom moveset) — เลือกได้สูงสุด 4 ท่าจากท่าที่เรียนได้ =====
+let _msPick = [];
+function openMovesetEditor(uid) {
+  const ind = indByUid(uid); if (!ind) return;
+  const learn = learnableMoves(ind);
+  const cur = (ind.moves && ind.moves.length) ? ind.moves.slice() : getMoves(ind.id, ind).map(m => m.name);
+  _msPick = cur.filter(n => learn.some(l => l.name === n)).slice(0, 4);
+  renderMovesetEditor(uid, learn);
+}
+function renderMovesetEditor(uid, learn) {
+  const ind = indByUid(uid);
+  const rows = learn.map(mv => {
+    const on = _msPick.includes(mv.name);
+    return `<button class="move-btn t-${mv.type}${mv.rare ? ' pp-low' : ''}" data-msmove="${mv.name}" style="${on ? 'box-shadow:0 0 0 3px var(--accent)' : 'opacity:.75'}">
+      <span class="mv-type">${TYPE_EMOJI[mv.type]} ${TYPE_TH[mv.type]}</span>${on ? '✅ ' : ''}${mv.name} <b>${mv.pow}</b>${mv.rare ? ' 🌟' : ''}<span class="mv-acc">🎯${mv.acc}%</span></button>`;
+  }).join('');
+  $('#modalBox').innerHTML = `
+    <h3 style="font-size:18px;margin:2px 0 4px">⚔️ จัดท่า — ${MON_BY_ID[ind.id].name}</h3>
+    <div class="sr-sub" style="margin-bottom:8px">เลือกได้สูงสุด 4 ท่า (เลือกแล้ว ${_msPick.length}/4) · 🌟 = ท่าหายาก · แผ่นสกิลซื้อที่ร้านตกปลา</div>
+    <div class="move-grid" style="grid-template-columns:1fr 1fr">${rows}</div>
+    <div class="modal-actions" style="margin-top:12px">
+      <button class="btn-primary" id="msSave" ${_msPick.length === 0 ? 'disabled' : ''}>บันทึก (${_msPick.length})</button>
+      <button class="btn-ghost" id="msReset">คืนค่าเริ่มต้น</button>
+      <button class="btn-ghost" id="msBack">กลับ</button>
+    </div>`;
+  openModal();
+  $('#modalBox').querySelectorAll('[data-msmove]').forEach(b => b.onclick = () => {
+    const n = b.dataset.msmove;
+    if (_msPick.includes(n)) _msPick = _msPick.filter(x => x !== n);
+    else if (_msPick.length < 4) _msPick.push(n);
+    else { toast('เลือกได้สูงสุด 4 ท่า', ''); return; }
+    renderMovesetEditor(uid, learn);
+  });
+  $('#msBack').onclick = () => openIndividualModal(uid);
+  $('#msReset').onclick = () => { ind.moves = null; save(); toast('คืนท่าเริ่มต้นแล้ว', 'good'); openIndividualModal(uid); };
+  $('#msSave').onclick = () => {
+    if (!_msPick.length) return;
+    ind.moves = _msPick.slice(0, 4); save();
+    toast(`⚔️ บันทึกท่าของ ${MON_BY_ID[ind.id].name} แล้ว!`, 'good');
+    openIndividualModal(uid);
+  };
+}
 function openIndividualModal(uid) {
   const ind = state.caught.find(c => c.uid === uid);
   if (!ind) return;
@@ -2602,8 +2677,9 @@ function openIndividualModal(uid) {
       ${typeBadges(m.types)}</div>
     <div style="text-align:left">${ivRows}</div>
     <div class="moveset">
-      <div class="ms-title">⚔️ ท่าโจมตี</div>
-      ${getMoves(ind.id).map(mv => `<span class="pill t-${mv.type}" style="color:#fff">${mv.name} <b>${mv.pow}</b> <small style="opacity:.75">🎯${mv.acc}%</small></span>`).join('')}
+      <div class="ms-title">⚔️ ท่าโจมตี ${ind.moves && ind.moves.length ? '<span class="badge" style="background:#3d7dca;font-size:9px">จัดเอง</span>' : ''}</div>
+      ${getMoves(ind.id, ind).map(mv => `<span class="pill t-${mv.type}${mv.rare ? ' combo-badge' : ''}" style="color:#fff">${TYPE_EMOJI[mv.type] || ''} ${mv.name} <b>${mv.pow}</b> <small style="opacity:.75">🎯${mv.acc}%</small></span>`).join('')}
+      <div style="margin-top:6px"><button class="mini-btn" id="mMoves">⚔️ จัดท่า</button></div>
     </div>
     <div class="moveset" id="heldSection">${heldSectionHtml(ind)}</div>
     ${(megaFormsFor(ind.id) || gmaxFormFor(ind.id)) ? `<div class="moveset" id="megaSection">${megaSectionHtml(ind)}</div>` : ''}
@@ -2639,6 +2715,7 @@ function openIndividualModal(uid) {
     openIndividualModal(uid); renderCurrentView();
   };
   const iv = $('#mIvReroll'); if (iv) iv.onclick = () => { _ivLocks = new Set(); openIvRerollModal(uid); };
+  const mm = $('#mMoves'); if (mm) mm.onclick = () => openMovesetEditor(uid);
   const sn = $('#mStone'); if (sn) sn.onclick = () => {
     if ((state.stones || 0) <= 0) { toast('❌ ไม่มีหินวิวัฒนาการ', 'bad'); return; }
     state.stones--; doEvolve(ind, m.evolvesTo); save(); openIndividualModal(uid); renderCurrentView();
@@ -3073,6 +3150,7 @@ function renderMenu() {
   renderMegaLeague();
   renderGyms();
   renderBpShop();
+  renderFishShop();
   renderCharms();
   renderDexRewards();
   const done = ACHIEVEMENTS.filter(a => state.achievements[a.id]).length;
@@ -3226,6 +3304,57 @@ function afterCatchbotCollect() {
   const r = collectCatchbot();
   toast(r ? `🤖 เก็บผล Catchbot: ${r}` : '🤖 ยังไม่มีผลผลิต', r ? 'good' : '');
   renderTopbar(); renderMenu();
+}
+// ===== ร้านตกปลา & แผ่นสกิล (ใช้เหรียญตกปลา) — 10 แผ่นสกิลสุ่ม รีทุก 3 วัน + เบ็ด + ไอเทมตกปลา =====
+const FISH_SHOP_CD = 3 * 86400000;
+const ROD_UPGRADE_COST = { 2: 40, 3: 100, 4: 250, 5: 600 };
+function tmCost(name) { const mv = MOVE_BY_NAME[name]; return Math.round((mv ? mv.pow : 60) * 0.5) + 30; }   // กลาง-ค่อนข้างแพง
+function ensureFishShopStock() {
+  if (Date.now() >= (state.fishShopResetAt || 0) || !(state.fishShopStock || []).length) {
+    state.fishShopStock = pickN(ALL_TM_NAMES, 10);
+    state.fishShopResetAt = Date.now() + FISH_SHOP_CD;
+    save();
+  }
+}
+function renderFishShop() {
+  const box = $('#fishShopBox'); if (!box) return;
+  ensureFishShopStock();
+  const ft = state.fishTokens || 0, rod = state.rods || 0;
+  const left = (state.fishShopResetAt || 0) - Date.now();
+  const rodHtml = rod >= 5
+    ? `<div class="shop-item"><div class="emoji">🎣</div><div class="si-body"><div class="si-name">${ROD_NAMES[5]} (สูงสุดแล้ว)</div><div class="si-desc">อัปเกรดเบ็ดครบทุกระดับ</div></div><button class="buy-btn" disabled>เต็ม</button></div>`
+    : rod < 1
+      ? `<div class="shop-item"><div class="emoji">🎣</div><div class="si-body"><div class="si-name">เบ็ดไม้</div><div class="si-desc">หาได้จากการจับโปเกมอน (1/300) เท่านั้น — จับไปเรื่อยๆ เดี๋ยวได้!</div></div><button class="buy-btn" disabled>ดรอปเท่านั้น</button></div>`
+      : (() => { const nt = rod + 1, c = ROD_UPGRADE_COST[nt]; return `<div class="shop-item"><div class="emoji">🎣</div><div class="si-body"><div class="si-name">อัปเกรด → ${ROD_NAMES[nt]}</div><div class="si-desc">ตกปลาติดง่ายขึ้น + เจอหายาก/เทพน้ำมากขึ้น</div></div><button class="buy-btn cur-token" data-rodup="${nt}" ${ft < c ? 'disabled' : ''}>${c}🎟️</button></div>`; })();
+  const items = [
+    { name: 'Net Ball ×5', emoji: '🕸️', desc: 'บอลจับสัตว์น้ำ/แมลง (×3.3)', cost: 20, act: () => { state.balls.net = (state.balls.net || 0) + 5; return '🕸️ +5 Net Ball'; } },
+    { name: 'เหยื่อล่อ (Lure)', emoji: '🪱', desc: 'ตกปลาติดโปเกมอนง่ายขึ้นถาวร', cost: 150, owned: () => state.fishItems.lure, act: () => { state.fishItems.lure = true; return '🪱 ได้เหยื่อล่อ! ติดปลาง่ายขึ้น'; } },
+    { name: 'เหยื่อทองคำ', emoji: '✨', desc: 'เจอโปเกมอนน้ำหายากมากขึ้นเล็กน้อย (ถาวร)', cost: 280, owned: () => state.fishItems.rare, act: () => { state.fishItems.rare = true; return '✨ ได้เหยื่อทองคำ! เจอหายากขึ้น'; } },
+  ];
+  const itemHtml = items.map((it, i) => { const owned = it.owned && it.owned(); const cant = owned || ft < it.cost; return `<div class="shop-item"><div class="emoji">${it.emoji}</div><div class="si-body"><div class="si-name">${it.name}</div><div class="si-desc">${it.desc}</div></div><button class="buy-btn cur-token" data-fi="${i}" ${cant ? 'disabled' : ''}>${owned ? 'มีแล้ว' : it.cost + '🎟️'}</button></div>`; }).join('');
+  const tmHtml = state.fishShopStock.map(name => { const mv = MOVE_BY_NAME[name]; if (!mv) return ''; const c = tmCost(name); const owned = state.learnedTMs && state.learnedTMs[name]; const cant = owned || ft < c; return `<div class="shop-item"><div class="emoji">💿</div><div class="si-body"><div class="si-name">TM ${name} <span class="badge t-${mv.type}" style="font-size:8px;padding:1px 5px">${TYPE_EMOJI[mv.type]} ${TYPE_TH[mv.type]}</span></div><div class="si-desc">พลัง ${mv.pow} · แม่น ${mv.acc}% · สอนตัวธาตุ${TYPE_TH[mv.type]}</div></div><button class="buy-btn cur-token" data-tm="${name}" ${cant ? 'disabled' : ''}>${owned ? 'มีแล้ว' : c + '🎟️'}</button></div>`; }).join('');
+  box.innerHTML = `<div class="dex-stats">🎟️ เหรียญตกปลา: ${ft} · 🎣 ${ROD_NAMES[rod] || 'ยังไม่มีเบ็ด'}${left > 0 ? ` · รีสกิลอีก ${Math.max(1, Math.floor(left / 86400000))} วัน` : ''}</div>
+    <div class="shop-cat">🎣 เบ็ด & ไอเทมตกปลา</div>${rodHtml}${itemHtml}
+    <div class="shop-cat">💿 แผ่นสกิล (TM) — สุ่ม 10 ท่า รีทุก 3 วัน</div>${tmHtml}`;
+  box.querySelectorAll('[data-tm]').forEach(b => b.onclick = () => buyTM(b.dataset.tm));
+  box.querySelectorAll('[data-fi]').forEach(b => b.onclick = () => {
+    const it = items[+b.dataset.fi]; if (it.owned && it.owned()) return;
+    if ((state.fishTokens || 0) < it.cost) { toast('❌ เหรียญตกปลาไม่พอ', 'bad'); return; }
+    state.fishTokens -= it.cost; const d = it.act(); save(); renderTopbar(); renderFishShop(); renderBallBar(); toast('🎣 ' + d, 'good');
+  });
+  box.querySelectorAll('[data-rodup]').forEach(b => b.onclick = () => {
+    const nt = +b.dataset.rodup, c = ROD_UPGRADE_COST[nt];
+    if ((state.fishTokens || 0) < c) { toast('❌ เหรียญตกปลาไม่พอ', 'bad'); return; }
+    state.fishTokens -= c; state.rods = nt; save(); renderTopbar(); renderFishShop(); toast(`🎣 อัปเกรดเป็น ${ROD_NAMES[nt]}!`, 'good');
+  });
+}
+function buyTM(name) {
+  const c = tmCost(name);
+  if (state.learnedTMs && state.learnedTMs[name]) { toast('มีแผ่นนี้แล้ว', ''); return; }
+  if ((state.fishTokens || 0) < c) { toast('❌ เหรียญตกปลาไม่พอ', 'bad'); return; }
+  state.fishTokens -= c; state.learnedTMs = state.learnedTMs || {}; state.learnedTMs[name] = true;
+  save(); renderTopbar(); renderFishShop();
+  toast(`💿 เรียนแผ่นสกิล ${name}! ไปจัดท่าที่หน้าโปเกมอน (ปุ่ม ⚔️ จัดท่า)`, 'good');
 }
 function renderTower() {
   const box = $('#towerBox'); if (!box) return;
@@ -3909,7 +4038,7 @@ function applyFoeHeld(stats, held) {
 function buildBattleTeam(members) {
   return members.map(ind => {
     const s = statsWithHeld(ind);
-    const ppMax = getMoves(ind.id).map(mv => movePP(mv.pow));
+    const ppMax = getMoves(ind.id, ind).map(mv => movePP(mv.pow));
     return { ind, stats: s, hp: s.hp, maxHp: s.hp, sashUsed: false, sitrusUsed: false, status: null, sleepT: 0, mega: null, dynamax: null, stages: freshStages(), pp: ppMax.slice(), ppMax };
   });
 }
@@ -4091,7 +4220,7 @@ function renderBattle() {
   const foeAbility = abilityFor(b.foeMon.id), myAbility = abilityFor(active.ind.id, active.ind);
   const abilityBadge = ab => ab ? `<span class="badge" style="background:#2c3a55" title="${ab.desc}">🧬 ${ab.name}</span>` : '';
   const curWeather = WEATHERS[getWeather(state.region)];
-  const moves = getMoves(active.ind.id);
+  const moves = getMoves(active.ind.id, active.ind);
   if (!active.pp) { active.ppMax = moves.map(mv => movePP(mv.pow)); active.pp = active.ppMax.slice(); }   // เผื่อเซฟเก่า/สลับตัวที่ยังไม่มี pp
   const outOfPP = active.pp.every((p, i) => i >= moves.length || p <= 0);
   let moveBtns;
@@ -4487,7 +4616,7 @@ function battleAttack(moveIdx) {
   const mon = MON_BY_ID[active.ind.id];
   const view = activeMonView(active);
   const isStruggle = moveIdx === -1;
-  let mv = isStruggle ? STRUGGLE_MOVE : (getMoves(active.ind.id)[moveIdx] || getMoves(active.ind.id)[0]);
+  let mv = isStruggle ? STRUGGLE_MOVE : (getMoves(active.ind.id, active.ind)[moveIdx] || getMoves(active.ind.id, active.ind)[0]);
   b.msg = '';
   // Z-Move: ถ้าติดอาวุธ Z ไว้ ท่าโจมตีนี้จะกลายเป็น Z-Move ของธาตุนั้น (พลังมหาศาล เข้าเป้าเสมอ ครั้งเดียว/สู้)
   if (b.zArmed && !isStruggle && mv && mv.pow > 0) {
@@ -4661,6 +4790,7 @@ function onFoeDown() {
     const swapMsg = grantSwapTicketDrop();   // ทุกชั้น — โอกาสหายากได้ตั๋ว Swap
     if (swapMsg) itemMsg = (itemMsg ? itemMsg + ' + ' : '') + swapMsg;
     if (Math.random() < 0.25) { itemMsg = (itemMsg ? itemMsg + ' + ' : '') + grantRandomBall(); }   // 25% ดรอปบอลพิเศษนอกร้าน
+    if (Math.random() < 1 / 6666) { const tm = grantRareTM(); if (tm) itemMsg = (itemMsg ? itemMsg + ' + ' : '') + '🌟💿 ' + tm; }   // หอคอย: 1/6666 ดรอปแผ่นสกิลหายาก
     if (floor > (state.tower.bestFloor || 0)) state.tower.bestFloor = floor;
     state.tower.floor = floor + 1;
     b.over = true; b.towerCleared = true;
@@ -5453,9 +5583,21 @@ function startRaidBattle() {
   renderBattle();
   $('#battleModal').classList.remove('hidden');
 }
+// ท่าหายากดรอปจาก World Boss (1/1000) และหอคอย (1/6666)
+function grantRareTM() {
+  const rareNames = Object.values(RARE_MOVES).map(m => m.name).filter(n => !(state.learnedTMs && state.learnedTMs[n]));
+  if (!rareNames.length) return null;
+  const n = pick(rareNames);
+  state.learnedTMs = state.learnedTMs || {}; state.learnedTMs[n] = true;
+  toast(`🌟💿 ได้แผ่นสกิลหายาก: ${n}!`, 'good');
+  logMsg(`🌟 ได้ <b>แผ่นสกิลหายาก ${n}</b>! ไปจัดท่าที่หน้าโปเกมอน`, 'big');
+  playSfx('rare');
+  return n;
+}
 async function raidSubmitDamage(dmgDealt) {
   state.raidReadyAt = Date.now() + RAID_CD;
   if (dmgDealt > 0) { state.raidTotalDamage = (state.raidTotalDamage || 0) + dmgDealt; checkAchievements(); }
+  if (dmgDealt > 0 && Math.random() < 1 / 1000) grantRareTM();   // World Boss: 1/1000 ดรอปแผ่นสกิลหายาก
   save();   // คูลดาวน์นับตอนจบการโจมตี (ไม่ว่าผลจะเป็นยังไง)
   if (!(dmgDealt > 0) || !(window.Cloud && Cloud.enabled) || !Cloud.loggedIn()) return;
   const res = await Cloud.raidAddDamage(weeklyEventKey(), state.playerName || 'เทรนเนอร์', dmgDealt);
