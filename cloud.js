@@ -172,6 +172,18 @@ const Cloud = {
     } catch (e) { return { error: String(e) }; }
   },
 
+  // ===== Live-Ops: ดึงคอนฟิกอีเวนต์สด (แก้ในแดชบอร์ด Supabase ได้เลย ไม่ต้อง deploy) =====
+  // อ่านสาธารณะ ไม่ต้องล็อกอิน · ถ้าไม่ได้ตั้งค่า/ผิดพลาด คืน {} (เกมใช้ค่าเริ่มต้น = ไม่มีอีเวนต์)
+  async getLiveConfig() {
+    if (!this.enabled) return {};
+    try {
+      const { data, error } = await this.client
+        .from('live_config').select('config').eq('id', 1).maybeSingle();
+      if (error || !data) return {};
+      return (data.config && typeof data.config === 'object') ? data.config : {};
+    } catch (e) { return {}; }
+  },
+
   // ===== เทรดโปเกมอนระหว่างผู้เล่น (ต้องสร้างตาราง public.trades — ดู CLOUD_SETUP.md) =====
   async createTrade(code, fromName, offerMon) {
     if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };

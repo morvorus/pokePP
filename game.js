@@ -1360,6 +1360,40 @@ function comboShinyBoost(monId) {
   if (!c || c.id !== monId || !c.count) return 1;
   return comboMult(c.count);
 }
+// ===== Live-Ops: คอนฟิกอีเวนต์สดจากคลาวด์ (แก้ในแดชบอร์ด Supabase ได้เลย ไม่ต้อง deploy) =====
+const LIVE_DEFAULTS = { message: '', messageUntil: 0, eventEmoji: '📣', shinyMult: 1, xpMult: 1, coinMult: 1 };
+let liveConfig = { ...LIVE_DEFAULTS };
+// ตัวคูณจากอีเวนต์สด — clamp กันค่าเพี้ยน (ป้องกันเชิงลึกแม้จะแก้ได้แค่แอดมิน)
+function liveShinyMult() { return clamp(+liveConfig.shinyMult || 1, 0.1, 10); }
+function liveXpMult() { return clamp(+liveConfig.xpMult || 1, 1, 5); }
+function liveCoinMult() { return clamp(+liveConfig.coinMult || 1, 1, 5); }
+function liveMsgActive() {
+  const m = (liveConfig.message || '').trim();
+  if (!m) return '';
+  const until = liveConfig.messageUntil ? Date.parse(liveConfig.messageUntil) : 0;
+  if (until && Date.now() > until) return '';   // หมดเวลาประกาศแล้ว
+  return m;
+}
+async function refreshLiveConfig() {
+  if (!(window.Cloud && Cloud.enabled)) return;
+  try {
+    const cfg = await Cloud.getLiveConfig();
+    liveConfig = { ...LIVE_DEFAULTS, ...(cfg || {}) };
+    renderLiveBanner();
+  } catch (e) { /* ใช้ค่าเริ่มต้นต่อไป */ }
+}
+function renderLiveBanner() {
+  const el = $('#liveBanner'); if (!el) return;
+  const msg = liveMsgActive();
+  const mults = [];
+  if (liveXpMult() > 1) mults.push(`XP ×${liveXpMult()}`);
+  if (liveShinyMult() > 1) mults.push(`✨ ×${liveShinyMult()}`);
+  if (liveCoinMult() > 1) mults.push(`🪙 ×${liveCoinMult()}`);
+  const multTxt = mults.length ? ` · <b>${mults.join(' · ')}</b>` : '';
+  if (!msg && !mults.length) { el.hidden = true; el.innerHTML = ''; return; }
+  el.hidden = false;
+  el.innerHTML = `<span class="lb-emoji">${liveConfig.eventEmoji || '📣'}</span> ${msg ? escapeHtml(msg) : 'อีเวนต์พิเศษกำลังจัด!'}${multTxt}`;
+}
 function shinyMultiplier() {
   let m = 1;
   if (isEventActive()) m *= 2;         // อีเวนต์สุดสัปดาห์ shiny ×2
@@ -1369,6 +1403,7 @@ function shinyMultiplier() {
   const we = currentWorldEvent();
   if (we) m *= we.shinyMult;           // อีเวนต์สุ่มตามฤดูกาล
   m *= WEEKLY_SHINY_MULT;              // อีเวนต์ประจำสัปดาห์ (ถาวรทั้งสัปดาห์)
+  m *= liveShinyMult();                // อีเวนต์สดจากคลาวด์ (Live-Ops)
   return m;
 }
 // ชั้น2 แบบ PokeMeow: Common 40% · Uncommon 30% · Rare 27% · Super Rare 3% (legendary แยกอิสระ)
@@ -3079,7 +3114,7 @@ function passReward(i, prem) {
 // ตัวแจกรางวัลกลาง — ทุกระบบ (เควส/อีเวนต์/บัตรฤดูกาล/มือใหม่/วิจัย) เรียกผ่านนี้
 // เพิ่มชนิดรางวัลใหม่ = แก้ที่เดียว (grantReward + rewardText)
 function grantReward(r) {
-  if (r.coins) state.coins += r.coins;
+  if (r.coins) state.coins += Math.round(r.coins * liveCoinMult());   // Live-Ops: อีเวนต์เหรียญ ×N
   if (r.bp) state.battlePoints = (state.battlePoints || 0) + r.bp;
   if (r.tokens) state.fishTokens = (state.fishTokens || 0) + r.tokens;
   if (r.ball) { const [k, n] = r.ball; state.balls[k] = (state.balls[k] || 0) + n; }
@@ -4111,12 +4146,13 @@ window.__ppBusy = () => !!battleState || !!document.querySelector('.fish-mini');
 function statsForWild(mon, level) { return statsForBase(mon.stats, level); }
 function gainXpTo(ind, amount) {
   if (!ind) return;
+  amount = Math.round(amount * liveXpMult());   // Live-Ops: อีเวนต์ Double XP
   ind.xp = (ind.xp || 0) + amount; let leveled = false;
   while (ind.xp >= xpForLevel(ind.level) && ind.level < 100) { ind.xp -= xpForLevel(ind.level); ind.level++; leveled = true; }
   if (leveled) { toast(`⬆️ <b>${MON_BY_ID[ind.id].name}</b> ขึ้น Lv.${ind.level}`, 'good'); tryEvolveByLevel(ind); }
   renderTopbar();
 }
-function gainTrainerXp(n) { state.trainerXp = (state.trainerXp || 0) + n; }
+function gainTrainerXp(n) { state.trainerXp = (state.trainerXp || 0) + Math.round(n * liveXpMult()); }
 function trainerLevel() { return levelFromXp(state.trainerXp); }
 
 function weatherBoosted(moveType) {   // ธาตุที่ได้บูสต์จากสภาพอากาศปัจจุบันของเขต (ใช้ทั้งฝั่งเราและศัตรู)
@@ -6184,6 +6220,10 @@ function init() {
   if (state.settings.music) document.addEventListener('pointerdown', () => startMusic(), { once: true });
 
   initCloud();   // เชื่อมคลาวด์ (ถ้าตั้งค่าไว้)
+  // Live-Ops: ดึงคอนฟิกอีเวนต์สด (ตอนเปิด + ทุก 5 นาที + ตอนกลับมาโฟกัส)
+  refreshLiveConfig();
+  setInterval(refreshLiveConfig, 5 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshLiveConfig(); });
 }
 // โมดูล ES เป็น deferred — ถ้า DOM พร้อมแล้วให้ init ทันที ไม่งั้นรอ event (กันเคสที่ event ยิงไปก่อน)
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
@@ -6198,5 +6238,7 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     pickLegendaryGenWeighted, genOf, onFoeDown, endBattle, throwBall, save, switchView,
     renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop, abilityFor,
     openIndividualModal, tradeNpc, claimDailyLogin, selectRegion, playSpawnFx, renderHallOfFame,
+    get liveConfig() { return liveConfig; }, set liveConfig(v) { liveConfig = { ...LIVE_DEFAULTS, ...v }; renderLiveBanner(); },
+    shinyMultiplier, liveXpMult, liveCoinMult,
   };
 }

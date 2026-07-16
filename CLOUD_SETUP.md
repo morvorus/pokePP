@@ -105,7 +105,35 @@ alter table public.raid_contrib enable row level security;
 create policy "raid public read"  on public.raid_contrib for select using (true);
 create policy "raid own insert" on public.raid_contrib for insert with check (auth.uid() = user_id);
 create policy "raid own update" on public.raid_contrib for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ===== (ตัวเลือก) 🎛️ Live-Ops: คุมอีเวนต์สดโดยไม่ต้อง deploy =====
+-- แก้แถว id=1 คอลัมน์ config (JSONB) ในแดชบอร์ด → ผู้เล่นทุกคนเห็นภายใน ~5 นาที
+-- อ่านสาธารณะ · ไม่มี write policy = แก้ได้เฉพาะแดชบอร์ด/service-role (ปลอดภัย)
+create table if not exists public.live_config (
+  id int primary key default 1,
+  config jsonb not null default '{}'::jsonb,
+  updated_at timestamptz default now()
+);
+alter table public.live_config enable row level security;
+create policy "live read" on public.live_config for select using (true);
+insert into public.live_config (id, config) values (1, '{}'::jsonb) on conflict (id) do nothing;
 ```
+
+### 🎛️ วิธีจัดอีเวนต์สด (หลังสร้างตาราง live_config)
+เมนูซ้าย **Table Editor → live_config →** แก้ช่อง `config` ของแถว id=1 เป็น JSON เช่น:
+```json
+{
+  "message": "สุดสัปดาห์ Double XP! 🎉",
+  "messageUntil": "2026-07-20T17:00:00Z",
+  "eventEmoji": "🎉",
+  "xpMult": 2,
+  "shinyMult": 1.5,
+  "coinMult": 1
+}
+```
+- `message` + `messageUntil` — ป้ายประกาศบนหน้าล่า (หมดเวลาแล้วหายเอง) · เว้นว่าง = ไม่โชว์
+- `xpMult` (1–5) · `shinyMult` (0.1–10) · `coinMult` (1–5) — ตัวคูณ (เกม clamp กันค่าเพี้ยนอยู่แล้ว)
+- อยากปิดอีเวนต์: ตั้งค่ากลับเป็น `{}` หรือ mult=1 · ไม่สร้างตารางนี้เกมก็เล่นได้ปกติ (ไม่มีอีเวนต์สด)
 
 ## 3. (แนะนำ) ปิดยืนยันอีเมล เพื่อล็อกอินง่ายขึ้น
 เมนูซ้าย → **Authentication** → **Providers** → **Email** → ปิด **Confirm email** → Save
