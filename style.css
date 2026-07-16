@@ -882,6 +882,16 @@ h2.view-title::after {
 @keyframes fmPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 .reduce-motion .fm-water, .reduce-motion .fm-tap { animation: none; }
 
+/* ===== เอฟเฟกต์ฉลองตอนจับตัวพิเศษ (particle burst) ===== */
+.celebrate { position: fixed; inset: 0; z-index: 900; pointer-events: none; overflow: hidden; }
+.celebrate .cp { position: absolute; left: 50%; top: 44%; transform: translate(-50%,-50%); opacity: 0; will-change: transform, opacity; filter: drop-shadow(0 2px 4px rgba(0,0,0,.4)); animation: cpBurst 1.35s cubic-bezier(.12,.66,.32,1) forwards; }
+@keyframes cpBurst {
+  0%   { transform: translate(-50%,-50%) scale(.3) rotate(0deg); opacity: 0; }
+  12%  { opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(1.05) rotate(var(--rot)); opacity: 0; }
+}
+.reduce-motion .celebrate { display: none; }
+
 /* ===== View Transitions (สลับหน้านุ่มลื่น) ===== */
 ::view-transition-old(root) { animation: vtOut .2s ease both; }
 ::view-transition-new(root) { animation: vtIn .26s cubic-bezier(.22,.9,.3,1) both; }

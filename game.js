@@ -1014,6 +1014,30 @@ function showRareAlert(mon, tier, shiny) {
 function hideRareAlert() { $('#rareAlert').classList.add('hidden'); }
 // เอฟเฟคเต็มจอตอนเจอ legendary/shiny — แสงวาบ + รัศมี + ประกายวิ่ง (ข้ามถ้าเปิดลดแอนิเมชัน)
 let _fxTimer = null;
+// เอฟเฟกต์ฉลองตอนจับตัวพิเศษ (particle burst) — ระดับความอลังตามความหายาก
+const CELEBRATE_KINDS = {
+  golden:    { n: 44, emojis: ['🌟', '✨', '👑', '💫', '🪙'] },
+  legendary: { n: 34, emojis: ['✨', '👑', '⭐', '💫'] },
+  shiny:     { n: 30, emojis: ['✨', '⭐', '💖', '🌈'] },
+  rare:      { n: 18, emojis: ['✨', '⭐'] },
+};
+function celebrate(kind) {
+  const conf = CELEBRATE_KINDS[kind];
+  if (!conf || (state.settings && state.settings.reduceMotion)) return;
+  const ov = document.createElement('div');
+  ov.className = 'celebrate';
+  let html = '';
+  for (let i = 0; i < conf.n; i++) {
+    const ang = Math.random() * Math.PI * 2, dist = 26 + Math.random() * 58;
+    const dx = Math.cos(ang) * dist, dy = Math.sin(ang) * dist - 12;
+    const e = conf.emojis[i % conf.emojis.length];
+    const size = 13 + Math.random() * 17, delay = Math.random() * 0.14, rot = (Math.random() * 2 - 1) * 220;
+    html += `<span class="cp" style="font-size:${size}px;--dx:${dx.toFixed(1)}vw;--dy:${dy.toFixed(1)}vh;--rot:${rot.toFixed(0)}deg;animation-delay:${delay.toFixed(2)}s">${e}</span>`;
+  }
+  ov.innerHTML = html;
+  document.body.appendChild(ov);
+  setTimeout(() => ov.remove(), 1700);
+}
 function playSpawnFx(kind) {
   if (state.settings && state.settings.reduceMotion) return;
   const ov = $('#fxOverlay'); if (!ov) return;
@@ -2108,6 +2132,7 @@ function onCatchSuccess(ballKey) {
   playSfx(shiny || tier === 'legendary' || tier === 'superrare' ? 'rare' : 'catch');
   toast(`🎉 จับ ${shiny ? '✨' : ''}<b>${mon.name}</b> Lv.${level} ได้! +${coins}🪙`, 'good');
   logMsg(`✅ จับ <b>${mon.name}</b> (${shiny ? 'Shiny' : TIER_LABEL[tier]}) Lv.${level} · IV ${ivPercent(ind)}% · +${coins}🪙`, 'good');
+  celebrate(golden ? 'golden' : tier === 'legendary' ? 'legendary' : shiny ? 'shiny' : (tier === 'rare' || tier === 'superrare') ? 'rare' : null);
   gainXp(xp);
   addStreak(tier);            // สตรีคจับต่อเนื่อง
   addFriendship(2);           // มิตรภาพหัวหน้าทีม
@@ -6315,6 +6340,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop, abilityFor,
     openIndividualModal, tradeNpc, claimDailyLogin, selectRegion, playSpawnFx, renderHallOfFame,
     get liveConfig() { return liveConfig; }, set liveConfig(v) { liveConfig = { ...LIVE_DEFAULTS, ...v }; renderLiveBanner(); },
-    shinyMultiplier, liveXpMult, liveCoinMult,
+    shinyMultiplier, liveXpMult, liveCoinMult, celebrate,
   };
 }
