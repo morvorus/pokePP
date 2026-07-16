@@ -1394,6 +1394,10 @@ function renderLiveBanner() {
   el.hidden = false;
   el.innerHTML = `<span class="lb-emoji">${liveConfig.eventEmoji || '📣'}</span> ${msg ? escapeHtml(msg) : 'อีเวนต์พิเศษกำลังจัด!'}${multTxt}`;
 }
+// Analytics: ส่งเหตุการณ์ (ไม่บล็อกเกม ไม่ล้ม ถ้าไม่ได้ตั้งคลาวด์ก็เงียบ)
+function track(name, meta) {
+  try { if (window.Cloud && Cloud.logEvent) Cloud.logEvent(name, meta); } catch (e) { /* เงียบ */ }
+}
 function shinyMultiplier() {
   let m = 1;
   if (isEventActive()) m *= 2;         // อีเวนต์สุดสัปดาห์ shiny ×2
@@ -4082,7 +4086,7 @@ function showTutorial() {
     <div class="tut-step"><span class="ts-ico">💾</span><div>อย่าลืม <b>Export เซฟ</b> ในเมนู ⚙️ เก็บไว้กันข้อมูลหาย</div></div>
     <div class="modal-actions"><button class="btn-primary" id="tutOk">เริ่มเล่นเลย!</button></div></div>`;
   openModal();
-  $('#tutOk').onclick = () => { state.tutorialDone = true; save(); closeModal(); };
+  $('#tutOk').onclick = () => { state.tutorialDone = true; save(); track('tutorial_done'); closeModal(); };
 }
 // ===== ภารกิจมือใหม่ (Beginner Checklist) — พาผู้เล่นใหม่ผ่านลูปหลัก แล้วแจกรางวัลนำร่อง =====
 const STARTER_GOALS = [
@@ -4101,6 +4105,7 @@ function starterTick(key) {
   ensureStarter();
   if (state.starter.allClaimed || state.starter.done[key]) return;
   state.starter.done[key] = true; save();
+  track('onboarding', { step: key });   // funnel มือใหม่: จับ/สู้/ร้าน/ตกปลา/เควส
   const g = STARTER_GOALS.find(x => x.key === key);
   if (g) toast(`✅ ภารกิจมือใหม่: ${g.name} — ไปรับรางวัลที่หน้าล่า!`, 'good');
   renderStarter();
@@ -6220,6 +6225,14 @@ function init() {
   if (state.settings.music) document.addEventListener('pointerdown', () => startMusic(), { once: true });
 
   initCloud();   // เชื่อมคลาวด์ (ถ้าตั้งค่าไว้)
+  // Analytics: บันทึกการเปิดเล่น 1 ครั้ง/เซสชัน พร้อมสแนปช็อตความคืบหน้า (ดู DAU/retention/progression ได้)
+  track('session_start', {
+    dex: Object.keys(state.seen || {}).length,
+    caught: state.totalCaught || 0,
+    playSec: state.playSec || 0,
+    trainerLv: trainerLevel(),
+    tutorialDone: !!state.tutorialDone,
+  });
   // Live-Ops: ดึงคอนฟิกอีเวนต์สด (ตอนเปิด + ทุก 5 นาที + ตอนกลับมาโฟกัส)
   refreshLiveConfig();
   setInterval(refreshLiveConfig, 5 * 60 * 1000);

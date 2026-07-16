@@ -135,6 +135,43 @@ insert into public.live_config (id, config) values (1, '{}'::jsonb) on conflict 
 - `xpMult` (1–5) · `shinyMult` (0.1–10) · `coinMult` (1–5) — ตัวคูณ (เกม clamp กันค่าเพี้ยนอยู่แล้ว)
 - อยากปิดอีเวนต์: ตั้งค่ากลับเป็น `{}` หรือ mult=1 · ไม่สร้างตารางนี้เกมก็เล่นได้ปกติ (ไม่มีอีเวนต์สด)
 
+## 2.1 (ตัวเลือก) 📊 Analytics — ดูข้อมูลผู้เล่นจริง
+สร้างตารางเก็บเหตุการณ์ (เปิดเล่น/ผ่านทิวทอเรียล/ก้าวหน้ามือใหม่) เพื่อดู DAU / retention / จุดที่ผู้เล่นเลิก
+```sql
+create table if not exists public.events (
+  id bigint generated always as identity primary key,
+  user_id uuid references auth.users(id) on delete set null,
+  name text not null,
+  meta jsonb,
+  created_at timestamptz default now()
+);
+alter table public.events enable row level security;
+-- ให้ทุกคน (รวมยังไม่ล็อกอิน) "เขียน" log ได้ แต่ "อ่าน" ไม่ได้ (อ่านได้เฉพาะแดชบอร์ด/service-role = ความเป็นส่วนตัว)
+grant insert on public.events to anon, authenticated;
+drop policy if exists "events insert" on public.events;
+create policy "events insert" on public.events for insert with check (true);
+create index if not exists events_name_time on public.events (name, created_at desc);
+```
+> เกม log แค่เหตุการณ์รวมๆ ไม่มีข้อมูลส่วนตัว · ถ้าไม่สร้างตารางนี้เกมก็เล่นได้ปกติ (ไม่ log อะไร)
+
+### 📊 วิธีดูข้อมูล (Supabase → SQL Editor)
+```sql
+-- ผู้เล่นใช้งานต่อวัน (DAU) 14 วันล่าสุด
+select date(created_at) วัน, count(distinct user_id) คน, count(*) เซสชัน
+from public.events where name='session_start' and created_at > now()-interval '14 days'
+group by 1 order by 1 desc;
+
+-- funnel มือใหม่: แต่ละด่านมีคนทำกี่คน (จับ→สู้→ร้าน→ตกปลา→เควส)
+select meta->>'step' ด่าน, count(distinct user_id) คน
+from public.events where name='onboarding' group by 1 order by 2 desc;
+
+-- อัตราผ่านทิวทอเรียล
+select
+  (select count(*) from public.events where name='tutorial_done') ผ่านทิวทอเรียล,
+  (select count(distinct user_id) from public.events where name='session_start') ผู้เล่นทั้งหมด;
+```
+> **ข้อมูลผู้เล่นแบบสแนปช็อต** ดูได้จากตาราง **`leaderboard`** อยู่แล้ว (dex/playtime/tower/caught/pvp ต่อคน) — เมนูซ้าย **Table Editor → leaderboard**
+
 ## 3. (แนะนำ) ปิดยืนยันอีเมล เพื่อล็อกอินง่ายขึ้น
 เมนูซ้าย → **Authentication** → **Providers** → **Email** → ปิด **Confirm email** → Save
 > ถ้าเปิดไว้ ผู้เล่นต้องยืนยันอีเมลก่อนล็อกอิน (ปลอดภัยกว่าแต่ยุ่งกว่า)

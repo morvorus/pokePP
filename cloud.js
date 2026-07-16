@@ -184,6 +184,19 @@ const Cloud = {
     } catch (e) { return {}; }
   },
 
+  // ===== Analytics: log เหตุการณ์สำคัญ (fire-and-forget · ไม่บล็อกเกม · ไม่ล้ม) =====
+  // ต้องสร้างตาราง public.events (ดู CLOUD_SETUP.md) · ถ้าไม่มี/ผิดพลาด เงียบไป ไม่กระทบเกม
+  logEvent(name, meta) {
+    if (!this.enabled || !name) return;
+    try {
+      this.client.from('events').insert({
+        user_id: this.user ? this.user.id : null,
+        name: String(name).slice(0, 40),
+        meta: meta || {},
+      }).then(() => {}, () => {});   // fire-and-forget, กลืน error
+    } catch (e) { /* เงียบ */ }
+  },
+
   // ===== เทรดโปเกมอนระหว่างผู้เล่น (ต้องสร้างตาราง public.trades — ดู CLOUD_SETUP.md) =====
   async createTrade(code, fromName, offerMon) {
     if (!this.enabled || !this.user) return { error: 'ไม่ได้ล็อกอิน' };
