@@ -5,7 +5,7 @@
 'use strict';
 import { MONSTERS } from './monsters-data.js';
 import { SPECIES_ABILITY, ABILITY_DEFS, HIDDEN_ABILITY } from './abilities-data.js';
-import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations, statStageMult, comboMult, xpToTier, tierForRating } from './logic.js';
+import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations, statStageMult, comboMult, xpToTier, tierForRating, xpForLevel, levelFromXp, tmPrice, ivRerollPrice } from './logic.js';
 import { TIER_LABEL, TIER_ORDER, TIER_EMOJI, TIER_LEVEL, TIER_WEIGHTS, TYPE_EMOJI, TYPE_TH, WEATHERS, NIGHT_BOOST, DAY_BOOST, Z_MOVES, PVP_TIERS } from './content.js';
 
 // cloud.js (classic script) รันก่อนโมดูลนี้และตั้ง window.Cloud ไว้ — ผูกเป็น const ให้อ้าง Cloud ในสโคปโมดูลได้
@@ -1194,7 +1194,7 @@ function renderTopbar() {
 // ================================================================
 //  BUDDY / XP / EVOLUTION
 // ================================================================
-function xpForLevel(level) { return 30 + level * 22; }
+// xpForLevel ย้ายไป logic.js แล้ว (import ด้านบน)
 function setBuddy(uid) {
   state.party = state.party.filter(u => u !== uid);
   state.party.unshift(uid);
@@ -2583,7 +2583,7 @@ function evoText(m) {
 // ===== สุ่มค่า IV ใหม่ (จ่ายเงิน) + ล็อกช่อง (ยิ่งล็อกยิ่งแพง) =====
 let _ivLocks = new Set();
 const IV_REROLL_BASE = 100000, IV_MAX_CHANCE = 0.01;   // พื้นฐาน 100,000 · +100,000/ช่องที่ล็อก · โอกาสได้ 31 = 1/100
-function ivRerollCost() { return IV_REROLL_BASE * (1 + _ivLocks.size); }
+function ivRerollCost() { return ivRerollPrice(IV_REROLL_BASE, _ivLocks.size); }
 function openIvRerollModal(uid) {
   const ind = indByUid(uid); if (!ind) return;
   const keys = ['hp', 'atk', 'def', 'spatk', 'spdef', 'spd'];
@@ -3491,7 +3491,7 @@ function afterCatchbotCollect() {
 // ===== ร้านตกปลา & แผ่นสกิล (ใช้เหรียญตกปลา) — 10 แผ่นสกิลสุ่ม รีทุก 3 วัน + เบ็ด + ไอเทมตกปลา =====
 const FISH_SHOP_CD = 3 * 86400000;
 const ROD_UPGRADE_COST = { 2: 40, 3: 100, 4: 250, 5: 600 };
-function tmCost(name) { const mv = MOVE_BY_NAME[name]; return Math.round((mv ? mv.pow : 60) * 0.5) + 30; }   // กลาง-ค่อนข้างแพง
+function tmCost(name) { const mv = MOVE_BY_NAME[name]; return tmPrice(mv ? mv.pow : 60); }   // สูตรราคาอยู่ที่ tmPrice ใน logic.js
 function ensureFishShopStock() {
   if (Date.now() >= (state.fishShopResetAt || 0) || !(state.fishShopStock || []).length) {
     state.fishShopStock = pickN(ALL_TM_NAMES, 10);
@@ -4140,7 +4140,7 @@ function gainXpTo(ind, amount) {
   renderTopbar();
 }
 function gainTrainerXp(n) { state.trainerXp = (state.trainerXp || 0) + n; }
-function trainerLevel() { return Math.floor(Math.pow((state.trainerXp || 0) / 60, 0.5)) + 1; }
+function trainerLevel() { return levelFromXp(state.trainerXp); }
 
 function weatherBoosted(moveType) {   // ธาตุที่ได้บูสต์จากสภาพอากาศปัจจุบันของเขต (ใช้ทั้งฝั่งเราและศัตรู)
   const w = WEATHERS[getWeather(state.region)];

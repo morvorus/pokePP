@@ -127,6 +127,18 @@ export function xpToTier(xp, perTier, max) {
   return Math.min(max, Math.floor((xp || 0) / perTier));
 }
 
+// XP ที่ต้องใช้เลื่อนจากเลเวลปัจจุบัน → เลเวลถัดไป (ของโปเกมอน)
+export function xpForLevel(level) { return 30 + level * 22; }
+
+// เลเวลเทรนเนอร์จาก XP สะสม (โค้งรากที่สอง — ยิ่งสูงยิ่งช้าลง)
+export function levelFromXp(xp) { return Math.floor(Math.pow((xp || 0) / 60, 0.5)) + 1; }
+
+// ราคาแผ่นสกิล TM จากพลังท่า (กลาง–ค่อนข้างแพง)
+export function tmPrice(pow) { return Math.round((pow || 60) * 0.5) + 30; }
+
+// ราคาสุ่ม IV ใหม่ — ยิ่งล็อกหลายช่องยิ่งแพง (base ต่อจำนวนช่องที่ล็อก)
+export function ivRerollPrice(base, lockedCount) { return base * (1 + (lockedCount || 0)); }
+
 // หาแรงก์จากคะแนน (tiers เรียงจากมากไปน้อยด้วย min) — คืน tier แรกที่ rating ถึง min
 export function tierForRating(rating, tiers) {
   return tiers.find(t => (rating || 0) >= t.min) || tiers[tiers.length - 1];

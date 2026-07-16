@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { clamp, typeEffect, movePP, tierOf, isoWeekNumber, UB_LEGENDARY_IDS,
   catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations,
-  statStageMult, comboMult, xpToTier, tierForRating } from './logic.js';
+  statStageMult, comboMult, xpToTier, tierForRating,
+  xpForLevel, levelFromXp, tmPrice, ivRerollPrice } from './logic.js';
 
 describe('clamp', () => {
   it('จำกัดค่าอยู่ในช่วง', () => {
@@ -223,6 +224,52 @@ describe('tierForRating (คะแนน → แรงก์)', () => {
   it('คะแนน 0/undefined = แรงก์ต่ำสุด', () => {
     expect(tierForRating(0, tiers).name).toBe('Bronze');
     expect(tierForRating(undefined, tiers).name).toBe('Bronze');
+  });
+});
+
+describe('xpForLevel (XP ต่อเลเวลโปเกมอน)', () => {
+  it('เพิ่มขึ้นตามเลเวล', () => {
+    expect(xpForLevel(1)).toBe(52);
+    expect(xpForLevel(50)).toBe(1130);
+    expect(xpForLevel(100)).toBe(2230);
+  });
+  it('monotonic เพิ่มเสมอ', () => {
+    for (let l = 1; l < 100; l++) expect(xpForLevel(l + 1)).toBeGreaterThan(xpForLevel(l));
+  });
+});
+
+describe('levelFromXp (เลเวลเทรนเนอร์จาก XP)', () => {
+  it('XP 0 = เลเวล 1', () => { expect(levelFromXp(0)).toBe(1); });
+  it('undefined ถือเป็น 0', () => { expect(levelFromXp(undefined)).toBe(1); });
+  it('โค้งรากที่สอง (ยิ่งสูงยิ่งช้า)', () => {
+    expect(levelFromXp(60)).toBe(2);     // sqrt(1)=1 → +1
+    expect(levelFromXp(240)).toBe(3);    // sqrt(4)=2 → +1
+    expect(levelFromXp(540)).toBe(4);    // sqrt(9)=3 → +1
+  });
+  it('monotonic ไม่ลดลง', () => {
+    let prev = 0;
+    for (let xp = 0; xp <= 100000; xp += 500) { const lv = levelFromXp(xp); expect(lv).toBeGreaterThanOrEqual(prev); prev = lv; }
+  });
+});
+
+describe('tmPrice (ราคาแผ่นสกิลจากพลังท่า)', () => {
+  it('ยิ่งแรงยิ่งแพง', () => {
+    expect(tmPrice(60)).toBe(60);    // round(30)+30
+    expect(tmPrice(150)).toBe(105);  // round(75)+30
+  });
+  it('ไม่มี pow ใช้ค่าตั้งต้น 60', () => {
+    expect(tmPrice(undefined)).toBe(60);
+  });
+});
+
+describe('ivRerollPrice (ราคาสุ่ม IV ตามช่องที่ล็อก)', () => {
+  it('ไม่ล็อก = base', () => { expect(ivRerollPrice(100000, 0)).toBe(100000); });
+  it('ยิ่งล็อกยิ่งแพงเป็นขั้น', () => {
+    expect(ivRerollPrice(100000, 1)).toBe(200000);
+    expect(ivRerollPrice(100000, 5)).toBe(600000);
+  });
+  it('lockedCount undefined ถือเป็น 0', () => {
+    expect(ivRerollPrice(100000, undefined)).toBe(100000);
   });
 });
 
