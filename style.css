@@ -959,8 +959,40 @@ h2.view-title::after {
 .preset-row .pr-actions button { padding: 5px 10px; font-size: 11px; }
 
 /* profile / stats */
-.profile-card { background: linear-gradient(135deg,var(--accent2),#2a4a8a); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; }
+.profile-card { position: relative; background: linear-gradient(135deg,var(--accent2),#2a4a8a); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; overflow: hidden; box-shadow: var(--shadow-md); }
+.profile-card::before { content: ''; position: absolute; inset: 0; background: radial-gradient(120% 80% at 85% -10%, rgba(255,215,107,.25), transparent 60%); pointer-events: none; }
 .profile-top { display: flex; align-items: center; gap: 12px; }
+/* ===== โปรไฟล์เทรนเนอร์ (hero) ===== */
+.profile-hero { position: relative; display: flex; align-items: center; gap: 13px; }
+.profile-hero .pf-avatar { border: none; padding: 0; cursor: pointer; box-shadow: 0 0 0 2px rgba(255,215,107,.5), 0 4px 12px rgba(0,0,0,.35); transition: transform .12s ease, box-shadow .2s ease; }
+.profile-hero .pf-avatar:active { transform: scale(.95); }
+.pf-av-edit { position: absolute; top: -4px; left: -4px; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #3a2c00; font-size: 11px; font-weight: 900; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+.pf-hero-info { flex: 1; min-width: 0; }
+.pf-name { font-size: 18px; font-weight: 900; line-height: 1.1; text-shadow: 0 1px 3px rgba(0,0,0,.4); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-title-btn { display: inline-flex; margin: 4px 0; padding: 0; border: none; background: none; cursor: pointer; }
+.title-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 800; padding: 3px 10px; border-radius: 999px; background: linear-gradient(180deg,#ffe07a,var(--accent)); color: #3a2c00; box-shadow: 0 2px 8px rgba(255,203,5,.35); }
+.title-badge.title-none { background: rgba(255,255,255,.14); color: rgba(255,255,255,.85); box-shadow: none; }
+.pf-lvrow { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+.pf-lv-badge { font-size: 12px; font-weight: 800; padding: 2px 9px; border-radius: 999px; background: rgba(0,0,0,.3); }
+/* ===== ตัวเลือก Title / Avatar (modal picker) ===== */
+.picker-box { max-width: 460px; }
+.picker-box h3 { margin: 0 0 4px; }
+.title-list { max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; margin-top: 4px; }
+.title-opt { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 11px; border: 1px solid rgba(255,255,255,.08); border-radius: 11px; background: rgba(255,255,255,.05); color: var(--text); font-family: inherit; cursor: pointer; transition: background .15s, border-color .15s; }
+.title-opt:not(.locked):hover { background: rgba(255,203,5,.14); }
+.title-opt.eq { border-color: var(--accent); background: rgba(255,203,5,.16); }
+.title-opt.locked { opacity: .5; cursor: default; }
+.title-opt .to-ico { font-size: 22px; width: 28px; text-align: center; flex-shrink: 0; }
+.title-opt .to-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.title-opt .to-name { font-weight: 800; font-size: 13px; }
+.title-opt .to-desc { font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title-opt .to-eq { color: var(--accent); font-weight: 900; }
+.avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 6px; }
+.avatar-opt { aspect-ratio: 1; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: radial-gradient(circle at 50% 30%, rgba(255,255,255,.1), rgba(0,0,0,.25)); cursor: pointer; display: flex; align-items: flex-end; justify-content: center; overflow: hidden; padding: 0; transition: transform .1s, border-color .15s; }
+.avatar-opt:active { transform: scale(.94); }
+.avatar-opt.eq { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,203,5,.4); }
+.avatar-opt .ao-img { max-width: 90%; max-height: 96%; image-rendering: pixelated; }
+.avatar-opt .ao-img.ts-hide { display: none; }
 .pf-avatar { position: relative; width: 64px; height: 64px; flex-shrink: 0; border-radius: 16px; background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.18), rgba(0,0,0,.25)); border: 1px solid rgba(255,255,255,.2); display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
 .pf-trainer { max-width: 60px; max-height: 62px; image-rendering: pixelated; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
 .pf-trainer.ts-hide { display: none; }

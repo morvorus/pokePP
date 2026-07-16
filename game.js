@@ -833,6 +833,8 @@ function newSave() {
     research: [], researchDate: '',   // Field Research เควสรายวันป้อน XP เข้า Season Pass
     quests: [], questDate: '',
     achievements: {},    // {achId:true} รับรางวัลแล้ว
+    equippedTitle: null, // id ของ achievement ที่เลือกโชว์เป็น Title (ต้องปลดล็อกก่อน)
+    avatarKey: null,     // สไปรต์เทรนเนอร์ที่เลือก (null = ค่าเริ่มต้น)
     settings: { sound: true, music: false, spawnSpeed: 'normal',
       rareAlerts: true, eventAlerts: true, mascotDeco: true, reduceMotion: false, confirmRelease: true, fastBattle: false, hardcoreMode: false },
     hardcoreDeaths: 0,   // จำนวนตัวที่ถูกปล่อยถาวรจากโหมด Hardcore (สถิติ ไม่รีเซ็ตแม้ปิดโหมด)
@@ -3333,6 +3335,8 @@ function renderMenu() {
   $('#profileBox').querySelectorAll('[data-savepreset]').forEach(el => el.onclick = () => savePreset(+el.dataset.savepreset));
   $('#profileBox').querySelectorAll('[data-loadpreset]').forEach(el => el.onclick = () => loadPreset(+el.dataset.loadpreset));
   $('#profileBox').querySelectorAll('[data-delpreset]').forEach(el => el.onclick = () => deletePreset(+el.dataset.delpreset));
+  const pfAv = $('#pfAvatarBtn'); if (pfAv) pfAv.onclick = openAvatarPicker;
+  const pfTitle = $('#pfTitleBtn'); if (pfTitle) pfTitle.onclick = openTitlePicker;
   const btnCheckin = $('#btnCheckin'); if (btnCheckin) btnCheckin.onclick = claimDailyLogin;
   renderHallOfFame();
   renderShinyDex();
@@ -3865,6 +3869,54 @@ function readyStatusHtml() {
     (farmReady > 0 ? chip('ไร่', true, ` ${farmReady} แปลง`) : farmGrowing > 0 ? `<span class="badge" style="font-size:10px;padding:3px 8px;background:rgba(255,255,255,.06)">🌱 ไร่กำลังโต ${farmGrowing}</span>` : '') +
     `</div>`;
 }
+// ===== Title (จาก achievement ที่ปลดล็อก) + Avatar เทรนเนอร์ =====
+const AVATAR_POOL = ['red-gen1', 'blue', 'cynthia', 'steven', 'wallace', 'lance', 'leon', 'guzma', 'lusamine', 'giovanni', 'misty', 'sabrina'];
+function playerAvatar() { return state.avatarKey || TRAINER_SPRITES.player; }
+function unlockedTitles() { return ACHIEVEMENTS.filter(a => state.achievements[a.id]); }
+function equippedTitleObj() {
+  const id = state.equippedTitle;
+  return (id && state.achievements[id]) ? (ACHIEVEMENTS.find(a => a.id === id) || null) : null;
+}
+function titleBadgeHtml() {
+  const t = equippedTitleObj();
+  return t ? `<span class="title-badge">${t.ico} ${escapeHtml(t.name)}</span>`
+    : `<span class="title-badge title-none">🏷️ ตั้ง Title</span>`;
+}
+function openTitlePicker() {
+  const unlocked = unlockedTitles();
+  const rows = ACHIEVEMENTS.map(a => {
+    const ok = !!state.achievements[a.id], eq = state.equippedTitle === a.id;
+    return `<button class="title-opt${ok ? '' : ' locked'}${eq ? ' eq' : ''}" ${ok ? `data-title="${a.id}"` : 'disabled'}>
+      <span class="to-ico">${a.ico}</span>
+      <span class="to-body"><span class="to-name">${escapeHtml(a.name)}</span><span class="to-desc">${ok ? escapeHtml(a.desc) : '🔒 ' + escapeHtml(a.desc)}</span></span>
+      ${eq ? '<span class="to-eq">✓</span>' : ''}</button>`;
+  }).join('');
+  $('#modalBox').innerHTML = `<div class="picker-box">
+    <h3>🏷️ เลือก Title <span class="sr-sub">(ปลดล็อก ${unlocked.length}/${ACHIEVEMENTS.length})</span></h3>
+    <div class="sr-sub" style="margin-bottom:8px">Title มาจากความสำเร็จที่ปลดล็อก — โชว์คู่ชื่อบนโปรไฟล์</div>
+    <button class="title-opt" data-title=""><span class="to-ico">🚫</span><span class="to-body"><span class="to-name">ไม่แสดง Title</span></span></button>
+    <div class="title-list">${rows}</div>
+    <div class="modal-actions"><button class="btn-ghost" id="titleClose">ปิด</button></div></div>`;
+  openModal();
+  $('#titleClose').onclick = closeModal;
+  $('#modalBox').querySelectorAll('[data-title]').forEach(b => b.onclick = () => {
+    state.equippedTitle = b.dataset.title || null; save(); closeModal(); renderMenu();
+    toast(state.equippedTitle ? '🏷️ เปลี่ยน Title แล้ว!' : 'เอา Title ออกแล้ว', 'good');
+  });
+}
+function openAvatarPicker() {
+  const rows = AVATAR_POOL.map(k => `<button class="avatar-opt${playerAvatar() === k ? ' eq' : ''}" data-av="${k}">${trainerImg(k, 'ao-img')}</button>`).join('');
+  $('#modalBox').innerHTML = `<div class="picker-box">
+    <h3>🧑‍🎤 เลือกอวตารเทรนเนอร์</h3>
+    <div class="avatar-grid">${rows}</div>
+    <div class="modal-actions"><button class="btn-ghost" id="avClose">ปิด</button></div></div>`;
+  openModal();
+  $('#avClose').onclick = closeModal;
+  $('#modalBox').querySelectorAll('[data-av]').forEach(b => b.onclick = () => {
+    state.avatarKey = b.dataset.av; save(); closeModal(); renderMenu();
+    toast('🧑‍🎤 เปลี่ยนอวตารแล้ว!', 'good');
+  });
+}
 function renderProfile() {
   const b = getBuddy();
   const tl = trainerLevel();
@@ -3879,13 +3931,16 @@ function renderProfile() {
   const prevXp = Math.pow(tl - 1, 2) * 60;
   const xpPct = clamp(Math.round(((state.trainerXp || 0) - prevXp) / Math.max(1, nextXp - prevXp) * 100), 0, 100);
   return `<div class="profile-card">
-    <div class="profile-top">
-      <div class="pf-avatar">
-        ${trainerImg(TRAINER_SPRITES.player, 'pf-trainer')}
+    <div class="profile-hero">
+      <button class="pf-avatar" id="pfAvatarBtn" title="เปลี่ยนอวตาร">
+        ${trainerImg(playerAvatar(), 'pf-trainer')}
         ${b ? `<span class="pf-buddy" title="Buddy: ${MON_BY_ID[b.id].name}">${spriteImg(b.id, b.shiny)}</span>` : ''}
-      </div>
-      <div style="flex:1;min-width:0"><div class="profile-lv">👤 เทรนเนอร์ Lv.${tl}</div>
-        <div class="profile-sub">🔥 streak ${state.streak || 0} วัน</div>
+        <span class="pf-av-edit">✎</span>
+      </button>
+      <div class="pf-hero-info">
+        <div class="pf-name">${escapeHtml(state.playerName || 'เทรนเนอร์')}</div>
+        <button class="pf-title-btn" id="pfTitleBtn">${titleBadgeHtml()}</button>
+        <div class="pf-lvrow"><span class="pf-lv-badge">👤 Lv.${tl}</span><span class="profile-sub">🔥 ${state.streak || 0} วัน</span></div>
         <div class="pf-xpbar"><div class="pf-xpfill" style="width:${xpPct}%"></div></div>
         <div class="profile-sub" style="font-size:10px;margin-top:3px">Trainer XP ${state.trainerXp || 0} / ${nextXp}</div>
       </div>
