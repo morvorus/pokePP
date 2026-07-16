@@ -1431,6 +1431,12 @@ function renderLiveBanner() {
 function track(name, meta) {
   try { if (window.Cloud && Cloud.logEvent) Cloud.logEvent(name, meta); } catch (e) { /* เงียบ */ }
 }
+// Skeleton loader — แถบ shimmer แทนหน้าโล่ง/สปินเนอร์ ระหว่างโหลดข้อมูล async
+function skelRows(n, h) {
+  let s = '';
+  for (let i = 0; i < (n || 5); i++) s += `<div class="skel-row" style="height:${h || 36}px"></div>`;
+  return `<div class="skel-wrap">${s}</div>`;
+}
 function shinyMultiplier() {
   let m = 1;
   if (isEventActive()) m *= 2;         // อีเวนต์สุดสัปดาห์ shiny ×2
@@ -5803,7 +5809,7 @@ function renderLeaderboard() {
     <div class="sr-sub" style="margin:4px 0 8px">สถิติของคุณ: 📖 ${me.dex}/${MONSTERS.length} · 🗼 ชั้น ${me.tower} · 🎯 ${me.caught} · ⏱️ ${Math.floor(me.playtime / 60)}ชม${me.hardcore ? ' · 💀 Hardcore' : ''}
       <a href="#" id="lbDelete" style="color:#ff8a95;margin-left:6px">ลบสถิติของฉัน</a></div>
     <div class="lb-tabs">${tabs}</div>
-    <div id="lbList" class="lb-list"><div class="sr-sub">⏳ กำลังโหลด...</div></div>`;
+    <div id="lbList" class="lb-list">${skelRows(6, 40)}</div>`;
   $('#lbSubmit').onclick = lbSubmit;
   $('#lbDelete').onclick = (e) => { e.preventDefault(); lbDelete(); };
   box.querySelectorAll('[data-lbtab]').forEach(el => el.onclick = () => { _lbTab = el.dataset.lbtab; renderLeaderboard(); });
@@ -5879,7 +5885,7 @@ function renderRaid() {
         <div class="rival-stat">เหลืออีก ${daysLeft} วัน · ตีได้วันละ 1 ครั้ง · ความเสียหายที่ทำได้จะสะสมเข้ากองกลาง</div>
       </div>
     </div>
-    <div id="raidProgress" class="sr-sub" style="margin-bottom:8px">⏳ กำลังโหลดความคืบหน้า...</div>
+    <div id="raidProgress" style="margin-bottom:8px">${skelRows(2, 22)}</div>
     <button class="rt-fight" id="raidFightBtn" style="width:100%" ${left > 0 ? 'disabled' : ''}>${left > 0 ? `รออีก ${Math.floor(left / 3600000)}ชม ${Math.floor((left % 3600000) / 60000)}น` : '⚔️ โจมตี Raid บอส!'}</button>`;
   const btn = $('#raidFightBtn'); if (btn) btn.onclick = startRaidBattle;
   raidLoadProgress();
@@ -6021,7 +6027,7 @@ async function ghostChallengeFriend() {
   startGhostBattle(res.ghost);
 }
 async function ghostRefresh() {
-  const list = $('#ghostList'); if (list) list.innerHTML = `<div class="sr-sub">⏳ กำลังค้นหา...</div>`;
+  const list = $('#ghostList'); if (list) list.innerHTML = skelRows(4, 56);
   const res = await Cloud.ghostList(40);
   if (!$('#ghostList')) return;
   if (res.error) { $('#ghostList').innerHTML = `<div class="sr-sub">⚠️ ยังใช้ไม่ได้ — ต้องมีคอลัมน์ team ในตาราง leaderboard (ดู CLOUD_SETUP.md)<br><span style="opacity:.6">${escapeHtml(res.error)}</span></div>`; return; }

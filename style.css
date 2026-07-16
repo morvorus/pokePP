@@ -898,6 +898,12 @@ h2.view-title::after {
 @keyframes vtOut { to { opacity: 0; transform: translateY(-5px); } }
 @keyframes vtIn { from { opacity: 0; transform: translateY(9px); } }
 
+/* ===== Skeleton loader (แถบ shimmer ระหว่างโหลด) ===== */
+.skel-wrap { display: flex; flex-direction: column; gap: 6px; }
+.skel-row { border-radius: 9px; background: linear-gradient(100deg, rgba(255,255,255,.05) 30%, rgba(255,255,255,.13) 50%, rgba(255,255,255,.05) 70%); background-size: 200% 100%; animation: skelShimmer 1.15s linear infinite; }
+@keyframes skelShimmer { to { background-position: -200% 0; } }
+.reduce-motion .skel-row { animation: none; }
+
 /* ===== ธีมอีเวนต์ (Live-Ops) — เปลี่ยนสี accent ทั้งเกม ===== */
 :root[data-event="halloween"] { --accent: #ff8a1e; --accent2: #6b2fb3; }
 :root[data-event="xmas"]      { --accent: #ff5c5c; --accent2: #2fa85a; }
