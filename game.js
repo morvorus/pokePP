@@ -1647,6 +1647,7 @@ function startFishMinigame() {
   _fishTimers.push(setTimeout(() => finish('miss'), 12000));   // กันค้าง
 }
 function resolveFish(quality) {
+  starterTick('firstFish');
   const q = FISH_QUALITY[quality] || FISH_QUALITY.ok;
   const rod = state.rods || 1;
   const catchP = clamp(0.5 + rod * 0.06 + ((state.fishItems && state.fishItems.lure) ? 0.12 : 0) + q.c, 0.02, 0.98);
@@ -1919,6 +1920,7 @@ function renderRegionBanner() {
   card.style.background = regionBgCss(r);
   card.classList.toggle('night', timeOfDay() === 'night');
   renderBoostStrip();
+  renderStarter();
 
   const we = currentWorldEvent();
   const ribbon = $('#eventRibbon');
@@ -2109,6 +2111,7 @@ function onCatchSuccess(ballKey) {
   state.caught.push(ind);
   state.seen[mon.id] = true;
   state.totalCaught++;
+  starterTick('firstCatch');
   // เบ็ดไม้ดรอปจากการจับ (ทางเดียวที่จะได้เบ็ด) — ได้แล้วเริ่มตกปลาได้
   if ((state.rods || 0) < 1 && Math.random() < ROD_DROP_CHANCE) {
     state.rods = 1;
@@ -3115,6 +3118,7 @@ function bumpQuest(type) {   // เพิ่มความคืบหน้า
   if (advanceWeeklyQuest(null, null, type)) ch = true;
   if (advanceResearch(null, null, type)) ch = true;
   if (type === 'winBattle' || type === 'fishCatch') addPassXp(3);
+  if (type === 'winBattle') starterTick('firstWin');
   if (ch) save();
 }
 function claimQuest(key) {
@@ -3416,7 +3420,7 @@ function renderMenu() {
       <div class="toggle${st.mascotDeco ? ' on' : ''}" id="tMascotDeco"></div>
     </div>
     <div class="set-row">
-      <div class="sr-label">🎬 ลดแอนิเมชัน<div class="sr-sub">ปิดการเคลื่อนไหว/สั่นไหวส่วนใหญ่ (accessibility)</div></div>
+      <div class="sr-label">🐢 โหมดประหยัด (Lite) · ลดแอนิเมชัน<div class="sr-sub">ปิดการเคลื่อนไหว/กรอบวิ่ง/แสงวูบส่วนใหญ่ — ลื่นขึ้นบนเครื่องช้า/ประหยัดแบต + ข้ามมินิเกมตกปลา (accessibility)</div></div>
       <div class="toggle${st.reduceMotion ? ' on' : ''}" id="tReduceMotion"></div>
     </div>
     <div class="set-row">
@@ -4101,11 +4105,65 @@ function showTutorial() {
     <div class="tut-step"><span class="ts-ico">🍓</span><div>โยน <b>เบอร์รี่</b> ก่อนปา เพิ่มโอกาสจับ</div></div>
     <div class="tut-step"><span class="ts-ico">🏆</span><div>ท้า <b>บอสประจำเขต</b> / <b>ยิม</b> / <b>หอคอยไต่ระดับ</b> · ทำ <b>เควส/ความสำเร็จ</b> รับรางวัล</div></div>
     <div class="tut-step"><span class="ts-ico">💎</span><div>ซื้อ <b>กำไลเมก้า/ไดนาแม็กซ์</b> ในร้านค้า แล้วซื้อหิน/พลังงานแนบให้ตัวที่ชอบ เปลี่ยนร่างกลางศึกได้</div></div>
+    <div class="tut-step"><span class="ts-ico">🎣</span><div>จับไปเรื่อยๆ มีโอกาสได้ <b>เบ็ดตกปลา</b> → กด 🎣 เล่น <b>มินิเกมจับจังหวะ</b> เจอโปเกมอนน้ำ/เทพทะเล</div></div>
+    <div class="tut-step"><span class="ts-ico">🎫</span><div>หน้า 📜 เควส มี <b>บัตรฤดูกาล</b> + <b>Field Research</b> เก็บ XP รับรางวัลไล่ระดับ · สู้ <b>PvP จัดอันดับ</b> ในเมนู</div></div>
     <div class="tut-step"><span class="ts-ico">🎀</span><div>ในเมนู ⚙️ ยังมี <b>คอนเทสต์ / ไร่เบอร์รี่ / พ่อค้าเร่ / คู่แข่งประจำตัว / คู่มือต่อสู้</b> ให้สำรวจเพิ่มเติม</div></div>
+    <div class="tut-step"><span class="ts-ico">🐢</span><div>เครื่องช้า/แบตน้อย? เปิด <b>โหมดลดแอนิเมชัน (Lite)</b> ในเมนู ⚙️ ตั้งค่า</div></div>
     <div class="tut-step"><span class="ts-ico">💾</span><div>อย่าลืม <b>Export เซฟ</b> ในเมนู ⚙️ เก็บไว้กันข้อมูลหาย</div></div>
     <div class="modal-actions"><button class="btn-primary" id="tutOk">เริ่มเล่นเลย!</button></div></div>`;
   openModal();
   $('#tutOk').onclick = () => { state.tutorialDone = true; save(); closeModal(); };
+}
+// ===== ภารกิจมือใหม่ (Beginner Checklist) — พาผู้เล่นใหม่ผ่านลูปหลัก แล้วแจกรางวัลนำร่อง =====
+const STARTER_GOALS = [
+  { key: 'firstCatch', ico: '🔴', name: 'จับโปเกมอนตัวแรก', reward: { ball: ['great', 5] } },
+  { key: 'firstWin', ico: '⚔️', name: 'ชนะการต่อสู้ครั้งแรก', reward: { coins: 500 } },
+  { key: 'visitShop', ico: '🏪', name: 'เปิดหน้าร้านค้า', reward: { ball: ['ultra', 3] } },
+  { key: 'firstFish', ico: '🎣', name: 'ลองตกปลา 1 ครั้ง', reward: { tokens: 20 } },
+  { key: 'openQuest', ico: '🎫', name: 'เปิดหน้าเควส (ดูบัตรฤดูกาล)', reward: { lockbox: 1 } },
+];
+function ensureStarter() {
+  if (!state.starter) {
+    state.starter = { done: {}, claimed: {}, allClaimed: (state.totalCaught || 0) > 5 };   // ผู้เล่นเก่าข้ามอัตโนมัติ
+  }
+}
+function starterTick(key) {
+  ensureStarter();
+  if (state.starter.allClaimed || state.starter.done[key]) return;
+  state.starter.done[key] = true; save();
+  const g = STARTER_GOALS.find(x => x.key === key);
+  if (g) toast(`✅ ภารกิจมือใหม่: ${g.name} — ไปรับรางวัลที่หน้าล่า!`, 'good');
+  renderStarter();
+}
+function claimStarter(key) {
+  ensureStarter();
+  const g = STARTER_GOALS.find(x => x.key === key);
+  if (!g || !state.starter.done[key] || state.starter.claimed[key]) return;
+  state.starter.claimed[key] = true; grantPassReward(g.reward);
+  if (STARTER_GOALS.every(x => state.starter.claimed[x.key]) && !state.starter.allClaimed) {
+    state.starter.allClaimed = true;
+    grantPassReward({ coins: 2000, candy: 2 });
+    toast('🎉 จบภารกิจมือใหม่! รับโบนัสใหญ่ +2000🪙 +2🍬', 'good'); playSfx('rare');
+  } else {
+    toast(`🎁 รับรางวัลมือใหม่: +${passRewardText(g.reward)}`, 'good');
+  }
+  save(); renderTopbar(); renderBallBar(); renderStarter();
+}
+function renderStarter() {
+  const box = $('#starterBox'); if (!box) return;
+  ensureStarter();
+  if (state.starter.allClaimed) { box.hidden = true; box.innerHTML = ''; return; }
+  box.hidden = false;
+  const rows = STARTER_GOALS.map(g => {
+    const done = state.starter.done[g.key], claimed = state.starter.claimed[g.key];
+    const btn = claimed ? '<span class="st-got">✓ รับแล้ว</span>'
+      : done ? `<button class="claim-btn st-claim" data-stk="${g.key}">รับ ${passRewardText(g.reward)}</button>`
+        : `<span class="st-todo">${passRewardText(g.reward)}</span>`;
+    return `<div class="starter-row${done ? ' done' : ''}"><span class="st-ico">${g.ico}</span><span class="st-name">${g.name}</span>${btn}</div>`;
+  }).join('');
+  const cnt = STARTER_GOALS.filter(g => state.starter.claimed[g.key]).length;
+  box.innerHTML = `<div class="starter-head">🌟 ภารกิจมือใหม่ (${cnt}/${STARTER_GOALS.length}) · ทำครบรับโบนัสใหญ่!</div>${rows}`;
+  box.querySelectorAll('[data-stk]').forEach(b => b.onclick = () => claimStarter(b.dataset.stk));
 }
 
 // ================================================================
@@ -5570,8 +5628,8 @@ function switchView(view) {
 function renderCurrentView() {
   if (currentView === 'map') renderMap();
   else if (currentView === 'dex') renderDex();
-  else if (currentView === 'shop') renderShop();
-  else if (currentView === 'quest') renderQuests();
+  else if (currentView === 'shop') { renderShop(); starterTick('visitShop'); }
+  else if (currentView === 'quest') { renderQuests(); starterTick('openQuest'); }
   else if (currentView === 'menu') renderMenu();
   else if (currentView === 'home') renderRouteTrainer();
 }
