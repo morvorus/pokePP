@@ -3048,10 +3048,10 @@ function advanceWeeklyQuest(mon, tier, bumpType) {
 function claimWeeklyQuest() {
   const q = state.weeklyQuest;
   if (!q || q.claimed || q.progress < q.target) return;
-  q.claimed = true; state.coins += q.rewardCoins;
-  const [bk, bn] = q.rewardBall; state.balls[bk] = (state.balls[bk] || 0) + bn;
-  if (q.rewardLockbox) state.lockboxes = (state.lockboxes || 0) + q.rewardLockbox;
+  q.claimed = true;
+  grantReward({ coins: q.rewardCoins, ball: q.rewardBall, lockbox: q.rewardLockbox });   // ผ่านตัวแจกรางวัลกลาง
   save(); renderTopbar(); renderQuests(); renderBallBar();
+  const [bk, bn] = q.rewardBall;
   toast(`🎁 รับรางวัลอีเวนต์: +${q.rewardCoins}🪙 +${bn}${BALLS[bk].emoji}${q.rewardLockbox ? ' +🎁' : ''}`, 'good');
   playSfx('rare');
 }
@@ -3084,10 +3084,11 @@ function bumpQuest(type) {   // เพิ่มความคืบหน้า
 function claimQuest(key) {
   const q = state.quests.find(x => x.key === key);
   if (!q || q.claimed || q.progress < q.target) return;
-  q.claimed = true; state.coins += q.rewardCoins;
-  const [bk, bn] = q.rewardBall; state.balls[bk] = (state.balls[bk] || 0) + bn;
+  q.claimed = true;
+  grantReward({ coins: q.rewardCoins, ball: q.rewardBall });   // ผ่านตัวแจกรางวัลกลาง
   addPassXp(20);   // เคลียร์เควสรายวัน → XP บัตรฤดูกาล
   save(); renderTopbar(); renderQuests(); renderBallBar();
+  const [bk, bn] = q.rewardBall;
   toast(`🎁 รับรางวัล: +${q.rewardCoins}🪙 +${bn}${BALLS[bk].emoji} · บัตร +20 XP`, 'good');
 }
 
@@ -3104,7 +3105,9 @@ function passReward(i, prem) {
   if (t === PASS_TIER_COUNT) return { coins: 30000, stone: 2, tokens: 30, bp: 40, candy: 2 };
   return ms ? { coins: 2500 * (t / 5), tokens: 15, ball: ['ultra', 3], candy: 1 } : { coins: 500 + t * 70, tokens: 5, bp: 5 };
 }
-function grantPassReward(r) {
+// ตัวแจกรางวัลกลาง — ทุกระบบ (เควส/อีเวนต์/บัตรฤดูกาล/มือใหม่/วิจัย) เรียกผ่านนี้
+// เพิ่มชนิดรางวัลใหม่ = แก้ที่เดียว (grantReward + rewardText)
+function grantReward(r) {
   if (r.coins) state.coins += r.coins;
   if (r.bp) state.battlePoints = (state.battlePoints || 0) + r.bp;
   if (r.tokens) state.fishTokens = (state.fishTokens || 0) + r.tokens;
@@ -3113,7 +3116,7 @@ function grantPassReward(r) {
   if (r.stone) state.stones = (state.stones || 0) + r.stone;
   if (r.candy) state.candies = (state.candies || 0) + r.candy;
 }
-function passRewardText(r) {
+function rewardText(r) {
   const p = [];
   if (r.coins) p.push(`${r.coins >= 1000 ? (r.coins / 1000) + 'k' : r.coins}🪙`);
   if (r.bp) p.push(`${r.bp}🎖️`);
@@ -3143,9 +3146,9 @@ function claimPassTier(i, prem) {
   const claimed = prem ? state.passClaimP : state.passClaim;
   if (claimed[i]) return;
   const r = passReward(i, prem);
-  grantPassReward(r); claimed[i] = true;
+  grantReward(r); claimed[i] = true;
   save(); renderTopbar(); renderBallBar(); renderSeasonPass();
-  toast(`🎫 รับรางวัลบัตรระดับ ${i + 1}: +${passRewardText(r)}`, 'good'); playSfx('rare');
+  toast(`🎫 รับรางวัลบัตรระดับ ${i + 1}: +${rewardText(r)}`, 'good'); playSfx('rare');
 }
 function buyPassPremium() {
   ensurePassSeason();
@@ -3186,10 +3189,10 @@ function claimResearch(key) {
   const q = (state.research || []).find(x => x.key === key);
   if (!q || q.claimed || q.progress < q.target) return;
   q.claimed = true;
-  if (q.reward) grantPassReward(q.reward);
+  if (q.reward) grantReward(q.reward);
   addPassXp(q.xp);
   save(); renderTopbar(); renderBallBar(); renderQuests();
-  toast(`🔬 เควสวิจัยสำเร็จ! บัตร +${q.xp} XP${q.reward ? ' · +' + passRewardText(q.reward) : ''}`, 'good'); playSfx('rare');
+  toast(`🔬 เควสวิจัยสำเร็จ! บัตร +${q.xp} XP${q.reward ? ' · +' + rewardText(q.reward) : ''}`, 'good'); playSfx('rare');
 }
 function renderSeasonPass() {
   const box = $('#seasonPassBox'); if (!box) return;
@@ -3202,8 +3205,8 @@ function renderSeasonPass() {
     const unlocked = i < tier;
     const fr = passReward(i, false), pr = passReward(i, true);
     const fClaimed = state.passClaim[i], pClaimed = state.passClaimP[i];
-    const fBtn = fClaimed ? `<div class="pass-cell got">✓</div>` : `<button class="pass-cell free${unlocked ? ' can' : ''}" data-passfree="${i}" ${unlocked ? '' : 'disabled'}>${passRewardText(fr)}</button>`;
-    const pBtn = pClaimed ? `<div class="pass-cell got">✓</div>` : `<button class="pass-cell prem${unlocked && state.passPrem ? ' can' : ''}" data-passprem="${i}" ${unlocked && state.passPrem ? '' : 'disabled'}>${passRewardText(pr)}</button>`;
+    const fBtn = fClaimed ? `<div class="pass-cell got">✓</div>` : `<button class="pass-cell free${unlocked ? ' can' : ''}" data-passfree="${i}" ${unlocked ? '' : 'disabled'}>${rewardText(fr)}</button>`;
+    const pBtn = pClaimed ? `<div class="pass-cell got">✓</div>` : `<button class="pass-cell prem${unlocked && state.passPrem ? ' can' : ''}" data-passprem="${i}" ${unlocked && state.passPrem ? '' : 'disabled'}>${rewardText(pr)}</button>`;
     cols.push(`<div class="pass-col${i === tier ? ' now' : ''}"><div class="pass-tnum">${i + 1}</div>${fBtn}${pBtn}</div>`);
   }
   const premBtn = state.passPrem
@@ -3230,7 +3233,7 @@ function renderResearch() {
       const done = q.progress >= q.target, pct = clamp(q.progress / q.target * 100, 0, 100);
       return `<div class="quest">
         <div class="quest-top"><div class="quest-name">${q.name}</div>
-          <div class="quest-reward">🎫+${q.xp}XP${q.reward ? ' · ' + passRewardText(q.reward) : ''}</div></div>
+          <div class="quest-reward">🎫+${q.xp}XP${q.reward ? ' · ' + rewardText(q.reward) : ''}</div></div>
         <div class="quest-bar"><div class="quest-fill" style="width:${pct}%;background:linear-gradient(90deg,#7ec8ff,#3d7dca)"></div></div>
         <div class="quest-foot"><span>${Math.min(q.progress, q.target)}/${q.target}</span>
           <button class="claim-btn${q.claimed ? ' done' : ''}" data-rkey="${q.key}" ${(!done || q.claimed) ? 'disabled' : ''}>${q.claimed ? 'รับแล้ว ✓' : 'รับ XP'}</button>
@@ -4099,13 +4102,13 @@ function claimStarter(key) {
   ensureStarter();
   const g = STARTER_GOALS.find(x => x.key === key);
   if (!g || !state.starter.done[key] || state.starter.claimed[key]) return;
-  state.starter.claimed[key] = true; grantPassReward(g.reward);
+  state.starter.claimed[key] = true; grantReward(g.reward);
   if (STARTER_GOALS.every(x => state.starter.claimed[x.key]) && !state.starter.allClaimed) {
     state.starter.allClaimed = true;
-    grantPassReward({ coins: 2000, candy: 2 });
+    grantReward({ coins: 2000, candy: 2 });
     toast('🎉 จบภารกิจมือใหม่! รับโบนัสใหญ่ +2000🪙 +2🍬', 'good'); playSfx('rare');
   } else {
-    toast(`🎁 รับรางวัลมือใหม่: +${passRewardText(g.reward)}`, 'good');
+    toast(`🎁 รับรางวัลมือใหม่: +${rewardText(g.reward)}`, 'good');
   }
   save(); renderTopbar(); renderBallBar(); renderStarter();
 }
@@ -4117,8 +4120,8 @@ function renderStarter() {
   const rows = STARTER_GOALS.map(g => {
     const done = state.starter.done[g.key], claimed = state.starter.claimed[g.key];
     const btn = claimed ? '<span class="st-got">✓ รับแล้ว</span>'
-      : done ? `<button class="claim-btn st-claim" data-stk="${g.key}">รับ ${passRewardText(g.reward)}</button>`
-        : `<span class="st-todo">${passRewardText(g.reward)}</span>`;
+      : done ? `<button class="claim-btn st-claim" data-stk="${g.key}">รับ ${rewardText(g.reward)}</button>`
+        : `<span class="st-todo">${rewardText(g.reward)}</span>`;
     return `<div class="starter-row${done ? ' done' : ''}"><span class="st-ico">${g.ico}</span><span class="st-name">${g.name}</span>${btn}</div>`;
   }).join('');
   const cnt = STARTER_GOALS.filter(g => state.starter.claimed[g.key]).length;
