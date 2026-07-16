@@ -262,7 +262,29 @@
 <script type="module" src="game.js"></script>
 <script>
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    window.addEventListener('load', async () => {
+      try {
+        // จำว่า "ตอนโหลดหน้ามี SW คุมอยู่แล้วไหม" — ถ้ามี = การเปลี่ยนคุมทีหลัง = มีอัปเดตใหม่ (ไม่ใช่ติดตั้งครั้งแรก)
+        const hadController = !!navigator.serviceWorker.controller;
+        const reg = await navigator.serviceWorker.register('sw.js');
+        // ตรวจอัปเดต: ทันทีที่โหลด, ทุกครั้งที่กลับมาโฟกัส, และทุก 5 นาที
+        const check = () => reg.update().catch(() => {});
+        check();
+        setInterval(check, 5 * 60 * 1000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+        // SW เวอร์ชันใหม่เข้าคุมแทน → รีเฟรชอัตโนมัติเมื่อ "ว่าง" (ไม่ขัดจังหวะการต่อสู้/ตกปลา)
+        if (hadController) {
+          let done = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (done) return; done = true;
+            (function reloadWhenIdle() {
+              if (window.__ppBusy && window.__ppBusy()) { setTimeout(reloadWhenIdle, 4000); return; }
+              location.reload();
+            })();
+          });
+        }
+      } catch (e) { /* ไม่มี SW ก็เล่นได้ปกติ */ }
+    });
   }
 </script>
 </body>

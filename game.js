@@ -4105,6 +4105,8 @@ function renderStarter() {
 //  BATTLE ENGINE
 // ================================================================
 let battleState = null;
+// auto-update: บอกตัวรีเฟรชว่า "กำลังยุ่ง" อยู่ไหม (กำลังสู้/ตกปลา) — จะได้ไม่รีหน้ากลางคัน
+window.__ppBusy = () => !!battleState || !!document.querySelector('.fish-mini');
 // statsForBase ย้ายไป logic.js แล้ว (import ด้านบน)
 function statsForWild(mon, level) { return statsForBase(mon.stats, level); }
 function gainXpTo(ind, amount) {
