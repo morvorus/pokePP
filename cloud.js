@@ -112,6 +112,7 @@ const Cloud = {
         dex: cap(score.dex, 2000), playtime: cap(score.playtime, 5259600),
         tower: cap(score.tower, 999), caught: cap(score.caught, 9999999),
         hardcore: cap(score.hardcore, 2000),   // เดกซ์ที่ทำได้ระหว่างเปิดโหมด Hardcore (0 ถ้าไม่เคยเปิด)
+        pvp: cap(score.pvp, 5000),             // คะแนน PvP จัดอันดับตามฤดูกาล
         updated_at: new Date().toISOString(),
       };
       if (score.team) row.team = score.team;   // สแนปช็อตทีมสำหรับ Ghost Battle (ถ้ามีคอลัมน์ team)
@@ -161,10 +162,10 @@ const Cloud = {
   // ดึงอันดับสูงสุดตามคอลัมน์ (dex/playtime/tower/caught)
   async topScores(column, limit) {
     if (!this.enabled) return { error: 'cloud ปิดอยู่' };
-    const col = ['dex', 'playtime', 'tower', 'caught', 'hardcore'].includes(column) ? column : 'dex';
+    const col = ['dex', 'playtime', 'tower', 'caught', 'hardcore', 'pvp'].includes(column) ? column : 'dex';
     try {
       const { data, error } = await this.client
-        .from('leaderboard').select('name, dex, playtime, tower, caught, hardcore')
+        .from('leaderboard').select('name, dex, playtime, tower, caught, hardcore, pvp')
         .order(col, { ascending: false }).limit(limit || 20);
       if (error) return { error: error.message };
       return { ok: true, rows: data || [], me: this.user ? this.user.id : null };

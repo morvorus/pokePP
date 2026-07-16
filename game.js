@@ -871,6 +871,7 @@ function newSave() {
     learnedTMs: {},      // {moveName:true} แผ่นสกิลที่เรียนแล้ว (สอนให้ตัวที่ธาตุตรงได้)
     fishShopStock: [],   // สต็อกแผ่นสกิลในร้านตกปลา (10 ชิ้น รีทุก 3 วัน)
     fishShopResetAt: 0,
+    pvpRating: 1000, pvpPeak: 1000, pvpSeason: '', pvpWins: 0, pvpLosses: 0,   // PvP จัดอันดับตามฤดูกาล
     quests: [], questDate: '',
     achievements: {},    // {achId:true} รับรางวัลแล้ว
     settings: { sound: true, music: false, spawnSpeed: 'normal',
@@ -4535,6 +4536,7 @@ function faintActive(b, aMon) {
         b.msg += ` · 👹 ทีมหมดแรง! ส่งความเสียหาย ${dmgDealt.toLocaleString()} เข้ากองกลาง Raid`;
         raidSubmitDamage(dmgDealt);
       }
+      if (b.isGhost) { pvpUpdate(false); b.msg += ` · ⚔️ PvP -18 (${state.pvpRating})`; save(); }   // PvP: แพ้ -คะแนน
     }
   } else { b.activeIdx = next; b.msg += ` ส่ง ${MON_BY_ID[b.team[next].ind.id].name} ลงสนาม!${applyIntimidate('player', b)}`; }
 }
@@ -4863,9 +4865,11 @@ function onFoeDown() {
       state.coins += g.reward;
       state.battlePoints = (state.battlePoints || 0) + bp;
       state.ghostWins = (state.ghostWins || 0) + 1;
+      pvpUpdate(true);   // PvP: ชนะ +คะแนนแรงก์
       gainTrainerXp(60);
-      b.victory = { trainerKey: foeTrainerName(b), emoji: '👤', title: `${g.name} (ออนไลน์)`, coins: g.reward, bp, xp: 60, items: '', bonus: `ชนะทีมออนไลน์รวม ${state.ghostWins} ครั้ง` };
-      b.msg = `👤 ชนะทีม ${g.name}! +${g.reward}🪙 +${bp}🎖️BP`;
+      const tier = pvpTier(state.pvpRating);
+      b.victory = { trainerKey: foeTrainerName(b), emoji: '👤', title: `${g.name} (ออนไลน์)`, coins: g.reward, bp, xp: 60, items: '', bonus: `แรงก์ ${tier.emoji} ${tier.name} · ${state.pvpRating} คะแนน (+25)` };
+      b.msg = `👤 ชนะทีม ${g.name}! +${g.reward}🪙 +${bp}🎖️BP · PvP +25 (${state.pvpRating})`;
       logMsg(`👤 ชนะ Ghost <b>${g.name}</b>! +${g.reward}🪙`, 'big');
       playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
       return;
@@ -5414,6 +5418,7 @@ const LB_TABS = [
   { key: 'caught', label: '🎯 จับรวม', fmt: v => `${v}` },
   { key: 'playtime', label: '⏱️ เวลาเล่น', fmt: v => `${Math.floor(v / 60)}ชม ${v % 60}น` },
   { key: 'hardcore', label: '💀 Hardcore', fmt: v => v > 0 ? `${v}/${MONSTERS.length}` : '—' },
+  { key: 'pvp', label: '⚔️ PvP', fmt: v => v > 0 ? `${pvpTier(v).emoji} ${v}` : '—' },
 ];
 function myLbScore() {
   // จำกัดค่าให้อยู่ในกรอบที่เป็นไปได้จริง กันการแก้เซฟส่งค่าเว่อร์ (กันโกงเบื้องต้นฝั่ง client)
@@ -5425,6 +5430,7 @@ function myLbScore() {
     playtime: clamp(Math.floor((state.playSec || 0) / 60), 0, 5259600),
     // เดกซ์ที่ทำได้ ถ้าเปิดโหมด Hardcore อยู่ตอนนี้ (0 = ไม่ได้เปิด/ไม่ขึ้นกระดานนี้)
     hardcore: state.settings && state.settings.hardcoreMode ? clamp(speciesOwnedCount(), 0, MONSTERS.length) : 0,
+    pvp: clamp(state.pvpRating || 1000, 0, 5000),
     team: myTeamSnapshot(),
   };
 }
@@ -5604,16 +5610,54 @@ async function raidSubmitDamage(dmgDealt) {
   if (res && res.ok) { toast(`👹 ส่งความเสียหายเข้ากองกลาง Raid: +${dmgDealt.toLocaleString()}`, 'good'); if (currentView === 'menu') renderRaid(); }
 }
 // ================================================================
-//  GHOST BATTLE — สู้กับทีมของผู้เล่นคนอื่นแบบ AI (async PvP)
+//  GHOST BATTLE — สู้กับทีมของผู้เล่นคนอื่นแบบ AI (async PvP) + จัดอันดับตามฤดูกาล
 // ================================================================
+const PVP_TIERS = [
+  { min: 2000, name: 'Master', emoji: '👑' }, { min: 1750, name: 'Diamond', emoji: '💎' },
+  { min: 1500, name: 'Platinum', emoji: '💠' }, { min: 1250, name: 'Gold', emoji: '🥇' },
+  { min: 1050, name: 'Silver', emoji: '🥈' }, { min: 0, name: 'Bronze', emoji: '🥉' },
+];
+function pvpTier(r) { return PVP_TIERS.find(t => (r || 0) >= t.min) || PVP_TIERS[PVP_TIERS.length - 1]; }
+function pvpSeasonKey() { const n = new Date(); return `${n.getUTCFullYear()}-${String(n.getUTCMonth() + 1).padStart(2, '0')}`; }
+// เริ่มฤดูกาลใหม่ (รายเดือน) — แจกรางวัลตามแรงก์ที่ได้ แล้วรีเซ็ตคะแนนกลับ 1000
+function ensurePvpSeason() {
+  const key = pvpSeasonKey();
+  if (state.pvpSeason === key) return;
+  if (state.pvpSeason) {   // จบฤดูกาลก่อนหน้า — ให้รางวัลตามแรงก์สูงสุด
+    const tier = pvpTier(state.pvpPeak || state.pvpRating || 1000);
+    const idx = PVP_TIERS.length - 1 - PVP_TIERS.indexOf(tier);
+    const bp = idx * 40, coins = idx * 3000;
+    if (bp || coins) {
+      state.battlePoints = (state.battlePoints || 0) + bp; state.coins += coins;
+      setTimeout(() => toast(`🏆 จบฤดูกาล PvP! แรงก์ ${tier.emoji} ${tier.name} — รับ +${bp}🎖️BP +${coins}🪙`, 'good'), 800);
+      logMsg(`🏆 จบฤดูกาล PvP ที่แรงก์ <b>${tier.emoji} ${tier.name}</b>! รับ ${bp}BP + ${coins}🪙`, 'big');
+    }
+  }
+  state.pvpSeason = key; state.pvpRating = 1000; state.pvpPeak = 1000; state.pvpWins = 0; state.pvpLosses = 0;
+  save();
+}
+function pvpUpdate(win) {
+  ensurePvpSeason();
+  if (win) { state.pvpRating = (state.pvpRating || 1000) + 25; state.pvpWins = (state.pvpWins || 0) + 1; if (state.pvpRating > (state.pvpPeak || 0)) state.pvpPeak = state.pvpRating; }
+  else { state.pvpRating = Math.max(600, (state.pvpRating || 1000) - 18); state.pvpLosses = (state.pvpLosses || 0) + 1; }
+}
 let _ghostCache = null;
 function renderGhostArena() {
   const box = $('#ghostBox'); if (!box) return;
   if (!(window.Cloud && Cloud.enabled)) { box.innerHTML = `<div class="sr-sub">ต้องตั้งค่าคลาวด์ก่อนถึงจะสู้ออนไลน์ได้</div>`; return; }
   if (!Cloud.loggedIn()) { box.innerHTML = `<div class="sr-sub">เข้าสู่ระบบก่อน (ส่วน "☁️ บัญชี / เซฟคลาวด์") แล้ว 📤 ส่งสถิติที่กระดานเพื่อลงทะเบียนทีม</div>`; return; }
   const myName = state.playerName || '(ยังไม่ตั้งชื่อ — ตั้งที่กระดานอันดับ)';
+  ensurePvpSeason();
+  const tier = pvpTier(state.pvpRating);
   box.innerHTML = `
-    <div class="sr-sub" style="margin-bottom:6px">สู้กับทีมของผู้เล่นคนอื่นแบบ AI · ชนะได้เหรียญ + BP<br>(อย่าลืม 📤 ส่งสถิติที่กระดาน เพื่อให้ทีมคุณโผล่ให้คนอื่นสู้ด้วย)</div>
+    <div class="rival-card" style="margin-bottom:8px">
+      <div style="font-size:34px">${tier.emoji}</div>
+      <div class="rival-info">
+        <div class="rival-name" style="color:var(--accent)">${tier.name} · ${state.pvpRating} คะแนน</div>
+        <div class="rival-stat">🏆 PvP ฤดูกาล ${state.pvpSeason} · ชนะ ${state.pvpWins || 0} · แพ้ ${state.pvpLosses || 0} · สูงสุด ${state.pvpPeak || state.pvpRating}</div>
+      </div>
+    </div>
+    <div class="sr-sub" style="margin-bottom:6px">ชนะ +25 · แพ้ -18 คะแนน · จบเดือนรีเซ็ต แจกรางวัลตามแรงก์ · สู้ทีมผู้เล่นคนอื่นแบบ AI<br>(อย่าลืม 📤 ส่งสถิติที่กระดาน เพื่อให้ทีมคุณโผล่ให้คนอื่นสู้ด้วย)</div>
     <div class="trade-card" style="margin-bottom:8px">
       <div class="trade-h">🎯 ท้าเพื่อนเจาะจง (ใส่ชื่อเพื่อน)</div>
       <div class="sr-sub" style="margin-bottom:5px">ชื่อของคุณ: <b class="trade-code">${escapeHtml(myName)}</b> — บอกเพื่อนเพื่อให้เขาท้าคุณ</div>

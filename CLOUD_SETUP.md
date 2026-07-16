@@ -69,6 +69,7 @@ create policy "trade delete" on public.trades for delete using (auth.uid() = fro
 -- ===== (ตัวเลือก) เพิ่มคอลัมน์ Hardcore เข้ากระดานจัดอันดับเดิม =====
 -- ⚠️ ต้องรันก่อนใช้งาน ไม่งั้นการส่งสถิติ/โหลดกระดานจัดอันดับ (ทุกแท็บ) จะ error ทันที เพราะโค้ดฝั่งเกมส่งคอลัมน์นี้ไปด้วยเสมอ
 alter table public.leaderboard add column if not exists hardcore int default 0;
+alter table public.leaderboard add column if not exists pvp int default 1000;   -- คะแนน PvP จัดอันดับตามฤดูกาล
 
 -- ===== (ตัวเลือก) ตาราง Raid บอสรายสัปดาห์ (ร่วมมือหลายคน) =====
 create table public.raid_contrib (
