@@ -882,6 +882,12 @@ h2.view-title::after {
 @keyframes fmPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
 .reduce-motion .fm-water, .reduce-motion .fm-tap { animation: none; }
 
+/* ===== View Transitions (สลับหน้านุ่มลื่น) ===== */
+::view-transition-old(root) { animation: vtOut .2s ease both; }
+::view-transition-new(root) { animation: vtIn .26s cubic-bezier(.22,.9,.3,1) both; }
+@keyframes vtOut { to { opacity: 0; transform: translateY(-5px); } }
+@keyframes vtIn { from { opacity: 0; transform: translateY(9px); } }
+
 /* ===== Live-Ops banner (ประกาศ/อีเวนต์สดจากคลาวด์) ===== */
 .live-banner { background: linear-gradient(90deg,rgba(255,203,5,.22),rgba(61,125,202,.18)); border: 1px solid rgba(255,203,5,.4); border-radius: var(--btn-radius); padding: 8px 12px; margin-bottom: var(--sp-2); font-size: 12.5px; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px; box-shadow: var(--shadow-sm); }
 .live-banner .lb-emoji { font-size: 18px; }

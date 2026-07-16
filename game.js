@@ -5648,11 +5648,19 @@ function closeModal() { $('#modal').classList.add('hidden'); }
 
 let currentView = 'home';
 function switchView(view) {
-  currentView = view;
-  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  $('#view-' + view).classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
-  renderCurrentView();
+  const apply = () => {
+    currentView = view;
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    $('#view-' + view).classList.add('active');
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+    renderCurrentView();
+  };
+  // View Transitions API — สลับหน้านุ่มลื่นเหมือนแอปเนทีฟ (ข้ามถ้าโหมดประหยัด/เบราว์เซอร์ไม่รองรับ)
+  if (document.startViewTransition && !(state.settings && state.settings.reduceMotion)) {
+    document.startViewTransition(apply);
+  } else {
+    apply();
+  }
 }
 function renderCurrentView() {
   if (currentView === 'map') renderMap();
