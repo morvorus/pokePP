@@ -1781,7 +1781,7 @@ function renderRegionBanner() {
   const wkChip = ` · <b style="color:#c9a3ff" title="${wk.desc} · เหรียญ ×${WEEKLY_COIN_MULT} · เลเจนดารี ×${WEEKLY_LEG_MULT} ทั้งสัปดาห์ (เหลือ ${weeklyEventDaysLeft()} วัน)">📅 ${wk.emoji} ${wk.name}</b>`;
   $('#rbLvl').innerHTML = `${timeIco} · ${w.emoji}${w.name}${wkChip}${ev}${safari}`;
   const card = $('#spawnCard');
-  card.style.background = sceneBgCss(r);
+  card.style.background = regionBgCss(r);
   card.classList.toggle('night', timeOfDay() === 'night');
   renderBoostStrip();
 
@@ -1805,17 +1805,10 @@ function mascotDecoHtml(ids) {
   return (ids || []).map((id, i) =>
     `<span class="deco-mon" style="left:${6 + i * 23}%;top:${8 + (i % 3) * 24}%;animation-delay:${i * .7}s">${spriteImg(id, false)}</span>`).join('');
 }
-// วาดฝั่งเรา (โปเกมอนหันหลังยืนบนพื้น) — คงอยู่เสมอ ไม่ขึ้นกับสปอว์นป่า
-function renderBuddyScene() {
-  const wrap = $('#buddyBackWrap'); if (!wrap) return;
-  const b = getBuddy();
-  wrap.innerHTML = b ? backSpriteImg(b.id, b.shiny, 'buddy-mon') : '';
-}
 function renderSpawn() {
   const card = $('#spawnCard');
   card.classList.remove('rare-glow', 'legend-glow', 'shiny-glow');
   const battleBtn = $('#battleBtn');
-  renderBuddyScene();
   if (!currentSpawn) {
     card.classList.add('empty');
     $('#spawnTop').innerHTML = '';
@@ -2063,15 +2056,7 @@ function selectRegion(id) {
   state.region = id; save();
   renderRegionBanner(); clearSpawn(); scheduleSpawn(1500);
   switchView('home');
-  summonBuddyFx();   // เทรนเนอร์เรียกโปเกมอนออกมาตอนเข้าเขต
   toast(`${r.emoji} เดินทางสู่ <b>${r.name}</b>`, 'good');
-}
-// เอฟเฟคเรียกโปเกมอนฝั่งเราเด้งออกมา (ตอนเข้าเขต) — เด้งบอลจากเทรนเนอร์แล้วบัดดี้ปรากฏ
-function summonBuddyFx() {
-  if (state.settings && state.settings.reduceMotion) return;
-  const wrap = $('#buddyBackWrap'); if (!wrap || !getBuddy()) return;
-  wrap.classList.remove('summon'); void wrap.offsetWidth; wrap.classList.add('summon');
-  setTimeout(() => wrap.classList.remove('summon'), 600);
 }
 
 // ================================================================
@@ -3308,11 +3293,11 @@ function claimDailyLogin() {
   state.coins += cd.coins;
   state.balls[cd.ball[0]] = (state.balls[cd.ball[0]] || 0) + cd.ball[1];
   if (cd.lockbox) state.lockboxes = (state.lockboxes || 0) + cd.lockbox;
-  if (cd.checkin) state.checkinCoins = (state.checkinCoins || 0) + cd.checkin;   // เหรียญเช็คอิน — แลกกำไลเมก้า/ไดนาแม็กซ์/ไอเทมพิเศษ
+  state.checkinCoins = (state.checkinCoins || 0) + 1;   // เหรียญเช็คอิน — กดรับได้รอบละ 1 เหรียญ (แลกกำไลเมก้า/ไดนาแม็กซ์/Z-Ring/ชาม)
   save(); renderMenu(); renderTopbar();
   const ballTxt = `${cd.ball[1]}${BALLS[cd.ball[0]].emoji}`;
   const lockboxTxt = cd.lockbox ? ` +${cd.lockbox}🎁` : '';
-  const ciTxt = cd.checkin ? ` +${cd.checkin}🗓️เช็คอิน` : '';
+  const ciTxt = ` +1🗓️เช็คอิน`;
   toast(`📅 เช็คอินสำเร็จ! วันที่ ${loginCycleDay(state.streak)}/7 (สตรีค ${state.streak}) +${cd.coins}🪙 +${ballTxt}${lockboxTxt}${ciTxt}`, 'good');
   checkAchievements();
 }
