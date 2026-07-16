@@ -203,9 +203,11 @@ h2.view-title::after {
 .spawn-card.rare-glow { box-shadow: 0 0 0 2px #7aa7ff, var(--shadow); }
 .spawn-card.legend-glow { box-shadow: 0 0 34px rgba(255,203,5,.45), var(--shadow); }
 .spawn-card.shiny-glow { box-shadow: 0 0 34px rgba(126,249,255,.55), var(--shadow); }
+.spawn-card.golden-glow { box-shadow: 0 0 44px rgba(255,215,0,.7), var(--shadow); }
+.golden-mon { filter: sepia(1) saturate(6) hue-rotate(-15deg) brightness(1.15) contrast(1.05) drop-shadow(0 8px 10px rgba(0,0,0,.5)) !important; }
 /* ===== กรอบเรืองแสงวิ่งวนรอบการ์ด (legendary = ทอง, shiny = รุ้ง) — ใช้ @property หมุนมุม conic ให้แสงวิ่ง ไม่เอียงการ์ด ===== */
 @property --brun { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
-.spawn-card.legend-glow::before, .spawn-card.shiny-glow::before {
+.spawn-card.legend-glow::before, .spawn-card.shiny-glow::before, .spawn-card.golden-glow::before {
   content: ''; position: absolute; inset: 0; border-radius: var(--radius); padding: 3px;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
@@ -213,8 +215,9 @@ h2.view-title::after {
 }
 .spawn-card.legend-glow::before { background: conic-gradient(from var(--brun), transparent 0deg 235deg, #ffe27a 290deg, #fff7d6 320deg, #ffcb05 345deg, transparent 360deg); }
 .spawn-card.shiny-glow::before { background: conic-gradient(from var(--brun), #ff5d6c, #ffcb05, #47d16c, #3d7dca, #a06bff, #ff5d6c); }
+.spawn-card.golden-glow::before { background: conic-gradient(from var(--brun), #ffd700, #fff3b0, #ffb800, #fff, #ffd700); }
 @keyframes brun { to { --brun: 360deg; } }
-.reduce-motion .spawn-card.legend-glow::before, .reduce-motion .spawn-card.shiny-glow::before { animation: none; }
+.reduce-motion .spawn-card.legend-glow::before, .reduce-motion .spawn-card.shiny-glow::before, .reduce-motion .spawn-card.golden-glow::before { animation: none; }
 .spawn-inner { position: relative; z-index: 2; }
 
 /* ===== เอฟเฟคเต็มจอตอนเจอ legendary/shiny ===== */

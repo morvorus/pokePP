@@ -835,6 +835,9 @@ function newSave() {
     teamPresets: [null, null, null],   // ชุดทีมสำรอง 3 ช่อง {name, uids:[...]}
     eggs: [],
     savedSpawn: null,    // สปอว์นค้างในเซฟ (กันรีเฟรชสุ่มใหม่)
+    rods: 0,             // ระดับเบ็ดตกปลา (0=ยังไม่มี, 1-5)
+    fishItems: {},       // ไอเทมช่วยตกปลา { lure:true, rare:true }
+    goldenSeaUntil: 0,   // เวลาสิ้นสุดอีเวนต์ทะเลทองคำ
     quests: [], questDate: '',
     achievements: {},    // {achId:true} รับรางวัลแล้ว
     settings: { sound: true, music: false, spawnSpeed: 'normal',
@@ -889,14 +892,14 @@ function save() {
 function persistSpawn() {
   state.savedSpawn = currentSpawn ? {
     id: currentSpawn.mon.id, tier: currentSpawn.tier, shiny: currentSpawn.shiny, level: currentSpawn.level,
-    deadline: currentSpawn.deadline, maxHp: currentSpawn.maxHp, hp: currentSpawn.hp, throws: currentSpawn.throws, fishing: currentSpawn.fishing,
+    deadline: currentSpawn.deadline, maxHp: currentSpawn.maxHp, hp: currentSpawn.hp, throws: currentSpawn.throws, fishing: currentSpawn.fishing, golden: currentSpawn.golden,
   } : null;
 }
 function restoreSpawn() {
   const s = state.savedSpawn;
   if (!s || !s.id || !s.deadline || s.deadline <= Date.now()) { state.savedSpawn = null; return false; }
   const mon = MON_BY_ID[s.id]; if (!mon) { state.savedSpawn = null; return false; }
-  currentSpawn = { mon, tier: s.tier, shiny: s.shiny, level: s.level, throws: s.throws || 0, deadline: s.deadline, maxHp: s.maxHp, hp: s.hp, fishing: s.fishing };
+  currentSpawn = { mon, tier: s.tier, shiny: s.shiny, level: s.level, throws: s.throws || 0, deadline: s.deadline, maxHp: s.maxHp, hp: s.hp, fishing: s.fishing, golden: s.golden };
   renderSpawn();
   clearTimeout(despawnTimer);
   despawnTimer = setTimeout(fleeSpawn, Math.max(500, s.deadline - Date.now()));
@@ -1511,12 +1514,12 @@ function startRouteTrainerBattle() {
   renderBattle();
   $('#battleModal').classList.remove('hidden');
 }
-// สร้าง spawn จริง (ใช้ร่วมกันทั้งเดินป่าปกติและตกปลา)
-function beginSpawn(mon, shiny, fromFishing) {
+// สร้าง spawn จริง (ใช้ร่วมกันทั้งเดินป่าปกติและตกปลา) · golden = ตัวสีทอง (Golden Kyogre)
+function beginSpawn(mon, shiny, fromFishing, golden) {
   const level = levelFor(mon._tier);
   const maxHp = wildMaxHp(mon, level);
   currentSpawn = { mon, tier: mon._tier, shiny, level, throws: 0, deadline: Date.now() + FLEE_MS,
-    maxHp, hp: maxHp, fishing: !!fromFishing };
+    maxHp, hp: maxHp, fishing: !!fromFishing, golden: !!golden };
   state.seen[mon.id] = true;
   renderSpawn();
   // แจ้งเตือน (ป๊อปอัพ) เฉพาะ superrare ขึ้นไป + shiny · เอฟเฟคเต็มจอเฉพาะ legendary/shiny (ตื่นเต้นสุด)
@@ -1531,30 +1534,58 @@ function beginSpawn(mon, shiny, fromFishing) {
   despawnTimer = setTimeout(fleeSpawn, FLEE_MS);
   save();   // เก็บสปอว์นลงเซฟทันที (กันรีเฟรชสุ่มใหม่)
 }
-// ===== ระบบตกปลา (แบบ PokeMeow) =====
+// ===== ระบบตกปลา — ต้องมีเบ็ด · เจอแต่โปเกมอนน้ำ/ทะเล(+เทพน้ำ) · Golden Kyogre เฉพาะอีเวนต์ทะเลทองคำ =====
 const FISH_CD = 5000;   // คูลดาวน์ตกปลา 5 วินาที
+const ROD_NAMES = ['—', 'เบ็ดไม้', 'เบ็ดเหล็ก', 'เบ็ดเงิน', 'เบ็ดทอง', 'เบ็ดเพชร'];   // index 1-5 = ระดับเบ็ด
+const ROD_DROP_CHANCE = 1 / 300;          // เบ็ดไม้ดรอปจากการจับเท่านั้น
+const GOLDEN_SEA_MS = 30 * 60000;         // อีเวนต์ทะเลทองคำ 30 นาที
+const GOLDEN_SEA_TRIGGER = 0.003;         // โอกาสเริ่มอีเวนต์ต่อการตกปลา
+const GOLDEN_KYOGRE_CHANCE = 1 / 7777777; // Golden Kyogre (id 382) เฉพาะช่วงอีเวนต์
+const FISH_LEG = FISH_POOL.filter(m => m._tier === 'legendary');   // เทพน้ำ/ทะเล
+function goldenSeaActive() { return (state.goldenSeaUntil || 0) > Date.now(); }
 function fish() {
+  if ((state.rods || 0) < 1) { toast('❌ ต้องมีเบ็ดก่อน! เบ็ดไม้หาได้จากการจับโปเกมอน (โอกาส 1/300)', 'bad'); return; }
   const now = Date.now();
   if (now < (state.fishReadyAt || 0)) {
     toast(`🎣 รอเบ็ดพร้อมอีก ${Math.ceil((state.fishReadyAt - now) / 1000)} วิ`, 'bad'); return;
   }
   state.fishReadyAt = now + FISH_CD;
-  const roll = Math.random();
-  if (roll < 0.60) {
-    // เกี่ยวโปเกมอนน้ำ/น้ำแข็งขึ้นมา
+  const rod = state.rods || 1;
+  // เริ่มอีเวนต์ทะเลทองคำแบบสุ่ม
+  if (!goldenSeaActive() && Math.random() < GOLDEN_SEA_TRIGGER) {
+    state.goldenSeaUntil = now + GOLDEN_SEA_MS;
+    toast('🌊✨ ทะเลทองคำปรากฏ! 30 นาที — ลุ้น Golden Kyogre!', 'good');
+    logMsg('🌊✨ อีเวนต์ทะเลทองคำเริ่มแล้ว! ตกปลาลุ้น Golden Kyogre (30 นาที)', 'big');
+    playSpawnFx('shiny');
+  }
+  // Golden Kyogre — เฉพาะช่วงทะเลทองคำ
+  if (goldenSeaActive() && Math.random() < GOLDEN_KYOGRE_CHANCE) {
     clearTimeout(spawnTimer);
-    const luck = isEventActive() ? 1 : 0;
-    let tier = rollRarity(luck);
-    let ti = TIER_ORDER.indexOf(tier);
-    while (ti >= 0 && !FISH_POOL_BY_TIER[TIER_ORDER[ti]].length) ti--;
-    const pool = ti >= 0 ? FISH_POOL_BY_TIER[TIER_ORDER[ti]] : FISH_POOL;
-    const mon = pick(pool.length ? pool : MONSTERS);
+    beginSpawn(MON_BY_ID[382], false, true, true);   // golden
+    toast('🌊👑 GOLDEN KYOGRE โผล่จากทะเลทองคำ!!!', 'good');
+    logMsg('🌊👑 พบ <b>Golden Kyogre</b> จากทะเลทองคำ!!!', 'big');
+    playSpawnFx('legend');
+    save(); renderTopbar(); updateFishBtn(); return;
+  }
+  const catchP = 0.5 + rod * 0.06 + ((state.fishItems && state.fishItems.lure) ? 0.12 : 0);   // เบ็ดดี/ไอเทม lure = ติดง่ายขึ้น
+  const roll = Math.random();
+  if (roll < catchP) {
+    clearTimeout(spawnTimer);
+    const luck = (isEventActive() ? 1 : 0) + Math.floor(rod / 2) + ((state.fishItems && state.fishItems.rare) ? 1 : 0);
+    let mon;
+    const legChance = (1 / 700) * (1 + rod * 0.25) + ((state.fishItems && state.fishItems.rare) ? 0.001 : 0);
+    if (FISH_LEG.length && Math.random() < legChance) mon = pick(FISH_LEG);   // เทพน้ำ/ทะเล
+    else {
+      let ti = TIER_ORDER.indexOf(rollRarity(luck));
+      while (ti >= 0 && !FISH_POOL_BY_TIER[TIER_ORDER[ti]].length) ti--;
+      const pool = ti >= 0 ? FISH_POOL_BY_TIER[TIER_ORDER[ti]] : FISH_POOL;
+      mon = pick(pool.length ? pool : FISH_POOL);
+    }
     const shiny = Math.random() < SHINY_CHANCE * shinyMultiplier() * comboShinyBoost(mon.id);
     beginSpawn(mon, shiny, true);
     toast('🎣 มีบางอย่างกินเบ็ด!', 'good');
-  } else if (roll < 0.90) {
-    // ได้เหรียญตกปลา + เหรียญ
-    const tok = rand(1, 3), coins = rand(10, 40);
+  } else if (roll < catchP + 0.3) {
+    const tok = rand(1, 3) + Math.floor(rod / 2), coins = rand(10, 40);
     state.fishTokens = (state.fishTokens || 0) + tok; state.coins += coins;
     toast(`🎣 ได้ 🪙${coins} + 🎟️${tok} เหรียญตกปลา`, 'good');
     logMsg(`🎣 ตกปลาได้ 🪙${coins} + 🎟️${tok} เหรียญตกปลา`, '');
@@ -1828,7 +1859,7 @@ function mascotDecoHtml(ids) {
 }
 function renderSpawn() {
   const card = $('#spawnCard');
-  card.classList.remove('rare-glow', 'legend-glow', 'shiny-glow');
+  card.classList.remove('rare-glow', 'legend-glow', 'shiny-glow', 'golden-glow');
   const battleBtn = $('#battleBtn');
   if (!currentSpawn) {
     card.classList.add('empty');
@@ -1841,21 +1872,23 @@ function renderSpawn() {
     return;
   }
   const { mon, tier, shiny, level } = currentSpawn;
+  const golden = !!currentSpawn.golden;
   card.classList.remove('empty');
-  if (shiny) card.classList.add('shiny-glow');
+  if (golden) card.classList.add('golden-glow');
+  else if (shiny) card.classList.add('shiny-glow');
   else if (tier === 'legendary') card.classList.add('legend-glow');
   else if (tier === 'rare' || tier === 'superrare') card.classList.add('rare-glow');
 
   $('#spawnSprite').outerHTML =
-    spriteImg(mon.id, shiny, '').replace('<img', '<img id="spawnSprite"');
+    spriteImg(mon.id, shiny, golden ? 'golden-mon' : '').replace('<img', '<img id="spawnSprite"');
   $('#spawnTop').innerHTML =
     `<span class="lv-badge">${mon.types.map(t => TYPE_EMOJI[t] || '').join('')} Lv.${level}</span>` +
-    (shiny ? '<span class="lv-badge">✨</span>' : '');
+    (golden ? '<span class="lv-badge">🌟 GOLDEN</span>' : shiny ? '<span class="lv-badge">✨</span>' : '');
   const cc = state.catchCombo;
   const comboMatch = cc && cc.id === mon.id && cc.count >= 2;
   $('#spawnTags').innerHTML =
     typeBadges(mon.types) +
-    `<span class="badge rarity-${shiny ? 'shiny' : tier}">${shiny ? '✨ shiny' : TIER_EMOJI[tier] + ' ' + TIER_LABEL[tier]}</span>` +
+    `<span class="badge rarity-${golden ? 'legendary' : shiny ? 'shiny' : tier}">${golden ? '🌟 GOLDEN' : shiny ? '✨ shiny' : TIER_EMOJI[tier] + ' ' + TIER_LABEL[tier]}</span>` +
     (comboMatch ? `<span class="badge combo-badge" title="จับต่อเนื่อง ×${cc.count} — โอกาส Shiny เพิ่มขึ้น!">🔥 คอมโบ ×${cc.count} · Shiny↑</span>` : '');
   renderWildHp();
   renderBerryBar();
@@ -1986,11 +2019,20 @@ function throwBall(k) {
 }
 function onCatchSuccess(ballKey) {
   const { mon, tier, shiny, level } = currentSpawn;
+  const golden = !!currentSpawn.golden;
   const ind = makeIndividual(mon.id, level, tier, shiny);
+  if (golden) { ind.golden = true; ['hp', 'atk', 'def', 'spatk', 'spdef', 'spd'].forEach(k => ind.iv[k] = 31); }   // Golden = IV เต็มทุกช่อง
   if (BALLS[ballKey] && BALLS[ballKey].friendBonus) ind.friend = Math.min(FRIEND_MAX, BALLS[ballKey].friendBonus);
   state.caught.push(ind);
   state.seen[mon.id] = true;
   state.totalCaught++;
+  // เบ็ดไม้ดรอปจากการจับ (ทางเดียวที่จะได้เบ็ด) — ได้แล้วเริ่มตกปลาได้
+  if ((state.rods || 0) < 1 && Math.random() < ROD_DROP_CHANCE) {
+    state.rods = 1;
+    toast('🎣✨ ได้เบ็ดไม้! กดปุ่ม 🎣 ตกปลาได้แล้ว', 'good');
+    logMsg('🎣 ได้ <b>เบ็ดไม้</b> จากการจับ! ไปลองตกปลาได้เลย', 'big');
+  }
+  if (golden) { toast(`🌊👑 จับ Golden Kyogre ได้แล้ว!!! สุดยอด!`, 'good'); logMsg('🌊👑 จับ <b>Golden Kyogre</b> สำเร็จ!!!', 'big'); }
   updateCatchCombo(mon.id, shiny);
   if (Math.random() < CATCH_LOCKBOX_CHANCE) {   // 5% ได้กล่องสุ่มจากการจับ
     state.lockboxes = (state.lockboxes || 0) + 1;
