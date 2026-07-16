@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { clamp, typeEffect, movePP, tierOf, isoWeekNumber, UB_LEGENDARY_IDS,
   catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations,
   statStageMult, comboMult, xpToTier, tierForRating,
-  xpForLevel, levelFromXp, tmPrice, ivRerollPrice } from './logic.js';
+  xpForLevel, levelFromXp, tmPrice, ivRerollPrice,
+  ivPercentOf, contestBaseScore, rivalBaseScore } from './logic.js';
 
 describe('clamp', () => {
   it('จำกัดค่าอยู่ในช่วง', () => {
@@ -270,6 +271,36 @@ describe('ivRerollPrice (ราคาสุ่ม IV ตามช่องที
   });
   it('lockedCount undefined ถือเป็น 0', () => {
     expect(ivRerollPrice(100000, undefined)).toBe(100000);
+  });
+});
+
+describe('ivPercentOf (%IV รวม)', () => {
+  const perfect = { hp: 31, atk: 31, def: 31, spatk: 31, spdef: 31, spd: 31 };
+  const zero = { hp: 0, atk: 0, def: 0, spatk: 0, spdef: 0, spd: 0 };
+  it('IV เต็ม = 100%', () => { expect(ivPercentOf(perfect)).toBe(100); });
+  it('IV ศูนย์ = 0%', () => { expect(ivPercentOf(zero)).toBe(0); });
+  it('ครึ่งทาง ~50%', () => {
+    expect(ivPercentOf({ hp: 16, atk: 16, def: 16, spatk: 15, spdef: 15, spd: 15 })).toBe(50);  // 93/186
+  });
+});
+
+describe('contestBaseScore (คะแนนคอนเทสต์ deterministic)', () => {
+  it('พื้นฐาน = %IV', () => {
+    expect(contestBaseScore({ ivPct: 80, typeMatch: false, natureMatch: false, shiny: false, level: 0 })).toBe(80);
+  });
+  it('บวกโบนัสตามเงื่อนไข (ธาตุ+25, นิสัย+15, shiny+10)', () => {
+    expect(contestBaseScore({ ivPct: 50, typeMatch: true, natureMatch: true, shiny: true, level: 0 })).toBe(100);
+  });
+  it('เลเวลช่วยแต่ตันที่ +20', () => {
+    expect(contestBaseScore({ ivPct: 0, typeMatch: false, natureMatch: false, shiny: false, level: 50 })).toBe(10);
+    expect(contestBaseScore({ ivPct: 0, typeMatch: false, natureMatch: false, shiny: false, level: 500 })).toBe(20);
+  });
+});
+
+describe('rivalBaseScore (คะแนนพื้นฐานคู่แข่ง)', () => {
+  it('เพิ่มตามเลเวลเทรนเนอร์', () => {
+    expect(rivalBaseScore(0)).toBe(30);
+    expect(rivalBaseScore(10)).toBe(42);
   });
 });
 

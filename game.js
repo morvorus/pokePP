@@ -5,7 +5,7 @@
 'use strict';
 import { MONSTERS } from './monsters-data.js';
 import { SPECIES_ABILITY, ABILITY_DEFS, HIDDEN_ABILITY } from './abilities-data.js';
-import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations, statStageMult, comboMult, xpToTier, tierForRating, xpForLevel, levelFromXp, tmPrice, ivRerollPrice } from './logic.js';
+import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations, statStageMult, comboMult, xpToTier, tierForRating, xpForLevel, levelFromXp, tmPrice, ivRerollPrice, ivPercentOf, contestBaseScore, rivalBaseScore } from './logic.js';
 import { TIER_LABEL, TIER_ORDER, TIER_EMOJI, TIER_LEVEL, TIER_WEIGHTS, TYPE_EMOJI, TYPE_TH, WEATHERS, NIGHT_BOOST, DAY_BOOST, Z_MOVES, PVP_TIERS } from './content.js';
 
 // cloud.js (classic script) รันก่อนโมดูลนี้และตั้ง window.Cloud ไว้ — ผูกเป็น const ให้อ้าง Cloud ในสโคปโมดูลได้
@@ -1057,10 +1057,7 @@ function makeIndividual(id, level, tier, shiny) {
   return { uid: genUid(), id, level, xp: 0, tier, shiny: !!shiny,
     nature: pick(NATURES).name, gender: rollGender(id), iv, ts: Date.now() };
 }
-function ivPercent(ind) {
-  const sum = Object.values(ind.iv).reduce((a, b) => a + b, 0);
-  return Math.round((sum / 186) * 100);
-}
+function ivPercent(ind) { return ivPercentOf(ind.iv); }   // คณิตอยู่ที่ ivPercentOf ใน logic.js
 function calcStats(ind, baseOverride) {
   const b = baseOverride || MON_BY_ID[ind.id].stats, iv = ind.iv, L = ind.level;
   const nat = NATURES.find(n => n.name === ind.nature) || NATURES[0];
@@ -1664,16 +1661,17 @@ const CONTEST_CATEGORIES = [
 const CONTEST_RANK_COIN = { 1: 800, 2: 400, 3: 200, 4: 80 };
 function contestScore(ind, cat) {
   const m = MON_BY_ID[ind.id];
-  let score = ivPercent(ind);                                              // 0-100 พื้นฐานจาก IV
-  if (m.types.some(t => cat.types.includes(t))) score += 25;                // ธาตุตรงหมวด
   const nat = NATURES.find(n => n.name === ind.nature);
-  if (nat && nat.up === cat.natureStat) score += 15;                        // นิสัยเสริมสเตตัสที่หมวดนี้ชอบ
-  if (ind.shiny) score += 10;
-  score += Math.min(20, ind.level / 5);                                    // เลเวลช่วยเล็กน้อย
-  score += Math.random() * 15;                                             // ฟอร์มวันนี้ (สุ่มเล็กน้อยให้มีลุ้น)
-  return Math.round(score);
+  const base = contestBaseScore({                                          // ส่วน deterministic อยู่ที่ logic.js
+    ivPct: ivPercentOf(ind.iv),
+    typeMatch: m.types.some(t => cat.types.includes(t)),
+    natureMatch: !!(nat && nat.up === cat.natureStat),
+    shiny: !!ind.shiny,
+    level: ind.level,
+  });
+  return Math.round(base + Math.random() * 15);                            // + ฟอร์มวันนี้ (สุ่มให้มีลุ้น)
 }
-function contestRivalScore() { return Math.round(30 + trainerLevel() * 1.2 + Math.random() * 40); }
+function contestRivalScore() { return Math.round(rivalBaseScore(trainerLevel()) + Math.random() * 40); }
 function enterContest(uid, catId) {
   const now = Date.now();
   state.contest = state.contest || { readyAt: 0, ribbons: {} };

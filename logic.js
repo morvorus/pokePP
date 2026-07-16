@@ -139,6 +139,25 @@ export function tmPrice(pow) { return Math.round((pow || 60) * 0.5) + 30; }
 // ราคาสุ่ม IV ใหม่ — ยิ่งล็อกหลายช่องยิ่งแพง (base ต่อจำนวนช่องที่ล็อก)
 export function ivRerollPrice(base, lockedCount) { return base * (1 + (lockedCount || 0)); }
 
+// %IV รวม (0-100) จาก object iv 6 ช่อง (สูงสุด 31×6 = 186)
+export function ivPercentOf(iv) {
+  const sum = Object.values(iv).reduce((a, b) => a + b, 0);
+  return Math.round((sum / 186) * 100);
+}
+
+// คะแนนคอนเทสต์ (ส่วน deterministic ก่อนบวกสุ่มฟอร์มวันนี้) — แยกให้ทดสอบได้
+export function contestBaseScore({ ivPct, typeMatch, natureMatch, shiny, level }) {
+  let s = ivPct;
+  if (typeMatch) s += 25;        // ธาตุตรงหมวด
+  if (natureMatch) s += 15;      // นิสัยเสริมสเตตัสที่หมวดชอบ
+  if (shiny) s += 10;
+  s += Math.min(20, (level || 0) / 5);   // เลเวลช่วยเล็กน้อย (ตัน 20)
+  return s;
+}
+
+// คะแนนพื้นฐานคู่แข่งคอนเทสต์ (ก่อนบวกสุ่ม) จากเลเวลเทรนเนอร์
+export function rivalBaseScore(level) { return 30 + (level || 0) * 1.2; }
+
 // หาแรงก์จากคะแนน (tiers เรียงจากมากไปน้อยด้วย min) — คืน tier แรกที่ rating ถึง min
 export function tierForRating(rating, tiers) {
   return tiers.find(t => (rating || 0) >= t.min) || tiers[tiers.length - 1];
