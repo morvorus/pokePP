@@ -1437,6 +1437,25 @@ function skelRows(n, h) {
   for (let i = 0; i < (n || 5); i++) s += `<div class="skel-row" style="height:${h || 36}px"></div>`;
   return `<div class="skel-wrap">${s}</div>`;
 }
+// แผงตกแต่งข้างจอ (เดสก์ท็อป) — โปเกมอนลอยขึ้นเบาๆ เติมพื้นที่ว่างสองข้าง
+const RAIL_MONS = [6, 9, 3, 25, 149, 130, 448, 445, 94, 143, 131, 133, 197, 282, 373, 700, 359, 248, 384];
+function renderSideRails() {
+  const mk = n => {
+    let h = '';
+    for (let i = 0; i < n; i++) {
+      const id = RAIL_MONS[Math.floor(Math.random() * RAIL_MONS.length)];
+      const left = 5 + Math.floor(Math.random() * 66);
+      const dur = 26 + Math.floor(Math.random() * 28);
+      const delay = -Math.floor(Math.random() * dur);
+      const size = 48 + Math.floor(Math.random() * 42);
+      h += `<span class="rail-mon-wrap" style="left:${left}%;width:${size}px;animation-duration:${dur}s;animation-delay:${delay}s">${spriteImg(id, false, 'rail-mon')}</span>`;
+    }
+    return h;
+  };
+  const L = $('#railLeft'), R = $('#railRight');
+  if (L) L.innerHTML = mk(5) + '<div class="rail-brand">POKÉPP</div>';
+  if (R) R.innerHTML = mk(5);
+}
 function shinyMultiplier() {
   let m = 1;
   if (isEventActive()) m *= 2;         // อีเวนต์สุดสัปดาห์ shiny ×2
@@ -6267,6 +6286,7 @@ function init() {
   checkWeeklyEvent();       // แจ้งอีเวนต์ประจำสัปดาห์ถ้าเข้าสัปดาห์ใหม่
   ensureDailyQuests();
   fillDexFilter();
+  renderSideRails();
   renderRegionBanner();
   renderTopbar();
   renderBallBar();

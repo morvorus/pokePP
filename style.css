@@ -898,6 +898,21 @@ h2.view-title::after {
 @keyframes vtOut { to { opacity: 0; transform: translateY(-5px); } }
 @keyframes vtIn { from { opacity: 0; transform: translateY(9px); } }
 
+/* ===== แผงตกแต่งข้างจอ (side rails) — โชว์เฉพาะจอกว้าง ===== */
+.side-rail { position: fixed; top: 0; bottom: 0; width: calc((100vw - 560px) / 2); pointer-events: none; z-index: 0; overflow: hidden; display: none; }
+.rail-left { left: 0; }
+.rail-right { right: 0; }
+@media (min-width: 1000px) { .side-rail { display: block; } }
+.side-rail::before { content: ''; position: absolute; width: 320px; height: 320px; border-radius: 50%; top: 12%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%); filter: blur(34px); opacity: .5; }
+.side-rail::after { content: ''; position: absolute; width: 260px; height: 260px; border-radius: 50%; bottom: 8%; background: radial-gradient(circle, color-mix(in srgb, var(--accent2) 28%, transparent), transparent 70%); filter: blur(38px); opacity: .5; }
+.rail-left::before { right: -80px; } .rail-left::after { left: -70px; }
+.rail-right::before { left: -80px; } .rail-right::after { right: -70px; }
+.rail-mon-wrap { position: absolute; bottom: -90px; opacity: .16; animation: railDrift linear infinite; will-change: transform; }
+.rail-mon-wrap img { width: 100%; image-rendering: pixelated; filter: drop-shadow(0 6px 10px rgba(0,0,0,.45)); }
+@keyframes railDrift { from { transform: translateY(0) rotate(-6deg); } to { transform: translateY(-118vh) rotate(6deg); } }
+.rail-brand { position: absolute; bottom: 22px; left: 0; right: 0; text-align: center; font-weight: 900; font-size: 13px; letter-spacing: 3px; color: rgba(255,255,255,.13); }
+.reduce-motion .rail-mon-wrap { display: none; }
+
 /* ===== Skeleton loader (แถบ shimmer ระหว่างโหลด) ===== */
 .skel-wrap { display: flex; flex-direction: column; gap: 6px; }
 .skel-row { border-radius: 9px; background: linear-gradient(100deg, rgba(255,255,255,.05) 30%, rgba(255,255,255,.13) 50%, rgba(255,255,255,.05) 70%); background-size: 200% 100%; animation: skelShimmer 1.15s linear infinite; }
