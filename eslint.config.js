@@ -23,7 +23,7 @@ const bugRules = {
 
 export default [
   {
-    files: ['game.js', 'logic.js', 'monsters-data.js', 'abilities-data.js'],
+    files: ['game.js', 'logic.js', 'monsters-data.js', 'abilities-data.js', 'content.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
