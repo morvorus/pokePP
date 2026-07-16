@@ -391,13 +391,16 @@ h2.view-title::after {
 .wm-pins { position: absolute; inset: 0; }
 .wm-pin {
   position: absolute; transform: translate(-50%, -50%); background: none; border: none; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0;
-  width: 0; /* let children overflow so labels don't push layout */
+  display: flex; align-items: center; justify-content: center; padding: 0;
+  width: 46px; height: 46px; /* พื้นที่กดใหญ่พอนิ้ว — กดตรงไหนก็เข้าเขต */
 }
 .wm-dot {
   position: relative; width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   font-size: 18px; color: #fff; box-shadow: 0 3px 8px rgba(0,0,0,.5), 0 0 0 2px rgba(255,255,255,.35);
-  transition: transform .12s ease;
+  transition: transform .12s ease; pointer-events: none;
+}
+.wm-label {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 1px; pointer-events: none;
 }
 .wm-pin:active .wm-dot { transform: scale(.9); }
 .wm-pin.active .wm-dot { box-shadow: 0 0 0 3px var(--accent), 0 0 14px rgba(255,203,5,.7); animation: wmPulse 1.6s ease-in-out infinite; }
