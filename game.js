@@ -1300,6 +1300,14 @@ function levelFor(tier) {
 }
 // ---------- world: time / weather / event ----------
 function timeOfDay() { const h = new Date().getHours(); return (h >= 6 && h < 18) ? 'day' : 'night'; }
+// ช่วงเวลา 4 ระยะ (รุ่งอรุณ/กลางวัน/พลบค่ำ/กลางคืน) — รุ่งอรุณ+พลบค่ำเป็น "golden hour" โบนัส Shiny
+function timePhase() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 8) return { key: 'dawn', emoji: '🌅', label: 'รุ่งอรุณ', golden: true };
+  if (h >= 8 && h < 17) return { key: 'day', emoji: '☀️', label: 'กลางวัน', golden: false };
+  if (h >= 17 && h < 20) return { key: 'dusk', emoji: '🌇', label: 'พลบค่ำ', golden: true };
+  return { key: 'night', emoji: '🌙', label: 'กลางคืน', golden: false };
+}
 function isEventActive() { const d = new Date().getDay(); return d === 0 || d === 6; }   // เสาร์-อาทิตย์
 function getWeather(regionId) {
   const w = state.weather[regionId];
@@ -1408,6 +1416,7 @@ function shinyMultiplier() {
   let m = 1;
   if (isEventActive()) m *= 2;         // อีเวนต์สุดสัปดาห์ shiny ×2
   if (timeOfDay() === 'night') m *= 1.3;
+  if (timePhase().golden) m *= 1.15;   // golden hour (รุ่งอรุณ/พลบค่ำ) ล่า Shiny ดีขึ้นเล็กน้อย
   m *= shinyCharmMultiplier();         // Shiny Charm ติดตัวถาวร (+2%/ชิ้น สูงสุด 5 ชิ้น)
   const we = currentWorldEvent();
   if (we) m *= we.shinyMult;           // อีเวนต์สุ่มตามฤดูกาล
@@ -1910,7 +1919,8 @@ function renderRegionBanner() {
   $('#rbEmoji').textContent = r.emoji;
   $('#rbName').textContent = r.name;
   const w = WEATHERS[getWeather(r.id)];
-  const timeIco = timeOfDay() === 'night' ? '🌙' : '☀️';
+  const tp = timePhase();
+  const timeIco = `${tp.emoji} ${tp.label}${tp.golden ? ' <b style="color:#ffd76b" title="Golden hour — โอกาส Shiny เพิ่มขึ้น">✨Shiny↑</b>' : ''}`;
   const ev = isEventActive() ? ' · <b style="color:var(--accent)">✨อีเวนต์สุดสัปดาห์ x2</b>' : '';
   const safari = (state.safari && state.safari.left > 0) ? ` · <b style="color:#ffd76b">🎫 Safari เหลือ ${state.safari.left}</b>` : '';
   const wk = weeklyEvent();
@@ -1918,7 +1928,8 @@ function renderRegionBanner() {
   $('#rbLvl').innerHTML = `${timeIco} · ${w.emoji}${w.name}${wkChip}${ev}${safari}`;
   const card = $('#spawnCard');
   card.style.background = regionBgCss(r);
-  card.classList.toggle('night', timeOfDay() === 'night');
+  card.classList.remove('night', 'dawn', 'dusk');
+  if (tp.key !== 'day') card.classList.add(tp.key);
   renderBoostStrip();
   renderStarter();
 

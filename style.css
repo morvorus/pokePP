@@ -190,6 +190,12 @@ h2.view-title::after {
 .spawn-card.night .scrim {
   background: linear-gradient(180deg, rgba(10,14,40,.55) 0%, rgba(10,14,40,.35) 40%, rgba(5,7,25,.6) 100%);
 }
+.spawn-card.dawn .scrim {
+  background: linear-gradient(180deg, rgba(255,150,90,.34) 0%, rgba(255,190,120,.14) 45%, rgba(90,60,120,.4) 100%);
+}
+.spawn-card.dusk .scrim {
+  background: linear-gradient(180deg, rgba(255,110,70,.36) 0%, rgba(150,80,120,.22) 45%, rgba(30,25,70,.55) 100%);
+}
 .spawn-card .deco {
   position: absolute; inset: 0; pointer-events: none; overflow: hidden;
   opacity: .55;
