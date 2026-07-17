@@ -915,20 +915,33 @@ function cloudSyncDebounced() {
 //  toast / log / rare alert
 // ================================================================
 let _audioCtx = null;
+// คลังเสียง (สังเคราะห์ด้วย Web Audio — ไม่ต้องมีไฟล์เสียง)
+const SFX = {
+  catch:     { notes: [660, 880], wave: 'triangle', vol: 0.15, step: 0.09, rel: 0.12 },
+  rare:      { notes: [523, 659, 784, 1047], wave: 'triangle', vol: 0.16, step: 0.09, rel: 0.12 },
+  shiny:     { notes: [784, 988, 1319, 1568, 2093], wave: 'sine', vol: 0.15, step: 0.08, rel: 0.14 },
+  legendary: { notes: [392, 523, 659, 784, 1047, 1319], wave: 'sawtooth', vol: 0.12, step: 0.1, rel: 0.16 },
+  levelup:   { notes: [523, 659, 784, 1047, 1319], wave: 'triangle', vol: 0.15, step: 0.07, rel: 0.12 },
+  coin:      { notes: [988, 1319], wave: 'square', vol: 0.09, step: 0.05, rel: 0.08 },
+  fail:      { notes: [200, 150], wave: 'triangle', vol: 0.14, step: 0.1, rel: 0.14 },
+  hit:       { notes: [180], wave: 'square', vol: 0.11, step: 0.04, rel: 0.08 },
+  ui:        { notes: [880], wave: 'sine', vol: 0.05, step: 0.04, rel: 0.06 },
+};
 function playSfx(type) {
   if (!state || !state.settings || !state.settings.sound) return;
+  const cfg = SFX[type] || SFX.catch;
   try {
     _audioCtx = _audioCtx || new (window.AudioContext || window.webkitAudioContext)();
     const ctx = _audioCtx, now = ctx.currentTime;
-    const notes = type === 'rare' ? [523, 659, 784, 1047] : type === 'fail' ? [200, 150] : [660, 880];
-    notes.forEach((f, i) => {
+    cfg.notes.forEach((f, i) => {
       const o = ctx.createOscillator(), g = ctx.createGain();
-      o.type = 'triangle'; o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, now + i * 0.09);
-      g.gain.exponentialRampToValueAtTime(0.15, now + i * 0.09 + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.09 + 0.12);
+      o.type = cfg.wave; o.frequency.value = f;
+      const t = now + i * cfg.step;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(cfg.vol, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + cfg.rel);
       o.connect(g); g.connect(ctx.destination);
-      o.start(now + i * 0.09); o.stop(now + i * 0.09 + 0.13);
+      o.start(t); o.stop(t + cfg.rel + 0.02);
     });
   } catch (e) {}
 }
@@ -2198,7 +2211,7 @@ function onCatchSuccess(ballKey) {
   state.coins += coins;
 
   gainTrainerXp({ common: 3, uncommon: 6, rare: 12, superrare: 25, legendary: 60 }[tier] + (shiny ? 30 : 0));
-  playSfx(shiny || tier === 'legendary' || tier === 'superrare' ? 'rare' : 'catch');
+  playSfx(golden || tier === 'legendary' ? 'legendary' : shiny ? 'shiny' : tier === 'superrare' || tier === 'rare' ? 'rare' : 'catch');
   toast(`🎉 จับ ${shiny ? '✨' : ''}<b>${mon.name}</b> Lv.${level} ได้! +${coins}🪙`, 'good');
   logMsg(`✅ จับ <b>${mon.name}</b> (${shiny ? 'Shiny' : TIER_LABEL[tier]}) Lv.${level} · IV ${ivPercent(ind)}% · +${coins}🪙`, 'good');
   celebrate(golden ? 'golden' : tier === 'legendary' ? 'legendary' : shiny ? 'shiny' : (tier === 'rare' || tier === 'superrare') ? 'rare' : null);
@@ -4303,7 +4316,7 @@ function gainXpTo(ind, amount) {
   amount = Math.round(amount * liveXpMult());   // Live-Ops: อีเวนต์ Double XP
   ind.xp = (ind.xp || 0) + amount; let leveled = false;
   while (ind.xp >= xpForLevel(ind.level) && ind.level < 100) { ind.xp -= xpForLevel(ind.level); ind.level++; leveled = true; }
-  if (leveled) { toast(`⬆️ <b>${MON_BY_ID[ind.id].name}</b> ขึ้น Lv.${ind.level}`, 'good'); tryEvolveByLevel(ind); }
+  if (leveled) { toast(`⬆️ <b>${MON_BY_ID[ind.id].name}</b> ขึ้น Lv.${ind.level}`, 'good'); playSfx('levelup'); tryEvolveByLevel(ind); }
   renderTopbar();
 }
 function gainTrainerXp(n) { state.trainerXp = (state.trainerXp || 0) + Math.round(n * liveXpMult()); }
@@ -5749,6 +5762,7 @@ function switchView(view) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
     renderCurrentView();
   };
+  playSfx('ui');   // เสียงคลิกเบาๆ ตอนสลับหน้า
   // View Transitions API — สลับหน้านุ่มลื่นเหมือนแอปเนทีฟ (ข้ามถ้าโหมดประหยัด/เบราว์เซอร์ไม่รองรับ)
   if (document.startViewTransition && !(state.settings && state.settings.reduceMotion)) {
     document.startViewTransition(apply);
