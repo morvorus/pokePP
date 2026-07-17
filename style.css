@@ -64,7 +64,7 @@ body {
   display: flex;
   flex-direction: column;
   position: relative;
-  padding-bottom: 72px;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
 }
 
 /* ===== Top bar ===== */
@@ -72,7 +72,7 @@ body {
   display: flex;
   gap: 8px;
   align-items: center;
-  padding: 10px 12px;
+  padding: max(10px, env(safe-area-inset-top)) 12px 10px;   /* กันชนรอยบาก (notch) ด้านบน */
   position: sticky;
   top: 0;
   z-index: 20;
@@ -551,6 +551,7 @@ h2.view-title::after {
   position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
   width: 100%; max-width: 560px; display: flex; background: var(--bg2);
   border-top: 1px solid rgba(255,255,255,.08); z-index: 30;
+  padding-bottom: env(safe-area-inset-bottom);   /* กันชนแถบ home indicator ล่าง */
 }
 .nav-btn {
   flex: 1; background: none; border: none; color: var(--muted);

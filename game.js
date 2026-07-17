@@ -2279,6 +2279,7 @@ function onCatchSuccess(ballKey) {
   state.caught.push(ind);
   state.seen[mon.id] = true;
   state.totalCaught++;
+  _wildKoStreak = 0;   // จับได้ = รีเซ็ตบ่อทิ้งเงินจากการโค่นป่ารัวๆ
   starterTick('firstCatch');
   // เบ็ดไม้ดรอปจากการจับ (ทางเดียวที่จะได้เบ็ด) — ได้แล้วเริ่มตกปลาได้
   if ((state.rods || 0) < 1 && Math.random() < ROD_DROP_CHANCE) {
@@ -4422,6 +4423,7 @@ function renderStarter() {
 //  BATTLE ENGINE
 // ================================================================
 let battleState = null;
+let _wildKoStreak = 0;   // จำนวนโค่นป่าติดกัน (กันเงินเฟ้อ — รีเซ็ตเมื่อจับได้)
 // auto-update: บอกตัวรีเฟรชว่า "กำลังยุ่ง" อยู่ไหม (กำลังสู้/ตกปลา) — จะได้ไม่รีหน้ากลางคัน
 window.__ppBusy = () => !!battleState || !!document.querySelector('.fish-mini');
 // statsForBase ย้ายไป logic.js แล้ว (import ด้านบน)
@@ -5256,10 +5258,13 @@ function battleAttack(moveIdx) {
     if (wildKO) {   // โค่นโปเกมอนป่า → ได้เงิน + XP (ไม่ได้ตัว) แล้วรอสปอว์นใหม่ตามคูลดาวน์
       b.over = true;
       const tierMult = { common: 1, uncommon: 1.4, rare: 2, superrare: 3, legendary: 6 }[currentSpawn ? currentSpawn.tier : 'common'] || 1;
-      const coins = Math.round((8 + b.foeLevel * 2) * tierMult);
+      // กันเงินเฟ้อ: โค่นรัวๆ ติดกันได้เงินลดลง (จับโปเกมอนรีเซ็ตกลับ) — จูงใจให้จับ ไม่ใช่บดฆ่าอย่างเดียว
+      _wildKoStreak++;
+      const dim = Math.max(0.3, 1 - (_wildKoStreak - 1) * 0.12);
+      const coins = Math.round((8 + b.foeLevel * 2) * tierMult * dim);
       state.coins += coins;
       gainXpTo(active.ind, Math.round(b.foeLevel * 1.2)); gainTrainerXp(6);
-      b.msg += ` · 💥 โค่น ${b.foeMon.name} ได้! +${coins}🪙 +XP (ไม่ได้ตัว)`;
+      b.msg += ` · 💥 โค่น ${b.foeMon.name} ได้! +${coins}🪙${dim < 1 ? ` (บดต่อเนื่อง ×${dim.toFixed(2)})` : ''} +XP (ไม่ได้ตัว)`;
       logMsg(`💥 โค่น <b>${b.foeMon.name}</b> Lv.${b.foeLevel}! +${coins}🪙`, '');
       clearSpawn(); scheduleSpawn(); playSfx('rare'); save(); renderTopbar();
       return true;
