@@ -345,7 +345,21 @@ const BP_SHOP = [
   { id: 'bp_goldegg', name: 'ไข่ทอง', emoji: '🥚', cost: 150, act: () => { state.eggs.push({ kind: 'gold', progressStart: state.totalCaught }); return '🥚 +1 ไข่ทอง'; } },
   { id: 'bp_candy5', name: 'Rare Candy ×5', emoji: '🍬', img: 'rare-candy', cost: 60, act: () => { state.candies = (state.candies || 0) + 5; return '🍬 +5 Rare Candy'; } },
   { id: 'bp_lifeorb', name: 'Life Orb', emoji: '🔮', img: 'life-orb', cost: 100, limit: 2, act: () => { state.heldInv['life-orb'] = (state.heldInv['life-orb'] || 0) + 1; return '🔮 +1 Life Orb'; } },
+  // ไอเทมใช้ตอนต่อสู้ — ราคากลางๆ ไม่ถูกจนเฟ้อ (หรือลุ้นดรอป 10% จากหอคอย/บอส/ยิม)
+  { id: 'bp_potion5', name: 'Potion ×5', emoji: '🧪', img: 'potion', cost: 25, act: () => { addBattleItem('potion', 5); return '🧪 +5 Potion'; } },
+  { id: 'bp_hyperpotion3', name: 'Hyper Potion ×3', emoji: '💉', img: 'hyper-potion', cost: 45, act: () => { addBattleItem('hyperpotion', 3); return '💉 +3 Hyper Potion'; } },
+  { id: 'bp_ether3', name: 'Ether ×3', emoji: '🔷', img: 'ether', cost: 35, act: () => { addBattleItem('ether', 3); return '🔷 +3 Ether'; } },
 ];
+function addBattleItem(key, n) { state.battleItems = state.battleItems || {}; state.battleItems[key] = (state.battleItems[key] || 0) + n; }
+// ลุ้นดรอปไอเทมต่อสู้ 10% (จากหอคอย/บอส/ยิม) — คืนข้อความถ้าดรอป
+function grantBattleItemDrop() {
+  if (Math.random() >= 0.1) return '';
+  const pool = [['potion', 3], ['hyperpotion', 1], ['ether', 2]];
+  const [key, n] = pick(pool);
+  addBattleItem(key, n);
+  const it = BATTLE_ITEM_BY_KEY[key];
+  return `${it.emoji} ${it.name} ×${n}`;
+}
 
 // ค่าคงที่กลไกเสริม
 const AMULET_MAX = 10, AMULET_PRICE = 1200;     // Amulet Coin: +5%/ชิ้น สูงสุด +50%
@@ -5292,6 +5306,8 @@ function onFoeDown() {
     }
     const swapMsg = grantSwapTicketDrop();   // ทุกชั้น — โอกาสหายากได้ตั๋ว Swap
     if (swapMsg) itemMsg = (itemMsg ? itemMsg + ' + ' : '') + swapMsg;
+    const biMsg = grantBattleItemDrop();   // 10% ดรอปไอเทมต่อสู้
+    if (biMsg) itemMsg = (itemMsg ? itemMsg + ' + ' : '') + biMsg;
     if (Math.random() < 0.25) { itemMsg = (itemMsg ? itemMsg + ' + ' : '') + grantRandomBall(); }   // 25% ดรอปบอลพิเศษนอกร้าน
     if (Math.random() < 1 / 6666) { const tm = grantRareTM(); if (tm) itemMsg = (itemMsg ? itemMsg + ' + ' : '') + '🌟💿 ' + tm; }   // หอคอย: 1/6666 ดรอปแผ่นสกิลหายาก
     if (floor > (state.tower.bestFloor || 0)) state.tower.bestFloor = floor;
@@ -5322,8 +5338,9 @@ function onFoeDown() {
       if (first) state.balls.ultra = (state.balls.ultra || 0) + 3;
       const ballDrop = grantRandomBall();
       const amuletMsg = grantAmuletDrop();
+      const biMsg = grantBattleItemDrop();   // 10% ดรอปไอเทมต่อสู้
       gainTrainerXp(100);
-      b.victory = { trainerKey: foeTrainerName(b), emoji: b.gym.emoji, title: b.gym.name, coins: reward, bp, xp: 100, items: (first ? '🟡 Ultra Ball ×3 ' : '') + ballDrop + (amuletMsg ? ' ' + amuletMsg : ''), bonus: first ? '🏅 เหรียญตราประจำเขต!' : 'ชนะซ้ำ — รางวัลลดลง' };
+      b.victory = { trainerKey: foeTrainerName(b), emoji: b.gym.emoji, title: b.gym.name, coins: reward, bp, xp: 100, items: (first ? '🟡 Ultra Ball ×3 ' : '') + ballDrop + (amuletMsg ? ' ' + amuletMsg : '') + (biMsg ? ' ' + biMsg : ''), bonus: first ? '🏅 เหรียญตราประจำเขต!' : 'ชนะซ้ำ — รางวัลลดลง' };
       b.msg = `🏆 ชนะ${b.gym.name}! +${reward}🪙 +${bp}🎖️BP`;
       logMsg(`🏆 ชนะบอสเขต <b>${b.bossData.region.name}</b>! +${reward}🪙`, 'big');
       playSfx('rare'); checkAchievements(); bumpQuest('winBattle'); save(); renderTopbar();
@@ -5417,6 +5434,8 @@ function onFoeDown() {
     let heldDrop = '';
     if (Math.random() < HELD_DROP_CHANCE) { heldDrop = grantRandomHeld(); itemMsg = (itemMsg ? itemMsg + ' ' : '') + heldDrop; }   // 5% ดรอปอุปกรณ์สวมใส่
     if (Math.random() < 0.5) { itemMsg = (itemMsg ? itemMsg + ' ' : '') + grantRandomBall(); }   // 50% ดรอปบอลพิเศษนอกร้าน
+    const biMsg = grantBattleItemDrop();   // 10% ดรอปไอเทมต่อสู้
+    if (biMsg) itemMsg = (itemMsg ? itemMsg + ' ' : '') + biMsg;
     gainTrainerXp(150);
     b.victory = { trainerKey: foeTrainerName(b), emoji: g.emoji, title: g.name, coins: coinsEarned, bp, xp: 150, items: itemMsg, bonus: (first ? '🎁 กล่องสุ่ม + 🎣 เหรียญตกปลา ×8 (ชนะครั้งแรก!)' : 'ชนะซ้ำ — รางวัลลดลง') + (heldDrop ? ` · 🎽 ดรอป ${heldDrop}!` : '') };
     b.msg = `🏆 ชนะ ${g.emoji} ${g.name}! +${coinsEarned}🪙 +${bp}🎖️BP${itemMsg ? ' +' + itemMsg : ''}${first ? ' +🎁กล่องสุ่ม (ชนะครั้งแรก!)' : ' (ชนะซ้ำ — รางวัลลดลง)'}`;
