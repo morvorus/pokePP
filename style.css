@@ -687,13 +687,13 @@ h2.view-title::after {
 .bt-scene-plat { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 92%; height: 22px; border-radius: 50%;
   background: radial-gradient(ellipse at 50% 35%, rgba(255,255,255,.26), rgba(0,0,0,.2) 55%, rgba(0,0,0,.45) 100%); box-shadow: 0 3px 8px rgba(0,0,0,.4); }
 .bt-mon-foe .bt-head, .bt-mon-me .bt-head { position: absolute; bottom: 10px; left: 0; right: 0; display: flex; justify-content: center; }
-.bt-mon-foe .bt-head img { height: clamp(60px, 20vw, 84px); width: auto; image-rendering: pixelated; filter: drop-shadow(0 5px 4px rgba(0,0,0,.5)); animation: bob 2s ease-in-out infinite; }
-.bt-mon-me .bt-head img { height: clamp(68px, 23vw, 96px); width: auto; image-rendering: pixelated; filter: drop-shadow(0 5px 4px rgba(0,0,0,.5)); animation: bobBack 2.6s ease-in-out infinite; }
+.bt-mon-foe .bt-head img { max-height: clamp(60px, 20vw, 84px); max-width: 116px; width: auto; height: auto; image-rendering: pixelated; filter: drop-shadow(0 5px 4px rgba(0,0,0,.5)); animation: bob 2s ease-in-out infinite; }
+.bt-mon-me .bt-head img { max-height: clamp(68px, 23vw, 96px); max-width: 128px; width: auto; height: auto; image-rendering: pixelated; filter: drop-shadow(0 5px 4px rgba(0,0,0,.5)); animation: bobBack 2.6s ease-in-out infinite; }
 .reduce-motion .bt-mon-foe .bt-head img, .reduce-motion .bt-mon-me .bt-head img { animation: none; }
 .bt-mon-foe .dmg-float, .bt-mon-me .dmg-float { top: -6px; left: 50%; right: auto; transform: translateX(-50%); }
 @media (max-width: 460px) {
   .bt-mon-foe { width: 96px; height: 80px; } .bt-mon-me { width: 108px; height: 88px; }
-  .bt-mon-foe .bt-head img { width: 74px; height: 74px; } .bt-mon-me .bt-head img { width: 86px; height: 86px; }
+  .bt-mon-foe .bt-head img { max-width: 92px; max-height: 74px; width: auto; height: auto; } .bt-mon-me .bt-head img { max-width: 104px; max-height: 86px; width: auto; height: auto; }
   .bt-hpbox { padding: 4px 6px; } .bt-hpname { font-size: 10px; }
 }
 .bt-log { min-height: 40px; font-size: 12px; color: #cfe; margin: 10px 0; text-align: center; }
