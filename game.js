@@ -835,6 +835,7 @@ function newSave() {
     achievements: {},    // {achId:true} รับรางวัลแล้ว
     equippedTitle: null, // id ของ achievement ที่เลือกโชว์เป็น Title (ต้องปลดล็อกก่อน)
     avatarKey: null,     // สไปรต์เทรนเนอร์ที่เลือก (null = ค่าเริ่มต้น)
+    battleItems: {},     // ไอเทมใช้ตอนต่อสู้ { potion, hyperpotion, ether }
     settings: { sound: true, music: false, spawnSpeed: 'normal',
       rareAlerts: true, eventAlerts: true, mascotDeco: true, reduceMotion: false, confirmRelease: true, fastBattle: false, hardcoreMode: false },
     hardcoreDeaths: 0,   // จำนวนตัวที่ถูกปล่อยถาวรจากโหมด Hardcore (สถิติ ไม่รีเซ็ตแม้ปิดโหมด)
@@ -4710,13 +4711,14 @@ function renderBattle() {
          </div>` : ''}
          ${b.zArmed ? `<div class="sr-sub" style="text-align:center;color:#ffd76b;margin-bottom:4px">⚡ เลือกท่าโจมตีเพื่อปลดปล่อย Z-Move!</div>` : ''}
          <div class="move-grid${battleBusy ? ' move-grid-busy' : ''}${b.zArmed ? ' z-armed' : ''}">${moveBtns}</div>
-         <div class="bt-actions"><button class="bt-flee" id="btFlee" ${battleBusy ? 'disabled' : ''}>${b.isBoss ? 'ยอมแพ้' : (b.mode === 'tower' ? 'ล่าถอย (คูลดาวน์ 12 ชม.)' : 'หนี')}</button></div>`}`;
+         <div class="bt-actions"><button class="bt-flee bt-bag" id="btBag" ${battleBusy ? 'disabled' : ''}>🎒 กระเป๋า</button><button class="bt-flee" id="btFlee" ${battleBusy ? 'disabled' : ''}>${b.isBoss ? 'ยอมแพ้' : (b.mode === 'tower' ? 'ล่าถอย (คูลดาวน์ 12 ชม.)' : 'หนี')}</button></div>`}`;
 
   if (b.over) {
     $('#btDone').onclick = endBattle;
     const twBtn = $('#btTowerNext'); if (twBtn) twBtn.onclick = towerContinueClimb;
   } else {
     $('#btFlee').onclick = endBattle;
+    const bagBtn = $('#btBag'); if (bagBtn) bagBtn.onclick = battleBusy ? null : openBattleBag;
     $('#battleBox').querySelectorAll('.move-btn[data-mv]').forEach(el => el.onclick = battleBusy ? null : () => battleAttack(+el.dataset.mv));
     if (battleBusy) $('#battleBox').querySelectorAll('.move-btn[data-mv]').forEach(el => el.disabled = true);
     $('#battleBox').querySelectorAll('.team-chip[data-sw]').forEach(el => el.onclick = battleBusy ? null : () => battleSwitch(+el.dataset.sw));
@@ -5187,6 +5189,60 @@ function battleAttack(moveIdx) {
     b.msg = '';
     foeTurn(b);
     b.msg = b.msg.replace(/^\s*·\s*/, '');   // ตัด " · " นำหน้าที่เหลือจากการขึ้นสเตจใหม่
+    endRound(b);
+    if (b.mode === 'wild' && currentSpawn) renderSpawn();
+    save(); renderBattle();
+  });
+}
+// ===== ไอเทมใช้ตอนต่อสู้ (กระเป๋า) — ใช้แล้วเสียเทิร์น ศัตรูโจมตี (เหมือนเกมจริง) =====
+const BATTLE_ITEMS = [
+  { key: 'potion', name: 'Potion', emoji: '🧪', img: 'potion', desc: 'ฟื้น HP 50', heal: 50 },
+  { key: 'hyperpotion', name: 'Hyper Potion', emoji: '💉', img: 'hyper-potion', desc: 'ฟื้น HP 150', heal: 150 },
+  { key: 'ether', name: 'Ether', emoji: '🔷', img: 'ether', desc: 'เติม PP ทุกท่า +10', pp: 10 },
+];
+const BATTLE_ITEM_BY_KEY = Object.fromEntries(BATTLE_ITEMS.map(i => [i.key, i]));
+function battleItemCount(key) { return (state.battleItems && state.battleItems[key]) || 0; }
+function openBattleBag() {
+  const b = battleState; if (!b || b.over || battleBusy) return;
+  const rows = BATTLE_ITEMS.map(it => {
+    const n = battleItemCount(it.key);
+    return `<button class="bag-item${n <= 0 ? ' empty' : ''}" data-bi="${it.key}" ${n <= 0 ? 'disabled' : ''}>
+      <span class="bi-ico">${itemIcon(it.emoji, it.img, '')}</span>
+      <span class="bi-body"><span class="bi-name">${it.name} ×${n}</span><span class="bi-desc">${it.desc}</span></span></button>`;
+  }).join('');
+  $('#modalBox').innerHTML = `<div class="picker-box"><h3>🎒 กระเป๋าไอเทม</h3>
+    <div class="sr-sub" style="margin-bottom:8px">ใช้ไอเทม = เสียเทิร์น (ศัตรูจะโจมตี)</div>
+    <div class="bag-list">${rows}</div>
+    <div class="modal-actions"><button class="btn-ghost" id="bagClose">ปิด</button></div></div>`;
+  openModal();
+  $('#bagClose').onclick = closeModal;
+  $('#modalBox').querySelectorAll('[data-bi]').forEach(el => el.onclick = () => useBattleItem(el.dataset.bi));
+}
+function useBattleItem(key) {
+  const b = battleState; if (!b || b.over || battleBusy) return;
+  const it = BATTLE_ITEM_BY_KEY[key]; if (!it) return;
+  if (battleItemCount(key) <= 0) { toast('❌ ไม่มีไอเทมนี้', 'bad'); return; }
+  const active = b.team[b.activeIdx];
+  let msg = '';
+  if (it.heal) {
+    if (active.hp >= active.maxHp) { toast('HP เต็มอยู่แล้ว', ''); return; }
+    const healed = Math.min(it.heal, active.maxHp - active.hp);
+    active.hp += healed;
+    msg = `ใช้ ${it.emoji} ${it.name}! ${MON_BY_ID[active.ind.id].name} ฟื้น HP +${healed}`;
+  } else if (it.pp) {
+    if (!Array.isArray(active.pp) || !Array.isArray(active.ppMax)) { toast('เติม PP ไม่ได้', 'bad'); return; }
+    let any = false;
+    active.pp = active.pp.map((p, i) => { const mx = active.ppMax[i]; if (p < mx) any = true; return Math.min(mx, p + it.pp); });
+    if (!any) { toast('PP เต็มทุกท่าแล้ว', ''); return; }
+    msg = `ใช้ ${it.emoji} ${it.name}! เติม PP ทุกท่า +${it.pp}`;
+  }
+  state.battleItems[key] = battleItemCount(key) - 1;
+  closeModal(); playSfx('coin');
+  // ใช้ไอเทม = เสียเทิร์น ศัตรูโจมตี (โครงเดียวกับสลับตัว)
+  revealTurns(b, msg, () => {
+    b.msg = '';
+    foeTurn(b);
+    b.msg = b.msg.replace(/^\s*·\s*/, '');
     endRound(b);
     if (b.mode === 'wild' && currentSpawn) renderSpawn();
     save(); renderBattle();

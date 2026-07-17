@@ -1065,6 +1065,17 @@ h2.view-title::after {
 .avatar-opt.eq { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,203,5,.4); }
 .avatar-opt .ao-img { max-width: 90%; max-height: 96%; image-rendering: pixelated; }
 .avatar-opt .ao-img.ts-hide { display: none; }
+/* กระเป๋าไอเทมต่อสู้ */
+.bag-list { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.bag-item { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; padding: 10px 12px; border: 1px solid rgba(255,255,255,.09); border-radius: 12px; background: rgba(255,255,255,.05); color: var(--text); font-family: inherit; cursor: pointer; transition: background var(--dur) ease; }
+.bag-item:not(.empty):hover { background: rgba(71,209,108,.15); }
+.bag-item.empty { opacity: .45; cursor: default; }
+.bag-item .bi-ico { font-size: 24px; width: 30px; text-align: center; flex-shrink: 0; }
+.bag-item .bi-ico img { width: 26px; height: 26px; image-rendering: pixelated; vertical-align: middle; }
+.bag-item .bi-body { display: flex; flex-direction: column; }
+.bag-item .bi-name { font-weight: 800; font-size: 13.5px; }
+.bag-item .bi-desc { font-size: 11px; color: var(--muted); }
+.bt-actions .bt-bag { background: rgba(71,209,108,.2); color: var(--good); }
 .pf-avatar { position: relative; width: 64px; height: 64px; flex-shrink: 0; border-radius: 16px; background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.18), rgba(0,0,0,.25)); border: 1px solid rgba(255,255,255,.2); display: flex; align-items: flex-end; justify-content: center; overflow: hidden; }
 .pf-trainer { max-width: 60px; max-height: 62px; image-rendering: pixelated; filter: drop-shadow(0 2px 3px rgba(0,0,0,.5)); }
 .pf-trainer.ts-hide { display: none; }
