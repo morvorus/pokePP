@@ -1431,6 +1431,18 @@ function renderLiveBanner() {
 function track(name, meta) {
   try { if (window.Cloud && Cloud.logEvent) Cloud.logEvent(name, meta); } catch (e) { /* เงียบ */ }
 }
+// Error tracking → analytics: เห็นบั๊ก/แครชจริงในสนาม (จำกัดจำนวน + กันซ้ำ กันสแปม)
+let _errCount = 0; const _errSeen = new Set();
+function setupErrorTracking() {
+  const report = msg => {
+    msg = String(msg || 'error').slice(0, 200);
+    if (_errCount >= 12 || _errSeen.has(msg)) return;
+    _errSeen.add(msg); _errCount++;
+    track('error', { msg });
+  };
+  window.addEventListener('error', e => report(`${e.message} @ ${(e.filename || '').split('/').pop()}:${e.lineno || 0}`));
+  window.addEventListener('unhandledrejection', e => report(`promise: ${(e.reason && e.reason.message) || e.reason || ''}`));
+}
 // Skeleton loader — แถบ shimmer แทนหน้าโล่ง/สปินเนอร์ ระหว่างโหลดข้อมูล async
 function skelRows(n, h) {
   let s = '';
@@ -6281,6 +6293,7 @@ function wireBus() {
 }
 function init() {
   load();
+  setupErrorTracking();
   wireBus();
   applyOfflineRewards();   // ต้องอ่าน lastSeen เก่าก่อน save ใดๆ
   checkWeeklyEvent();       // แจ้งอีเวนต์ประจำสัปดาห์ถ้าเข้าสัปดาห์ใหม่

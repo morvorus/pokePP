@@ -31,12 +31,17 @@
   --btn-danger-bg: rgba(255,93,108,.22);
   --btn-radius: 12px;
   --btn-radius-sm: 10px;
+  /* --- ระบบการเคลื่อนไหว (motion tokens) — ใช้ร่วมกันทั้งเกมให้ความรู้สึกสม่ำเสมอ --- */
+  --ease-out: cubic-bezier(.22,.9,.3,1);
+  --ease-in-out: cubic-bezier(.65,0,.35,1);
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+  --dur-fast: .12s; --dur: .22s; --dur-slow: .4s;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; }
 button, select, input, textarea { font-family: inherit; }
-button { transition: transform .08s ease, filter .15s ease, box-shadow .15s ease; }
+button { transition: transform var(--dur-fast) var(--ease-out), filter var(--dur) ease, box-shadow var(--dur) ease; }
 button:not(:disabled):active { transform: scale(.96); }
 button:disabled { opacity: .5; cursor: not-allowed; }
 /* ปิดแอนิเมชันส่วนใหญ่เมื่อผู้เล่นเปิดตัวเลือก "ลดแอนิเมชัน" */
@@ -563,10 +568,14 @@ h2.view-title::after {
 @keyframes toastOut { to { opacity:0; transform: translateY(-12px);} }
 
 /* ===== Modal ===== */
-.modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; }
+.modal { position: fixed; inset: 0; background: rgba(4,6,20,.58); backdrop-filter: blur(7px); -webkit-backdrop-filter: blur(7px); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 20px; animation: modalFade var(--dur) var(--ease-out); }
+@keyframes modalFade { from { opacity: 0; } }
+.reduce-motion .modal { animation: none; }
 @media (max-width: 460px) { .modal { padding: 8px; } }
 .modal.hidden { display: none; }
-.modal-box { background: linear-gradient(160deg,var(--card),var(--card2)); border-radius: 18px; padding: 20px; max-width: 360px; width: 100%; box-shadow: var(--shadow); text-align: center; max-height: 86vh; overflow-y: auto; }
+.modal-box { background: linear-gradient(160deg,var(--card),var(--card2)); border: 1px solid rgba(255,255,255,.1); border-radius: 18px; padding: 20px; max-width: 360px; width: 100%; box-shadow: var(--shadow-lg); text-align: center; max-height: 86vh; overflow-y: auto; animation: modalPop var(--dur) var(--ease-spring); }
+@keyframes modalPop { from { opacity: 0; transform: scale(.92) translateY(10px); } }
+.reduce-motion .modal-box { animation: none; }
 .modal-box img.big { width: 130px; height: 130px; object-fit: contain; image-rendering: pixelated; }
 .modal-box h3 { margin: 6px 0; font-size: 22px; }
 .stat-row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
