@@ -2701,6 +2701,7 @@ function evoText(m) {
 // ---------- individual detail ----------
 // ===== สุ่มค่า IV ใหม่ (จ่ายเงิน) + ล็อกช่อง (ยิ่งล็อกยิ่งแพง) =====
 let _ivLocks = new Set();
+let _candyTimer = null;   // หน่วงรีเฟรชโมดอลตอนกดลูกอมรัวๆ (กันโมดอลหลุด/กระพริบ)
 const IV_REROLL_BASE = 100000, IV_MAX_CHANCE = 0.01;   // พื้นฐาน 100,000 · +100,000/ช่องที่ล็อก · โอกาสได้ 31 = 1/100
 function ivRerollCost() { return ivRerollPrice(IV_REROLL_BASE, _ivLocks.size); }
 function openIvRerollModal(uid) {
@@ -2854,9 +2855,19 @@ function openIndividualModal(uid) {
   };
   const cd = $('#mCandy'); if (cd) cd.onclick = () => {
     if ((state.candies || 0) <= 0 || ind.level >= 100) return;
+    // อัปเดตทันทีในที่ (ไม่รีสร้างโมดอลทุกคลิก) — กดรัวๆ ได้ลื่น ไม่หลุด
     state.candies--; ind.level++; ind.xp = 0;
-    toast(`🍬 ${MON_BY_ID[ind.id].name} ขึ้นเป็น Lv.${ind.level}`, 'good');
-    tryEvolveByLevel(ind); save(); renderTopbar(); openIndividualModal(uid); renderCurrentView();
+    cd.textContent = `🍬 Rare Candy (มี ${state.candies})`;
+    if ((state.candies || 0) <= 0 || ind.level >= 100) cd.disabled = true;
+    playSfx('levelup');
+    // หน่วงงานหนัก (เซฟ/เช็ควิวัฒนาการ/รีเฟรช) ไว้ทำครั้งเดียวหลังหยุดกด
+    clearTimeout(_candyTimer);
+    _candyTimer = setTimeout(() => {
+      const before = ind.id;
+      tryEvolveByLevel(ind); save(); renderTopbar();
+      toast(`🍬 ${MON_BY_ID[ind.id].name} ขึ้นเป็น Lv.${ind.level}`, 'good');
+      if (ind.id !== before || $('#modalBox')) { openIndividualModal(uid); renderCurrentView(); }   // รีเฟรชครั้งเดียว (โชว์เลเวล/ร่างใหม่)
+    }, 260);
   };
   const nk = $('#mNick'); if (nk) nk.onclick = () => {
     const cur = ind.nick || '';
@@ -6414,7 +6425,11 @@ function init() {
   setInterval(updateRivalCd, 1000);
   setInterval(updateCheckinCd, 1000);
   applyReduceMotion();
+  // บันทึกอัตโนมัติแบบครบวงจร — ทุกการกระทำเรียก save() อยู่แล้ว + กันพลาดเพิ่ม 3 ชั้น:
   window.addEventListener('beforeunload', () => { state.lastSeen = Date.now(); save(); });
+  window.addEventListener('pagehide', () => { state.lastSeen = Date.now(); save(); });   // มือถือเชื่อถือได้กว่า beforeunload
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state) { state.lastSeen = Date.now(); save(); } });   // สลับแท็บ/ย่อ = เซฟ
+  setInterval(() => { if (state) save(); }, 30000);   // เซฟความปลอดภัยทุก 30 วิ (เผื่อมีจุดที่ลืมเรียก)
 
   if (!state.tutorialDone) setTimeout(showTutorial, 400);
   if (state.settings.music) document.addEventListener('pointerdown', () => startMusic(), { once: true });
