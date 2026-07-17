@@ -3138,6 +3138,7 @@ function setShopTab(tab, fromClick) {
   document.querySelectorAll('[data-shoptab]').forEach(b => b.classList.toggle('active', b.dataset.shoptab === tab));
   if (tab === 'bp') renderBpShop();
   else if (tab === 'fish') renderFishShop();
+  // ซ่อนร้านอื่นจริงๆ ด้วย attribute hidden (มี CSS .shop-grid[hidden]{display:none} ทำให้ทำงานจริง) — ไม่รวมกัน
   Object.entries(SHOP_PANELS).forEach(([k, sel]) => { const el = $(sel); if (el) el.hidden = (k !== tab); });
   // เอฟเฟกต์เปลี่ยนหน้า + เลื่อนขึ้นบน เฉพาะตอนกดสลับแท็บจริงๆ (ไม่ทำตอน re-render หลังซื้อ = ไม่เด้งขึ้นบน)
   if (fromClick) {
