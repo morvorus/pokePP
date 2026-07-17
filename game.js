@@ -991,6 +991,10 @@ function toast(msg, kind) {
   setTimeout(() => el.remove(), 3000);
 }
 function logMsg(msg, kind) {
+  // มิเรอร์เข้าฟีดกิจกรรมล่าสุดในแผงข้างจอ (เดสก์ท็อป)
+  _recentActivity.unshift(msg);
+  if (_recentActivity.length > 12) _recentActivity.pop();
+  renderRailFeed();
   const box = $('#log');
   const el = document.createElement('div');
   el.className = 'log-item log-in ' + (kind || '');
@@ -1449,24 +1453,45 @@ function skelRows(n, h) {
   for (let i = 0; i < (n || 5); i++) s += `<div class="skel-row" style="height:${h || 36}px"></div>`;
   return `<div class="skel-wrap">${s}</div>`;
 }
-// แผงตกแต่งข้างจอ (เดสก์ท็อป) — โปเกมอนลอยขึ้นเบาๆ เติมพื้นที่ว่างสองข้าง
+// แผงตกแต่งข้างจอ (เดสก์ท็อป) — โปเกมอนลอยเบาๆ + วิดเจ็ตมีประโยชน์ เติมพื้นที่ว่างสองข้าง
 const RAIL_MONS = [6, 9, 3, 25, 149, 130, 448, 445, 94, 143, 131, 133, 197, 282, 373, 700, 359, 248, 384];
+let _recentActivity = [];
+function railMons(n) {
+  let h = '';
+  for (let i = 0; i < n; i++) {
+    const id = RAIL_MONS[Math.floor(Math.random() * RAIL_MONS.length)];
+    const left = 5 + Math.floor(Math.random() * 66);
+    const dur = 26 + Math.floor(Math.random() * 28);
+    const delay = -Math.floor(Math.random() * dur);
+    const size = 46 + Math.floor(Math.random() * 40);
+    h += `<span class="rail-mon-wrap" style="left:${left}%;width:${size}px;animation-duration:${dur}s;animation-delay:${delay}s">${spriteImg(id, false, 'rail-mon')}</span>`;
+  }
+  return h;
+}
 function renderSideRails() {
-  const mk = n => {
-    let h = '';
-    for (let i = 0; i < n; i++) {
-      const id = RAIL_MONS[Math.floor(Math.random() * RAIL_MONS.length)];
-      const left = 5 + Math.floor(Math.random() * 66);
-      const dur = 26 + Math.floor(Math.random() * 28);
-      const delay = -Math.floor(Math.random() * dur);
-      const size = 48 + Math.floor(Math.random() * 42);
-      h += `<span class="rail-mon-wrap" style="left:${left}%;width:${size}px;animation-duration:${dur}s;animation-delay:${delay}s">${spriteImg(id, false, 'rail-mon')}</span>`;
-    }
-    return h;
-  };
   const L = $('#railLeft'), R = $('#railRight');
-  if (L) L.innerHTML = mk(5) + '<div class="rail-brand">POKÉPP</div>';
-  if (R) R.innerHTML = mk(5);
+  if (L) L.innerHTML = railMons(5) + '<div class="rail-brand">POKÉPP</div>';
+  if (R) R.innerHTML = railMons(4) + `<div class="rail-widgets">
+      <div class="rail-card"><div class="rail-card-h">🏆 อันดับเดกซ์</div><div id="railLb" class="rail-lb">${skelRows(5, 18)}</div></div>
+      <div class="rail-card"><div class="rail-card-h">📜 กิจกรรมล่าสุด</div><div id="railFeed" class="rail-feed"></div></div>
+    </div>`;
+  renderRailWidgets();
+}
+function renderRailFeed() {
+  const box = $('#railFeed'); if (!box) return;
+  box.innerHTML = _recentActivity.length
+    ? _recentActivity.slice(0, 7).map(m => `<div class="rail-feed-item">${m}</div>`).join('')
+    : '<div class="rail-empty">เริ่มเล่นเพื่อดูกิจกรรม</div>';
+}
+function renderRailWidgets() {
+  renderRailFeed();
+  const box = $('#railLb'); if (!box) return;
+  if (!(window.Cloud && Cloud.enabled)) { box.innerHTML = '<div class="rail-empty">ตั้งค่าคลาวด์เพื่อดูอันดับ</div>'; return; }
+  Cloud.topScores('dex', 5).then(res => {
+    const el = $('#railLb'); if (!el) return;
+    if (res.error || !res.rows || !res.rows.length) { el.innerHTML = '<div class="rail-empty">ยังไม่มีข้อมูล</div>'; return; }
+    el.innerHTML = res.rows.map((r, i) => `<div class="rail-lb-row"><span class="rl-rank">${['🥇', '🥈', '🥉'][i] || (i + 1)}</span><span class="rl-nm">${escapeHtml(r.name || '—')}</span><span class="rl-v">${r.dex || 0}</span></div>`).join('');
+  }).catch(() => {});
 }
 function shinyMultiplier() {
   let m = 1;
@@ -6371,6 +6396,7 @@ function init() {
   refreshLiveConfig();
   setInterval(refreshLiveConfig, 5 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshLiveConfig(); });
+  setInterval(renderRailWidgets, 5 * 60 * 1000);   // รีเฟรชมินิกระดานข้างจอเป็นระยะ
 }
 // โมดูล ES เป็น deferred — ถ้า DOM พร้อมแล้วให้ init ทันที ไม่งั้นรอ event (กันเคสที่ event ยิงไปก่อน)
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
