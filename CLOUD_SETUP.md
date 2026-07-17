@@ -173,6 +173,24 @@ select
 ```
 > **ข้อมูลผู้เล่นแบบสแนปช็อต** ดูได้จากตาราง **`leaderboard`** อยู่แล้ว (dex/playtime/tower/caught/pvp ต่อคน) — เมนูซ้าย **Table Editor → leaderboard**
 
+## 2.2 (ตัวเลือก) 📢 ฟีดแจ้งเตือนทั้งเซิร์ฟเวอร์
+แจ้งเมื่อมีคนจับเลเจนดารี/ไชนี่/โกลเด้น หรือได้กำไรเมก้า → โชว์แถบลอยด้านบนให้ทุกคนเห็น (ดึงทุก 20 วิ)
+```sql
+create table if not exists public.feed (
+  id bigint generated always as identity primary key,
+  name text, kind text, mon text,
+  created_at timestamptz default now()
+);
+alter table public.feed enable row level security;
+grant select, insert on public.feed to anon, authenticated;
+drop policy if exists "feed read" on public.feed;
+drop policy if exists "feed insert" on public.feed;
+create policy "feed read" on public.feed for select using (true);
+create policy "feed insert" on public.feed for insert with check (true);
+create index if not exists feed_time on public.feed (created_at desc);
+```
+> ไม่สร้างตารางนี้เกมก็เล่นได้ปกติ (แค่ไม่มีแถบแจ้งเตือนทั้งเซิร์ฟเวอร์)
+
 ## 3. (แนะนำ) ปิดยืนยันอีเมล เพื่อล็อกอินง่ายขึ้น
 เมนูซ้าย → **Authentication** → **Providers** → **Email** → ปิด **Confirm email** → Save
 > ถ้าเปิดไว้ ผู้เล่นต้องยืนยันอีเมลก่อนล็อกอิน (ปลอดภัยกว่าแต่ยุ่งกว่า)

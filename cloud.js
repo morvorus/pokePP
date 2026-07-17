@@ -184,6 +184,28 @@ const Cloud = {
     } catch (e) { return {}; }
   },
 
+  // ===== ฟีดแจ้งเตือนทั้งเซิร์ฟเวอร์ (จับเทพ/ไชนี่, ได้กำไรเมก้า ฯลฯ) — ผ่านตาราง feed =====
+  // ใช้ DB insert + poll (เสถียรกว่า Realtime broadcast มาก) · ถ้าไม่มีตาราง/ผิดพลาดก็เงียบ ไม่กระทบเกม
+  async pushFeed(row) {
+    if (!this.enabled) return;
+    try {
+      await this.client.from('feed').insert({
+        name: String(row.name || 'เทรนเนอร์').slice(0, 24),
+        kind: String(row.kind || '').slice(0, 16),
+        mon: String(row.mon || '').slice(0, 24),
+      });
+    } catch (e) { /* เงียบ */ }
+  },
+  async recentFeed(sinceIso) {
+    if (!this.enabled) return [];
+    try {
+      const { data, error } = await this.client.from('feed')
+        .select('id, name, kind, mon, created_at')
+        .gt('created_at', sinceIso).order('created_at', { ascending: true }).limit(20);
+      return error ? [] : (data || []);
+    } catch (e) { return []; }
+  },
+
   // ===== Analytics: log เหตุการณ์สำคัญ (fire-and-forget · ไม่บล็อกเกม · ไม่ล้ม) =====
   // ต้องสร้างตาราง public.events (ดู CLOUD_SETUP.md) · ถ้าไม่มี/ผิดพลาด เงียบไป ไม่กระทบเกม
   logEvent(name, meta) {

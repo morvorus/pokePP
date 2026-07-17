@@ -1070,6 +1070,61 @@ function celebrate(kind) {
   document.body.appendChild(ov);
   setTimeout(() => ov.remove(), 1700);
 }
+// เอฟเฟกต์กลางจอ (ใหญ่ ชั่วครู่) — ตอนได้ของหายากมาก เช่น กำไรเมก้า/ไดนาแม็กซ์
+function centerEvent(emoji, text) {
+  if (state.settings && state.settings.reduceMotion) { toast(text, 'good'); return; }
+  const el = document.createElement('div');
+  el.className = 'center-event';
+  el.innerHTML = `<div class="ce-emoji">${emoji}</div><div class="ce-text">${text}</div>`;
+  document.body.appendChild(el);
+  try { playSfx('legendary'); } catch (e) { /* เงียบ */ }
+  setTimeout(() => { el.classList.add('ce-out'); setTimeout(() => el.remove(), 500); }, 2600);
+}
+// แถบแจ้งเตือนทั้งเซิร์ฟเวอร์ (ลอยด้านบน ~15 วิ ไม่ใหญ่ กันบังจอ)
+function serverBanner(html) {
+  let wrap = $('#serverBanners');
+  if (!wrap) { wrap = document.createElement('div'); wrap.id = 'serverBanners'; document.body.appendChild(wrap); }
+  const el = document.createElement('div');
+  el.className = 'server-banner';
+  el.innerHTML = html;
+  wrap.appendChild(el);
+  while (wrap.children.length > 4) wrap.firstChild.remove();   // จำกัดไม่ให้รก
+  setTimeout(() => { el.classList.add('sb-out'); setTimeout(() => el.remove(), 500); }, 15000);
+}
+// รับ broadcast จากผู้เล่นอื่น → โชว์แถบแจ้งเตือน
+function onGlobalNotice(p) {
+  if (!p || !p.name) return;
+  const name = escapeHtml(String(p.name).slice(0, 24)), mon = escapeHtml(String(p.mon || '').slice(0, 24));
+  let txt;
+  if (p.kind === 'golden') txt = `🌟 <b>${name}</b> จับ <b>Golden ${mon}</b> ได้!!!`;
+  else if (p.kind === 'shiny') txt = `✨ <b>${name}</b> จับ <b>Shiny ${mon}</b> ได้!`;
+  else if (p.kind === 'legendary') txt = `👑 <b>${name}</b> จับเลเจนดารี <b>${mon}</b> ได้!`;
+  else if (p.kind === 'mega') txt = `💎 <b>${name}</b> ได้ <b>กำไรเมก้า</b>!`;
+  else if (p.kind === 'dynamax') txt = `💥 <b>${name}</b> ได้ <b>กำไรไดนาแม็กซ์</b>!`;
+  else return;
+  serverBanner(txt);
+}
+// ส่งเหตุการณ์เด่นของเราขึ้นฟีดกลาง (ทุกคนจะเห็นภายในไม่กี่วินาที)
+function broadcastNotice(kind, monName) {
+  try { if (window.Cloud && Cloud.pushFeed) Cloud.pushFeed({ name: state.playerName || 'เทรนเนอร์', kind, mon: monName || '' }); } catch (e) { /* เงียบ */ }
+}
+// ดึงฟีดใหม่มาโชว์แบนเนอร์ (poll เป็นระยะ · กันซ้ำ · ข้ามของตัวเอง)
+let _feedSeen = new Set();
+let _feedSince = new Date().toISOString();
+async function pollFeed() {
+  if (!(window.Cloud && Cloud.enabled)) return;
+  let rows;
+  try { rows = await Cloud.recentFeed(_feedSince); } catch (e) { return; }
+  const myName = state.playerName || '';
+  for (const r of rows) {
+    if (r.created_at && r.created_at > _feedSince) _feedSince = r.created_at;
+    if (r.id == null || _feedSeen.has(r.id)) continue;
+    _feedSeen.add(r.id);
+    if (r.name && r.name === myName) continue;   // ของตัวเอง (เห็นเอฟเฟกต์ในเครื่องแล้ว) ไม่ต้องโชว์ซ้ำ
+    onGlobalNotice(r);
+  }
+  if (_feedSeen.size > 300) _feedSeen = new Set();   // กันบวมระยะยาว
+}
 function playSpawnFx(kind) {
   if (state.settings && state.settings.reduceMotion) return;
   const ov = $('#fxOverlay'); if (!ov) return;
@@ -2230,6 +2285,9 @@ function onCatchSuccess(ballKey) {
   toast(`🎉 จับ ${shiny ? '✨' : ''}<b>${mon.name}</b> Lv.${level} ได้! +${coins}🪙`, 'good');
   logMsg(`✅ จับ <b>${mon.name}</b> (${shiny ? 'Shiny' : TIER_LABEL[tier]}) Lv.${level} · IV ${ivPercent(ind)}% · +${coins}🪙`, 'good');
   celebrate(golden ? 'golden' : tier === 'legendary' ? 'legendary' : shiny ? 'shiny' : (tier === 'rare' || tier === 'superrare') ? 'rare' : null);
+  if (golden) broadcastNotice('golden', mon.name);          // แจ้งทั้งเซิร์ฟเวอร์เฉพาะของเด่นๆ
+  else if (shiny) broadcastNotice('shiny', mon.name);
+  else if (tier === 'legendary') broadcastNotice('legendary', mon.name);
   gainXp(xp);
   addStreak(tier);            // สตรีคจับต่อเนื่อง
   addFriendship(2);           // มิตรภาพหัวหน้าทีม
@@ -5339,6 +5397,12 @@ function onFoeDown() {
       const ballDrop = grantRandomBall();
       const amuletMsg = grantAmuletDrop();
       const biMsg = grantBattleItemDrop();   // 10% ดรอปไอเทมต่อสู้
+      // ดรอปหายากมาก: กำไรเมก้า/ไดนาแม็กซ์ (เฉพาะที่ยังไม่มี) → เอฟเฟกต์กลางจอ + แจ้งทั้งเซิร์ฟเวอร์
+      if (!state.hasMegaRing && Math.random() < 0.15) {
+        state.hasMegaRing = true; centerEvent('💎', 'ดรอป กำไรเมก้า!'); broadcastNotice('mega'); logMsg('💎 ดรอป <b>กำไรเมก้า</b> จากบอสเขต!', 'big');
+      } else if (!state.hasDynamaxBand && Math.random() < 0.15) {
+        state.hasDynamaxBand = true; centerEvent('💥', 'ดรอป กำไรไดนาแม็กซ์!'); broadcastNotice('dynamax'); logMsg('💥 ดรอป <b>กำไรไดนาแม็กซ์</b> จากบอสเขต!', 'big');
+      }
       gainTrainerXp(100);
       b.victory = { trainerKey: foeTrainerName(b), emoji: b.gym.emoji, title: b.gym.name, coins: reward, bp, xp: 100, items: (first ? '🟡 Ultra Ball ×3 ' : '') + ballDrop + (amuletMsg ? ' ' + amuletMsg : '') + (biMsg ? ' ' + biMsg : ''), bonus: first ? '🏅 เหรียญตราประจำเขต!' : 'ชนะซ้ำ — รางวัลลดลง' };
       b.msg = `🏆 ชนะ${b.gym.name}! +${reward}🪙 +${bp}🎖️BP`;
@@ -6523,6 +6587,7 @@ function init() {
   setInterval(refreshLiveConfig, 5 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshLiveConfig(); });
   setInterval(renderRailWidgets, 5 * 60 * 1000);   // รีเฟรชมินิกระดานข้างจอเป็นระยะ
+  setInterval(pollFeed, 20000);   // ฟีดแจ้งเตือนทั้งเซิร์ฟเวอร์ (จับเทพ/ไชนี่/กำไรเมก้า) ทุก 20 วิ
 }
 // โมดูล ES เป็น deferred — ถ้า DOM พร้อมแล้วให้ init ทันที ไม่งั้นรอ event (กันเคสที่ event ยิงไปก่อน)
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
@@ -6538,6 +6603,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop, abilityFor,
     openIndividualModal, tradeNpc, claimDailyLogin, selectRegion, playSpawnFx, renderHallOfFame,
     get liveConfig() { return liveConfig; }, set liveConfig(v) { liveConfig = { ...LIVE_DEFAULTS, ...v }; renderLiveBanner(); applyLiveTheme(); },
-    shinyMultiplier, liveXpMult, liveCoinMult, celebrate,
+    shinyMultiplier, liveXpMult, liveCoinMult, celebrate, centerEvent, serverBanner, onGlobalNotice, broadcastNotice, pollFeed,
   };
 }

@@ -908,6 +908,25 @@ h2.view-title::after {
 }
 .reduce-motion .celebrate { display: none; }
 
+/* เอฟเฟกต์กลางจอ (ของหายากมาก เช่น กำไรเมก้า) */
+.center-event { position: fixed; inset: 0; z-index: 950; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; gap: 6px; animation: ceIn .4s var(--ease-spring); }
+.center-event.ce-out { animation: ceOut .5s ease forwards; }
+.center-event .ce-emoji { font-size: 84px; filter: drop-shadow(0 0 22px rgba(255,215,107,.8)); animation: ceBob 1.2s ease-in-out infinite; }
+.center-event .ce-text { font-size: 24px; font-weight: 900; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,.7), 0 0 20px rgba(255,215,107,.6); padding: 6px 20px; background: rgba(0,0,0,.35); border-radius: 999px; backdrop-filter: blur(4px); }
+@keyframes ceIn { from { opacity: 0; transform: scale(.6); } }
+@keyframes ceOut { to { opacity: 0; transform: scale(1.15); } }
+@keyframes ceBob { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-10px) rotate(4deg); } }
+.reduce-motion .center-event { animation: none; }
+.reduce-motion .center-event .ce-emoji { animation: none; }
+
+/* แถบแจ้งเตือนทั้งเซิร์ฟเวอร์ (ลอยด้านบน ไม่ใหญ่ กันบังจอ) */
+#serverBanners { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 800; display: flex; flex-direction: column; gap: 5px; align-items: center; pointer-events: none; width: min(94vw, 540px); }
+.server-banner { max-width: 100%; font-size: 12.5px; font-weight: 700; color: #fff; padding: 7px 15px; border-radius: 999px; background: linear-gradient(90deg,rgba(61,125,202,.92),rgba(40,45,90,.92)); border: 1px solid rgba(255,255,255,.16); box-shadow: var(--shadow-md); backdrop-filter: blur(8px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: sbIn .4s var(--ease-out); }
+.server-banner.sb-out { animation: sbOut .5s ease forwards; }
+@keyframes sbIn { from { opacity: 0; transform: translateY(-12px); } }
+@keyframes sbOut { to { opacity: 0; transform: translateY(-12px); } }
+.reduce-motion .server-banner { animation: none; }
+
 /* ===== View Transitions (สลับหน้านุ่มลื่น) ===== */
 ::view-transition-old(root) { animation: vtOut .2s ease both; }
 ::view-transition-new(root) { animation: vtIn .26s cubic-bezier(.22,.9,.3,1) both; }
