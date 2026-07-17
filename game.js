@@ -4721,6 +4721,27 @@ function battleArmZ() {
   b.zArmed = !b.zArmed;
   renderBattle();
 }
+// สีเอฟเฟกต์ประจำธาตุ (สำหรับแฟลช/particle ท่าโจมตี)
+const TYPE_FX_COLOR = {
+  normal: '#cfc9ad', fire: '#ff7a2e', water: '#3f9bff', electric: '#ffd23f', grass: '#57c463', ice: '#7fe0e6',
+  fighting: '#e0522b', poison: '#b45cc9', ground: '#d9a44a', flying: '#8fb5f0', psychic: '#ff6ba6', bug: '#9fbf3a',
+  rock: '#c0a86a', ghost: '#7b6bd6', dragon: '#6a5cff', dark: '#5a5470', steel: '#9aa8bd', fairy: '#ff9ed6',
+};
+// เอฟเฟกต์ท่าโจมตีตามธาตุ — แฟลชสี + particle อีโมจิธาตุ พุ่งกระจายบนเป้า
+function battleMoveFx(side, type, eff) {
+  const color = TYPE_FX_COLOR[type] || '#ffffff', glyph = TYPE_EMOJI[type] || '💥';
+  const fx = document.createElement('div');
+  fx.className = 'move-fx'; fx.style.setProperty('--fxc', color);
+  const n = eff > 1 ? 12 : eff < 1 && eff > 0 ? 6 : 9;
+  let html = '<span class="mfx-flash"></span>';
+  for (let i = 0; i < n; i++) {
+    const ang = (i / n) * Math.PI * 2 + Math.random() * 0.5, dist = 22 + Math.random() * 28;
+    html += `<span class="mfx-p" style="--dx:${(Math.cos(ang) * dist).toFixed(0)}px;--dy:${(Math.sin(ang) * dist).toFixed(0)}px;animation-delay:${(Math.random() * 0.08).toFixed(2)}s">${glyph}</span>`;
+  }
+  fx.innerHTML = html;
+  side.appendChild(fx);
+  setTimeout(() => fx.remove(), 750);
+}
 // เอฟเฟกต์ต่อสู้: สั่น/แฟลชสไปรต์ + ตัวเลขดาเมจลอย (อ่านจาก b._fx ที่ตั้งไว้ตอนคำนวณดาเมจ)
 function applyBattleFx(b) {
   if (!b || !b._fx) return;
@@ -4731,6 +4752,7 @@ function applyBattleFx(b) {
     const side = $(sel); if (!side) return;
     const img = side.querySelector('.bt-head img');
     if (img && !reduce) { img.classList.remove('hit-shake'); void img.offsetWidth; img.classList.add('hit-shake'); }
+    if (info.type && info.dmg > 0 && !reduce) battleMoveFx(side, info.type, info.eff);   // เอฟเฟกต์ท่าตามธาตุ
     if (info.dmg > 0) {
       const f = document.createElement('div');
       f.className = 'dmg-float' + (info.crit ? ' crit' : '') + (info.eff > 1 ? ' super' : info.eff < 1 && info.eff > 0 ? ' weak' : '');
@@ -4886,7 +4908,7 @@ function foeTurn(b) {
   let sturdyMsg = '';
   if (defAbility && defAbility.fx === 'sturdy' && wasFull && dmg >= active.hp) { dmg = active.hp - 1; sturdyMsg = ` · 🗿 ${view.name} ทนอยู่ด้วย Sturdy!`; }
   active.hp = Math.max(0, active.hp - dmg);
-  b._fx = Object.assign(b._fx || {}, { me: { dmg, crit: atkRes.crit, eff: atkRes.eff } });
+  b._fx = Object.assign(b._fx || {}, { me: { dmg, crit: atkRes.crit, eff: atkRes.eff, type: mv.type } });
   b.msg += ` · ${foeName} ใช้ ${mv.name}! ${atkRes.crit ? '🎯คริติคอล! ' : ''}${atkRes.weather ? '🌦️ ' : ''}-${dmg}${sturdyMsg}`;
   b.msg += tryInflict(mv, active, view.types, view.name, defAbility, atkAbility);
   b.msg += applyStatFx(mv, b.foe.stages, active.stages, foeName, view.name, atkAbility, defAbility);
@@ -5085,7 +5107,7 @@ function battleAttack(moveIdx) {
     let sturdyMsg = '';
     if (defAbility && defAbility.fx === 'sturdy' && foeWasFull && dmg >= b.foeHp && b.mode !== 'wild') { dmg = b.foeHp - 1; sturdyMsg = ` · 🗿 ${foeNameForMsg} ทนอยู่ด้วย Sturdy!`; }
     b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - dmg);
-    b._fx = Object.assign(b._fx || {}, { foe: { dmg, crit: atk.crit, eff: atk.eff } });
+    b._fx = Object.assign(b._fx || {}, { foe: { dmg, crit: atk.crit, eff: atk.eff, type: mv.type } });
     b.msg += `${view.name} ใช้ ${mv.name}! ${atk.crit ? '🎯 คริติคอล! ' : ''}${atk.weather ? '🌦️ อากาศช่วย! ' : ''}-${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}${sturdyMsg}`;
     if (isStruggle) {   // ดิ้นรน: บาดเจ็บตัวเอง 1/4 HP
       const recoil = Math.max(1, Math.floor(active.maxHp / 4));

@@ -655,6 +655,13 @@ h2.view-title::after {
   100% { transform: translateY(-38px) scale(1); opacity: 0; }
 }
 .reduce-motion .hit-shake { animation: none; }
+/* เอฟเฟกต์ท่าโจมตีตามธาตุ (แฟลช + particle) */
+.move-fx { position: absolute; inset: 0; z-index: 5; pointer-events: none; display: flex; align-items: center; justify-content: center; }
+.mfx-flash { position: absolute; width: 88px; height: 88px; border-radius: 50%; background: radial-gradient(circle, var(--fxc), transparent 62%); animation: mfxFlash .5s ease-out forwards; mix-blend-mode: screen; }
+@keyframes mfxFlash { 0% { transform: scale(.3); opacity: .85; } 100% { transform: scale(1.5); opacity: 0; } }
+.mfx-p { position: absolute; font-size: 15px; opacity: 0; filter: drop-shadow(0 0 5px var(--fxc)); animation: mfxP .62s cubic-bezier(.2,.7,.3,1) forwards; }
+@keyframes mfxP { 0% { transform: translate(0,0) scale(.4); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(var(--dx),var(--dy)) scale(1.05); opacity: 0; } }
+.reduce-motion .move-fx { display: none; }
 .reduce-motion .dmg-float { animation: dmgFloatStatic 1s ease-out forwards; }
 @keyframes dmgFloatStatic { 0% { opacity: 0; } 15% { opacity: 1; } 85% { opacity: 1; } 100% { opacity: 0; } }
 .bt-side.foe { border: 1px solid rgba(255,93,108,.3); }
