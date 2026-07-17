@@ -3969,11 +3969,21 @@ function claimDailyLogin() {
   state.balls[cd.ball[0]] = (state.balls[cd.ball[0]] || 0) + cd.ball[1];
   if (cd.lockbox) state.lockboxes = (state.lockboxes || 0) + cd.lockbox;
   state.checkinCoins = (state.checkinCoins || 0) + 1;   // เหรียญเช็คอิน — กดรับได้รอบละ 1 เหรียญ (แลกกำไลเมก้า/ไดนาแม็กซ์/Z-Ring/ชาม)
+  // โบนัสไมล์สโตนสตรีค — ล็อกอินต่อเนื่องครบทุก 7 วัน รับโบนัสใหญ่ (จูงใจให้เข้าเล่นทุกวัน)
+  let streakBonus = '';
+  if (state.streak > 0 && state.streak % 7 === 0) {
+    const bonusCoins = 500 + state.streak * 30;
+    const bonusCheckin = state.streak >= 30 ? 5 : state.streak >= 14 ? 3 : 2;
+    state.coins += bonusCoins; state.checkinCoins += bonusCheckin; state.lockboxes = (state.lockboxes || 0) + 1;
+    streakBonus = ` · 🔥 สตรีค ${state.streak} วัน! +${bonusCoins}🪙 +${bonusCheckin}🗓️ +🎁`;
+    logMsg(`🔥 ล็อกอินต่อเนื่อง <b>${state.streak} วัน</b>! รับโบนัสสตรีคใหญ่ +${bonusCoins}🪙`, 'big');
+    playSfx('rare');
+  }
   save(); renderMenu(); renderTopbar();
   const ballTxt = `${cd.ball[1]}${BALLS[cd.ball[0]].emoji}`;
   const lockboxTxt = cd.lockbox ? ` +${cd.lockbox}🎁` : '';
   const ciTxt = ` +1🗓️เช็คอิน`;
-  toast(`📅 เช็คอินสำเร็จ! วันที่ ${loginCycleDay(state.streak)}/7 (สตรีค ${state.streak}) +${cd.coins}🪙 +${ballTxt}${lockboxTxt}${ciTxt}`, 'good');
+  toast(`📅 เช็คอินสำเร็จ! วันที่ ${loginCycleDay(state.streak)}/7 (สตรีค ${state.streak}) +${cd.coins}🪙 +${ballTxt}${lockboxTxt}${ciTxt}${streakBonus}`, 'good');
   checkAchievements();
 }
 function applyOfflineRewards() {
