@@ -227,6 +227,68 @@ const Cloud = {
     } catch (e) { return []; }
   },
 
+  // ===== กิลด์/ทีม (ต้องล็อกอิน) — ตาราง guilds + guild_members + view guild_ranking =====
+  async myGuild() {   // สมาชิกกิลด์ของเรา + ข้อมูลกิลด์ (หรือ null ถ้ายังไม่มีกิลด์)
+    if (!this.enabled || !this.user) return null;
+    try {
+      const { data: m } = await this.client.from('guild_members').select('guild_id, contrib').eq('user_id', this.user.id).maybeSingle();
+      if (!m || !m.guild_id) return null;
+      const { data: g } = await this.client.from('guilds').select('id, name, emoji, leader_name').eq('id', m.guild_id).maybeSingle();
+      return g ? { guild: g, contrib: m.contrib || 0 } : null;
+    } catch (e) { return null; }
+  },
+  async createGuild(name, emoji, myName) {
+    if (!this.enabled || !this.user) return { error: 'ต้องล็อกอินก่อน' };
+    try {
+      if (await this.myGuild()) return { error: 'คุณอยู่ในกิลด์อื่นอยู่แล้ว' };
+      const { data: g, error } = await this.client.from('guilds')
+        .insert({ name: String(name).slice(0, 20), emoji: String(emoji || '🛡️').slice(0, 4), leader_name: (myName || name).slice(0, 24) })
+        .select().single();
+      if (error) return { error: (error.message || '').includes('duplicate') ? 'ชื่อกิลด์นี้มีคนใช้แล้ว' : error.message };
+      const { error: e2 } = await this.client.from('guild_members').upsert({ user_id: this.user.id, guild_id: g.id, name: (myName || 'ผู้นำ').slice(0, 24), contrib: 0 });
+      if (e2) return { error: e2.message };
+      return { ok: true, guild: g };
+    } catch (e) { return { error: String(e) }; }
+  },
+  async joinGuild(guildId, myName) {
+    if (!this.enabled || !this.user) return { error: 'ต้องล็อกอินก่อน' };
+    try {
+      if (await this.myGuild()) return { error: 'ออกจากกิลด์เดิมก่อน' };
+      const { error } = await this.client.from('guild_members').upsert({ user_id: this.user.id, guild_id: guildId, name: (myName || 'สมาชิก').slice(0, 24), contrib: 0 });
+      return error ? { error: error.message } : { ok: true };
+    } catch (e) { return { error: String(e) }; }
+  },
+  async leaveGuild() {
+    if (!this.enabled || !this.user) return { error: 'ต้องล็อกอินก่อน' };
+    try {
+      const { error } = await this.client.from('guild_members').delete().eq('user_id', this.user.id);
+      return error ? { error: error.message } : { ok: true };
+    } catch (e) { return { error: String(e) }; }
+  },
+  async guildMembers(guildId) {
+    if (!this.enabled) return [];
+    try {
+      const { data } = await this.client.from('guild_members').select('name, contrib').eq('guild_id', guildId).order('contrib', { ascending: false }).limit(50);
+      return data || [];
+    } catch (e) { return []; }
+  },
+  async guildRanking(limit) {
+    if (!this.enabled) return [];
+    try {
+      const { data } = await this.client.from('guild_ranking').select('id, name, emoji, leader_name, members, contrib').order('contrib', { ascending: false }).limit(limit || 20);
+      return data || [];
+    } catch (e) { return []; }
+  },
+  async donateGuild(amount) {   // เพิ่ม contrib ของแถวตัวเอง (อ่าน-เขียนของตัวเอง ปลอดภัย)
+    if (!this.enabled || !this.user) return { error: 'ต้องล็อกอินก่อน' };
+    try {
+      const { data: m } = await this.client.from('guild_members').select('contrib').eq('user_id', this.user.id).maybeSingle();
+      if (!m) return { error: 'ยังไม่ได้อยู่กิลด์' };
+      const { error } = await this.client.from('guild_members').update({ contrib: (m.contrib || 0) + amount }).eq('user_id', this.user.id);
+      return error ? { error: error.message } : { ok: true, contrib: (m.contrib || 0) + amount };
+    } catch (e) { return { error: String(e) }; }
+  },
+
   // ===== Analytics: log เหตุการณ์สำคัญ (fire-and-forget · ไม่บล็อกเกม · ไม่ล้ม) =====
   // ต้องสร้างตาราง public.events (ดู CLOUD_SETUP.md) · ถ้าไม่มี/ผิดพลาด เงียบไป ไม่กระทบเกม
   logEvent(name, meta) {

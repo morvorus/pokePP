@@ -3590,6 +3590,7 @@ function renderMenu() {
   renderCloudUI();
   renderLeaderboard();
   renderChat();
+  renderGuild();
   renderRaid();
   renderGhostArena();
   renderTrade();
@@ -6356,6 +6357,106 @@ async function pollChat() {
   if (_chatSeen.size > 500) _chatSeen = new Set(_chatMsgs.map(m => m.id));
   if (added && currentView === 'menu') renderChat();
 }
+// ===== กิลด์/ทีม (ต้องล็อกอิน + ตั้งชื่อ) =====
+function guildLevel(contrib) { return Math.floor(Math.sqrt((contrib || 0) / 500)); }
+let _guildBusy = false;
+async function renderGuild() {
+  const box = $('#guildBox'); if (!box) return;
+  if (!(window.Cloud && Cloud.enabled)) { box.innerHTML = `<div class="sr-sub">ต้องตั้งค่าคลาวด์ก่อนถึงจะใช้กิลด์ได้</div>`; return; }
+  if (!Cloud.loggedIn || !Cloud.loggedIn()) { box.innerHTML = `<div class="sr-sub">เข้าสู่ระบบก่อน (ส่วน "☁️ บัญชี / เซฟคลาวด์")</div>`; return; }
+  if (!state.playerName) { box.innerHTML = `<div class="sr-sub">ตั้งชื่อที่ "🏆 กระดานจัดอันดับ" ก่อนถึงจะใช้กิลด์ได้</div>`; return; }
+  box.innerHTML = skelRows(3, 34);
+  let mine;
+  try { mine = await Cloud.myGuild(); } catch (e) { mine = null; }
+  if (currentView !== 'menu') return;
+  if (mine) renderMyGuild(box, mine);
+  else renderGuildBrowse(box);
+}
+async function renderMyGuild(box, mine) {
+  const g = mine.guild;
+  const members = await Cloud.guildMembers(g.id);
+  if (currentView !== 'menu') return;
+  const total = members.reduce((s, m) => s + (m.contrib || 0), 0);
+  const glv = guildLevel(total);
+  const nextAt = (glv + 1) * (glv + 1) * 500, curAt = glv * glv * 500;
+  const pct = clamp((total - curAt) / Math.max(1, nextAt - curAt) * 100, 0, 100);
+  const rows = members.map((m, i) => `<div class="guild-mrow"><span class="gm-rank">${['🥇', '🥈', '🥉'][i] || (i + 1)}</span><span class="gm-name">${escapeHtml(m.name || '?')}</span><span class="gm-contrib">${(m.contrib || 0).toLocaleString()}</span></div>`).join('');
+  box.innerHTML = `
+    <div class="guild-card">
+      <div class="guild-emoji">${g.emoji || '🛡️'}</div>
+      <div style="flex:1;min-width:0">
+        <div class="guild-name">${escapeHtml(g.name)}</div>
+        <div class="sr-sub">👑 ${escapeHtml(g.leader_name || '')} · เลเวลกิลด์ ${glv} · สมาชิก ${members.length}</div>
+        <div class="pf-xpbar" style="margin-top:5px"><div class="pf-xpfill" style="width:${pct}%"></div></div>
+        <div class="sr-sub" style="font-size:10px;margin-top:3px">พลังกิลด์รวม ${total.toLocaleString()} · คุณสมทบ ${(mine.contrib || 0).toLocaleString()}</div>
+      </div>
+    </div>
+    <div class="sr-sub" style="margin:8px 0 4px">สมทบเหรียญเพิ่มพลังกิลด์ (ช่วยกันไต่เลเวล):</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <button class="set-btn" id="gDonate1" style="flex:1">สมทบ 1,000🪙</button>
+      <button class="set-btn" id="gDonate5" style="flex:1">5,000🪙</button>
+      <button class="set-btn danger" id="gLeave">ออก</button>
+    </div>
+    <div class="guild-mlist">${rows}</div>`;
+  $('#gDonate1').onclick = () => doDonate(1000);
+  $('#gDonate5').onclick = () => doDonate(5000);
+  $('#gLeave').onclick = doLeaveGuild;
+}
+async function renderGuildBrowse(box) {
+  const ranking = await Cloud.guildRanking(20);
+  if (currentView !== 'menu') return;
+  const list = ranking.map((r, i) => `<div class="guild-row">
+    <div class="guild-info"><span class="guild-emoji-sm">${r.emoji || '🛡️'}</span><div style="min-width:0"><div class="guild-name-sm">${['🥇', '🥈', '🥉'][i] || ''} ${escapeHtml(r.name)}</div><div class="sr-sub" style="font-size:10px">Lv.${guildLevel(r.contrib)} · ${r.members} คน · พลัง ${(r.contrib || 0).toLocaleString()}</div></div></div>
+    <button class="rt-fight" data-gjoin="${r.id}">เข้าร่วม</button></div>`).join('');
+  box.innerHTML = `
+    <div class="trade-card" style="margin-bottom:8px">
+      <div class="trade-h">🛡️ สร้างกิลด์ใหม่</div>
+      <div style="display:flex;gap:6px">
+        <input class="save-io" id="gEmoji" maxlength="4" placeholder="🛡️" style="width:52px;min-height:auto;padding:9px;text-align:center;font-size:16px">
+        <input class="save-io" id="gName" maxlength="20" placeholder="ชื่อกิลด์" style="flex:1;min-height:auto;padding:9px;font-family:inherit;font-size:13px">
+        <button class="set-btn" id="gCreate">สร้าง</button>
+      </div>
+    </div>
+    <div class="sr-sub" style="margin-bottom:5px">🏆 กิลด์อันดับต้น — กดเข้าร่วมได้เลย</div>
+    <div id="guildList">${list || emptyState('🛡️', 'ยังไม่มีกิลด์', 'สร้างกิลด์แรกของเซิร์ฟเวอร์เลย!')}</div>`;
+  $('#gCreate').onclick = doCreateGuild;
+  box.querySelectorAll('[data-gjoin]').forEach(b => b.onclick = () => doJoinGuild(b.dataset.gjoin));
+}
+async function doCreateGuild() {
+  const name = ($('#gName').value || '').trim(), emoji = ($('#gEmoji').value || '').trim() || '🛡️';
+  if (name.length < 2) { toast('ชื่อกิลด์สั้นเกินไป', 'bad'); return; }
+  if (_guildBusy) return; _guildBusy = true;
+  const res = await Cloud.createGuild(name, emoji, state.playerName);
+  _guildBusy = false;
+  if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  toast(`🛡️ สร้างกิลด์ ${name} สำเร็จ!`, 'good'); playSfx('rare');
+  renderGuild();
+}
+async function doJoinGuild(id) {
+  if (_guildBusy) return; _guildBusy = true;
+  const res = await Cloud.joinGuild(id, state.playerName);
+  _guildBusy = false;
+  if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  toast('🛡️ เข้าร่วมกิลด์แล้ว!', 'good');
+  renderGuild();
+}
+async function doLeaveGuild() {
+  if (!confirmAction('ออกจากกิลด์นี้? (พลังที่สมทบไปไม่คืน)')) return;
+  const res = await Cloud.leaveGuild();
+  if (res && res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  toast('ออกจากกิลด์แล้ว', 'good'); renderGuild();
+}
+async function doDonate(amount) {
+  if (_guildBusy) return;
+  if ((state.coins || 0) < amount) { toast('❌ เหรียญไม่พอ', 'bad'); return; }
+  _guildBusy = true;
+  const res = await Cloud.donateGuild(amount);
+  _guildBusy = false;
+  if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  state.coins -= amount; save(); bus.emit('currency:changed');
+  toast(`🛡️ สมทบ ${amount.toLocaleString()}🪙 เข้ากิลด์!`, 'good'); playSfx('coin');
+  renderGuild();
+}
 let _ghostCache = null;
 function renderGhostArena() {
   const box = $('#ghostBox'); if (!box) return;
@@ -6728,6 +6829,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop, abilityFor,
     openIndividualModal, tradeNpc, claimDailyLogin, selectRegion, playSpawnFx, renderHallOfFame,
     get liveConfig() { return liveConfig; }, set liveConfig(v) { liveConfig = { ...LIVE_DEFAULTS, ...v }; renderLiveBanner(); applyLiveTheme(); },
-    shinyMultiplier, liveXpMult, liveCoinMult, celebrate, centerEvent, serverBanner, onGlobalNotice, broadcastNotice, pollFeed, renderChat, pollChat, syncedWorldEvent, currentWorldEvent,
+    shinyMultiplier, liveXpMult, liveCoinMult, celebrate, centerEvent, serverBanner, onGlobalNotice, broadcastNotice, pollFeed, renderChat, pollChat, syncedWorldEvent, currentWorldEvent, renderGuild, guildLevel,
   };
 }

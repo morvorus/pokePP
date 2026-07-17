@@ -977,6 +977,20 @@ h2.view-title::after {
 :root[data-event="ocean"]     { --accent: #43d0e6; --accent2: #2f7fd6; }
 :root[data-event] body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; height: 130px; pointer-events: none; z-index: 0; opacity: .4; background: radial-gradient(80% 100% at 50% 0%, var(--accent), transparent 72%); transition: opacity .4s; }
 
+/* ===== กิลด์ / ทีม ===== */
+.guild-card { display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg,var(--accent2),#2a4a8a); border-radius: 14px; padding: 13px 15px; box-shadow: var(--shadow-sm); }
+.guild-emoji { font-size: 40px; flex-shrink: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
+.guild-name { font-size: 17px; font-weight: 900; text-shadow: 0 1px 3px rgba(0,0,0,.4); }
+.guild-mlist { display: flex; flex-direction: column; gap: 3px; max-height: 220px; overflow-y: auto; }
+.guild-mrow { display: flex; align-items: center; gap: 9px; padding: 6px 9px; background: rgba(0,0,0,.2); border-radius: 8px; font-size: 12.5px; }
+.guild-mrow .gm-rank { width: 22px; text-align: center; font-weight: 800; color: var(--muted); }
+.guild-mrow .gm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.guild-mrow .gm-contrib { font-weight: 800; color: var(--accent); }
+.guild-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgba(0,0,0,.2); border-radius: 10px; margin-bottom: 5px; }
+.guild-info { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; }
+.guild-emoji-sm { font-size: 24px; flex-shrink: 0; }
+.guild-name-sm { font-weight: 800; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ===== แชทออนไลน์ ===== */
 .chat-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; padding: 6px; background: rgba(0,0,0,.2); border-radius: 10px; margin-bottom: 8px; }
 .chat-msg { font-size: 12.5px; line-height: 1.4; padding: 5px 9px; border-radius: 9px; background: rgba(255,255,255,.05); align-self: flex-start; max-width: 88%; word-break: break-word; }

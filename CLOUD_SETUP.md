@@ -231,6 +231,50 @@ create trigger chat_guard_trg before insert on public.chat for each row execute 
 ```
 > ไม่สร้างตารางนี้เกมก็เล่นได้ปกติ (แค่หน้าแชทจะว่าง)
 
+## 2.26 (ตัวเลือก) 🛡️ กิลด์ / ทีม
+รวมกลุ่ม สมทบพลัง ไต่เลเวลกิลด์ร่วมกัน (ต้องล็อกอิน + ตั้งชื่อที่กระดานอันดับ)
+```sql
+create table if not exists public.guilds (
+  id uuid primary key default gen_random_uuid(),
+  name text unique not null,
+  emoji text, leader_name text,
+  created_at timestamptz default now()
+);
+alter table public.guilds enable row level security;
+grant select, insert on public.guilds to anon, authenticated;
+drop policy if exists "guild read" on public.guilds;
+drop policy if exists "guild insert" on public.guilds;
+create policy "guild read" on public.guilds for select using (true);
+create policy "guild insert" on public.guilds for insert with check (auth.uid() is not null);
+
+create table if not exists public.guild_members (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  guild_id uuid references public.guilds(id) on delete cascade,
+  name text, contrib bigint default 0,
+  joined_at timestamptz default now()
+);
+alter table public.guild_members enable row level security;
+grant select on public.guild_members to anon;
+grant select, insert, update, delete on public.guild_members to authenticated;
+drop policy if exists "gm read" on public.guild_members;
+drop policy if exists "gm own insert" on public.guild_members;
+drop policy if exists "gm own update" on public.guild_members;
+drop policy if exists "gm own delete" on public.guild_members;
+create policy "gm read" on public.guild_members for select using (true);
+create policy "gm own insert" on public.guild_members for insert with check (auth.uid() = user_id);
+create policy "gm own update" on public.guild_members for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+create policy "gm own delete" on public.guild_members for delete using (auth.uid() = user_id);
+
+-- view จัดอันดับกิลด์ (พลังรวม + จำนวนสมาชิก)
+create or replace view public.guild_ranking as
+  select g.id, g.name, g.emoji, g.leader_name,
+    count(m.user_id) as members, coalesce(sum(m.contrib), 0) as contrib
+  from public.guilds g left join public.guild_members m on m.guild_id = g.id
+  group by g.id;
+grant select on public.guild_ranking to anon, authenticated;
+```
+> ไม่สร้างตารางเกมก็เล่นได้ปกติ (แค่หน้ากิลด์จะบอกให้ตั้งค่า)
+
 ## 2.3 (แนะนำ) 💾 สำรองข้อมูลอัตโนมัติทุกวัน (ฟรี ด้วย GitHub Actions)
 มีเวิร์กโฟลว์ `.github/workflows/backup.yml` ดัมพ์ตาราง saves/leaderboard/trades/raid เป็นไฟล์ทุกวัน
 1. Supabase → **Project Settings → Database → Connection string → URI** (คัดลอก · ใส่รหัสผ่าน DB ที่จดไว้ตอนสร้างโปรเจกต์)
