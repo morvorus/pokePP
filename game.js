@@ -836,6 +836,7 @@ function newSave() {
     teamPresets: [null, null, null],   // ชุดทีมสำรอง 3 ช่อง {name, uids:[...]}
     eggs: [],
     savedSpawn: null,    // สปอว์นค้างในเซฟ (กันรีเฟรชสุ่มใหม่)
+    regionSpawns: {},    // สปอว์นค้างต่อเขต (กันรีโปเกม่อนด้วยการออก-เข้าเขตเดิม)
     rods: 0,             // ระดับเบ็ดตกปลา (0=ยังไม่มี, 1-5)
     fishItems: {},       // ไอเทมช่วยตกปลา { lure:true, rare:true }
     goldenSeaUntil: 0,   // เวลาสิ้นสุดอีเวนต์ทะเลทองคำ
@@ -898,22 +899,37 @@ function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) { console.warn(e); }
   cloudSyncDebounced();
 }
-// เก็บสปอว์นปัจจุบันลงเซฟ (กันรีเฟรชหน้าจอเพื่อสุ่มมอนใหม่ — รีเฟรชแล้วได้ตัวเดิม deadline เดิม)
-function persistSpawn() {
-  state.savedSpawn = currentSpawn ? {
+// สแนปช็อตสปอว์นปัจจุบัน (ใช้ทั้งกันรีเฟรช + จำต่อเขต)
+function spawnSnapshot() {
+  return currentSpawn ? {
     id: currentSpawn.mon.id, tier: currentSpawn.tier, shiny: currentSpawn.shiny, level: currentSpawn.level,
     deadline: currentSpawn.deadline, maxHp: currentSpawn.maxHp, hp: currentSpawn.hp, throws: currentSpawn.throws, fishing: currentSpawn.fishing, golden: currentSpawn.golden,
   } : null;
 }
-function restoreSpawn() {
-  const s = state.savedSpawn;
-  if (!s || !s.id || !s.deadline || s.deadline <= Date.now()) { state.savedSpawn = null; return false; }
-  const mon = MON_BY_ID[s.id]; if (!mon) { state.savedSpawn = null; return false; }
+// เก็บสปอว์นปัจจุบันลงเซฟ (กันรีเฟรชหน้าจอเพื่อสุ่มมอนใหม่ — รีเฟรชแล้วได้ตัวเดิม deadline เดิม)
+function persistSpawn() { state.savedSpawn = spawnSnapshot(); }
+// นำสปอว์นจากสแนปช็อตกลับมา (ใช้ร่วมกันทั้งกันรีเฟรช + จำต่อเขต) — คืน true ถ้ากู้สำเร็จ
+function applySpawnSnapshot(s) {
+  if (!s || !s.id || !s.deadline || s.deadline <= Date.now()) return false;
+  const mon = MON_BY_ID[s.id]; if (!mon) return false;
   currentSpawn = { mon, tier: s.tier, shiny: s.shiny, level: s.level, throws: s.throws || 0, deadline: s.deadline, maxHp: s.maxHp, hp: s.hp, fishing: s.fishing, golden: s.golden };
   renderSpawn();
   clearTimeout(despawnTimer);
   despawnTimer = setTimeout(fleeSpawn, Math.max(500, s.deadline - Date.now()));
   return true;
+}
+// กันการรีโปเกม่อน: จำสปอว์นของเขตที่ออกไป แล้วคืนตัวเดิมเมื่อกลับมาเขตเดิม (จนกว่าจะหมดเวลา)
+function restoreRegionSpawn(id) {
+  const s = state.regionSpawns && state.regionSpawns[id];
+  if (!s) return false;
+  const ok = applySpawnSnapshot(s);
+  delete state.regionSpawns[id];   // เอาออกเมื่อกู้แล้ว (จะถูกเก็บใหม่ถ้าออกจากเขตอีกครั้ง)
+  return ok;
+}
+function restoreSpawn() {
+  const ok = applySpawnSnapshot(state.savedSpawn);
+  if (!ok) state.savedSpawn = null;
+  return ok;
 }
 let _cloudTimer = null;
 function cloudSyncDebounced() {
@@ -2354,8 +2370,15 @@ function selectRegion(id) {
     if (left > 0) { toast(`⏳ รอเปลี่ยนเขตอีก ${Math.ceil(left / 1000)} วิ`, 'bad'); return; }
     state.regionSwitchReadyAt = Date.now() + REGION_SWITCH_CD;
   }
-  state.region = id; save();
-  renderRegionBanner(); clearSpawn(); scheduleSpawn(1500);
+  // กันการรีโปเกม่อน: เก็บสปอว์นของเขตเดิมไว้ (ยกเว้นตัวจากตกปลา) แล้วคืนตัวเดิมถ้ากลับมาเขตนี้ในเวลาที่ยังไม่หมด
+  if (currentSpawn && !currentSpawn.fishing && id !== state.region) {
+    state.regionSpawns = state.regionSpawns || {};
+    state.regionSpawns[state.region] = spawnSnapshot();
+  }
+  state.region = id;
+  renderRegionBanner(); clearSpawn();
+  if (!restoreRegionSpawn(id)) scheduleSpawn(1500);   // มีตัวเดิมของเขตนี้ค้างอยู่? เอาคืน · ไม่มีค่อยสุ่มใหม่
+  save();
   switchView('home');
   toast(`${r.emoji} เดินทางสู่ <b>${r.name}</b>`, 'good');
 }
@@ -3099,12 +3122,12 @@ function renderShop() {
     const qty = (state.shopQty && state.shopQty[k]) || 1;
     addBalls(k, qty, BALLS[k].price * qty);
   });
-  document.querySelectorAll('[data-shoptab]').forEach(b => b.onclick = () => setShopTab(b.dataset.shoptab));
-  setShopTab(_shopTab);
+  document.querySelectorAll('[data-shoptab]').forEach(b => b.onclick = () => setShopTab(b.dataset.shoptab, true));
+  setShopTab(_shopTab);   // re-render ปกติ (ไม่เลื่อนจอ)
 }
 const SHOP_PANELS = { main: '#shopGrid', bp: '#bpShopBox', fish: '#fishShopBox' };
 let _shopTab = (() => { try { return SHOP_PANELS[localStorage.getItem('pp_shopTab')] ? localStorage.getItem('pp_shopTab') : 'main'; } catch { return 'main'; } })();
-function setShopTab(tab) {
+function setShopTab(tab, fromClick) {
   if (!SHOP_PANELS[tab]) tab = 'main';
   _shopTab = tab;
   try { localStorage.setItem('pp_shopTab', tab); } catch { /* private mode */ }
@@ -3112,9 +3135,12 @@ function setShopTab(tab) {
   if (tab === 'bp') renderBpShop();
   else if (tab === 'fish') renderFishShop();
   Object.entries(SHOP_PANELS).forEach(([k, sel]) => { const el = $(sel); if (el) el.hidden = (k !== tab); });
-  const active = $(SHOP_PANELS[tab]);   // เอฟเฟกต์เปลี่ยนหน้า (fade + เลื่อนขึ้นบน)
-  if (active) { active.classList.remove('shop-page'); void active.offsetWidth; active.classList.add('shop-page'); }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  // เอฟเฟกต์เปลี่ยนหน้า + เลื่อนขึ้นบน เฉพาะตอนกดสลับแท็บจริงๆ (ไม่ทำตอน re-render หลังซื้อ = ไม่เด้งขึ้นบน)
+  if (fromClick) {
+    const active = $(SHOP_PANELS[tab]);
+    if (active) { active.classList.remove('shop-page'); void active.offsetWidth; active.classList.add('shop-page'); }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 }
 function spendTokens(n) { if ((state.fishTokens || 0) < n) { toast('❌ เหรียญตกปลาไม่พอ', 'bad'); return false; } state.fishTokens -= n; return true; }
 function spendCheckin(n) { if ((state.checkinCoins || 0) < n) { toast('❌ เหรียญเช็คอินไม่พอ (ได้จากล็อกอินรายวัน)', 'bad'); return false; } state.checkinCoins -= n; return true; }
@@ -5189,9 +5215,10 @@ function battleAttack(moveIdx) {
     if (active.status === 'burn') dmg = Math.floor(dmg * 0.6);   // ไหม้ลดพลังโจมตี
     if (wasDynamaxed) dmg = Math.floor(dmg * DYNAMAX_DMG_MULT);   // โบนัสดาเมจไดนาแม็กซ์
     const koMode = b.mode !== 'wild';
+    const wildKO = b.mode === 'wild' && dmg >= b.foeHp;   // ตีแรงพอจะโค่นตัวป่า → ได้เงิน+XP แทนการจับ (ตีเบาๆ = อ่อนแรงให้จับ)
     let sturdyMsg = '';
     if (defAbility && defAbility.fx === 'sturdy' && foeWasFull && dmg >= b.foeHp && b.mode !== 'wild') { dmg = b.foeHp - 1; sturdyMsg = ` · 🗿 ${foeNameForMsg} ทนอยู่ด้วย Sturdy!`; }
-    b.foeHp = Math.max(koMode ? 0 : 1, b.foeHp - dmg);
+    b.foeHp = wildKO ? 0 : Math.max(koMode ? 0 : 1, b.foeHp - dmg);
     b._fx = Object.assign(b._fx || {}, { foe: { dmg, crit: atk.crit, eff: atk.eff, type: mv.type } });
     b.msg += `${view.name} ใช้ ${mv.name}! ${atk.crit ? '🎯 คริติคอล! ' : ''}${atk.weather ? '🌦️ อากาศช่วย! ' : ''}-${dmg}${atk.eff > 1 ? ' (ได้เปรียบ!)' : atk.eff < 1 ? ' (เสียเปรียบ)' : ''}${sturdyMsg}`;
     if (isStruggle) {   // ดิ้นรน: บาดเจ็บตัวเอง 1/4 HP
@@ -5221,6 +5248,17 @@ function battleAttack(moveIdx) {
       b.msg += ` · 🐚 ฟื้น ${heal}`;
     }
     if (b.mode === 'wild' && currentSpawn) currentSpawn.hp = b.foeHp;
+    if (wildKO) {   // โค่นโปเกมอนป่า → ได้เงิน + XP (ไม่ได้ตัว) แล้วรอสปอว์นใหม่ตามคูลดาวน์
+      b.over = true;
+      const tierMult = { common: 1, uncommon: 1.4, rare: 2, superrare: 3, legendary: 6 }[currentSpawn ? currentSpawn.tier : 'common'] || 1;
+      const coins = Math.round((8 + b.foeLevel * 2) * tierMult);
+      state.coins += coins;
+      gainXpTo(active.ind, Math.round(b.foeLevel * 1.2)); gainTrainerXp(6);
+      b.msg += ` · 💥 โค่น ${b.foeMon.name} ได้! +${coins}🪙 +XP (ไม่ได้ตัว)`;
+      logMsg(`💥 โค่น <b>${b.foeMon.name}</b> Lv.${b.foeLevel}! +${coins}🪙`, '');
+      clearSpawn(); scheduleSpawn(); playSfx('rare'); save(); renderTopbar();
+      return true;
+    }
     if (b.foeHp <= 0) { onFoeDown(); return true; }
     if (b.mode === 'wild' && b.foeHp <= 1) {
       b.over = true;
