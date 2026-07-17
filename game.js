@@ -1120,8 +1120,12 @@ function onGlobalNotice(p) {
   else return;
   serverBanner(txt);
 }
-// ส่งเหตุการณ์เด่นของเราขึ้นฟีดกลาง (ทุกคนจะเห็นภายในไม่กี่วินาที)
+// ส่งเหตุการณ์เด่นของเราขึ้นฟีดกลาง (ทุกคนจะเห็นภายในไม่กี่วินาที) — throttle กันสแปมฝั่ง client
+let _lastFeedPush = 0;
 function broadcastNotice(kind, monName) {
+  const now = Date.now();
+  if (now - _lastFeedPush < 4000) return;   // ไม่ push ถี่กว่า 4 วิ (server ก็มี rate-limit ซ้อนอีกชั้น)
+  _lastFeedPush = now;
   try { if (window.Cloud && Cloud.pushFeed) Cloud.pushFeed({ name: state.playerName || 'เทรนเนอร์', kind, mon: monName || '' }); } catch (e) { /* เงียบ */ }
 }
 // ดึงฟีดใหม่มาโชว์แบนเนอร์ (poll เป็นระยะ · กันซ้ำ · ข้ามของตัวเอง)

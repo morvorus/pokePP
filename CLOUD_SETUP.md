@@ -188,8 +188,28 @@ drop policy if exists "feed insert" on public.feed;
 create policy "feed read" on public.feed for select using (true);
 create policy "feed insert" on public.feed for insert with check (true);
 create index if not exists feed_time on public.feed (created_at desc);
+
+-- 🛡️ กันสแปมฟีด: ชื่อเดิมโพสต์ได้ไม่ถี่กว่า 8 วิ + ลบแถวเก่ากว่า 1 ชม.อัตโนมัติ (ป้องกันตารางบวม)
+create or replace function public.feed_guard() returns trigger language plpgsql as $$
+begin
+  if exists (select 1 from public.feed where name = new.name and created_at > now() - interval '8 seconds') then
+    return null;   -- โพสต์ถี่เกินไป → ข้ามเงียบๆ (ไม่ error client)
+  end if;
+  if random() < 0.05 then delete from public.feed where created_at < now() - interval '1 hour'; end if;
+  return new;
+end; $$;
+drop trigger if exists feed_guard_trg on public.feed;
+create trigger feed_guard_trg before insert on public.feed for each row execute function public.feed_guard();
 ```
 > ไม่สร้างตารางนี้เกมก็เล่นได้ปกติ (แค่ไม่มีแถบแจ้งเตือนทั้งเซิร์ฟเวอร์)
+
+## 2.3 (แนะนำ) 💾 สำรองข้อมูลอัตโนมัติทุกวัน (ฟรี ด้วย GitHub Actions)
+มีเวิร์กโฟลว์ `.github/workflows/backup.yml` ดัมพ์ตาราง saves/leaderboard/trades/raid เป็นไฟล์ทุกวัน
+1. Supabase → **Project Settings → Database → Connection string → URI** (คัดลอก · ใส่รหัสผ่าน DB ที่จดไว้ตอนสร้างโปรเจกต์)
+2. GitHub repo → **Settings → Secrets and variables → Actions → New repository secret**
+   - ชื่อ `SUPABASE_DB_URL` · ค่า = connection string จากข้อ 1
+3. เสร็จ! ดูไฟล์สำรองที่แท็บ **Actions → DB Backup → artifact** (เก็บ 30 วัน) · กดรันเองได้ด้วยปุ่ม Run workflow
+> ยังไม่ตั้ง secret เวิร์กโฟลว์จะข้ามเงียบๆ ไม่พัง
 
 ## 3. (แนะนำ) ปิดยืนยันอีเมล เพื่อล็อกอินง่ายขึ้น
 เมนูซ้าย → **Authentication** → **Providers** → **Email** → ปิด **Confirm email** → Save

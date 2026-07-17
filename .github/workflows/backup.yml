@@ -1,0 +1,44 @@
+name: DB Backup (Supabase)
+# สำรองข้อมูล Supabase อัตโนมัติทุกวัน → เก็บเป็น artifact (ฟรี บน GitHub Actions)
+# ต้องตั้ง secret ก่อน: Settings → Secrets and variables → Actions → New secret
+#   ชื่อ SUPABASE_DB_URL = connection string จาก Supabase (Project Settings → Database → Connection string → URI)
+# ถ้ายังไม่ตั้ง secret เวิร์กโฟลว์จะข้ามเงียบๆ ไม่ error
+on:
+  schedule:
+    - cron: '17 3 * * *'   # ทุกวัน 03:17 UTC (~10:17 น. ไทย)
+  workflow_dispatch: {}      # กดรันเองได้จากแท็บ Actions
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install pg_dump 16 (ให้เข้ากับ Postgres 15 ของ Supabase)
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update && sudo apt-get install -y postgresql-client-16
+
+      - name: Dump ตารางสำคัญ (saves + leaderboard + trades + raid)
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$DB_URL" ]; then
+            echo "⚠️ ยังไม่ได้ตั้ง secret SUPABASE_DB_URL — ข้ามการสำรอง (ไม่ error)"
+            exit 0
+          fi
+          STAMP=$(date -u +%Y%m%d-%H%M)
+          /usr/lib/postgresql/16/bin/pg_dump "$DB_URL" \
+            --data-only --no-owner --no-privileges \
+            --table=public.saves --table=public.leaderboard \
+            --table=public.trades --table=public.raid_contrib \
+            | gzip > "backup-$STAMP.sql.gz"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          echo "✅ สำรองข้อมูลสำเร็จ: backup-$STAMP.sql.gz"
+
+      - name: Upload artifact (เก็บ 30 วัน)
+        if: env.STAMP != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pokepp-backup-${{ env.STAMP }}
+          path: backup-*.sql.gz
+          retention-days: 30
