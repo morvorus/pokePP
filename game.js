@@ -1409,12 +1409,24 @@ function getWeather(regionId) {
   state.weather[regionId] = { type, until: Date.now() + WEATHER_MS };
   return type;
 }
-// ---------- อีเวนต์สุ่มตามฤดูกาล (World Events) ----------
+// ---------- อีเวนต์โลก (World Events) — deterministic ตามเวลา UTC ทุกเครื่องเห็นตรงกันทั้งเซิร์ฟเวอร์ ----------
+const EVENT_SLOT_MS = 30 * 60000;   // แบ่งเวลาเป็นช่องละ 30 นาที · แต่ละช่องคำนวณอีเวนต์เหมือนกันทุกเครื่อง
+function _slotHash(n) {   // แฮชจำนวนเต็ม deterministic (เครื่องไหนก็ได้ผลเดียวกันจาก slot เดียวกัน)
+  let h = (n ^ 0x9e3779b9) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  return (h ^ (h >>> 16)) >>> 0;
+}
+function syncedWorldEvent() {
+  const slot = Math.floor(Date.now() / EVENT_SLOT_MS);
+  const h = _slotHash(slot);
+  if (h % 5 >= 2) return null;                 // ~2 ใน 5 ช่องมีอีเวนต์ (ที่เหลือปกติ)
+  const ev = RANDOM_EVENTS[h % RANDOM_EVENTS.length];
+  return { ev, id: ev.id, until: (slot + 1) * EVENT_SLOT_MS };
+}
 function currentWorldEvent() {
-  const we = state.worldEvent;
-  if (!we) return null;
-  if (we.until <= Date.now()) { state.worldEvent = null; renderRegionBanner(); return null; }
-  return RANDOM_EVENTS.find(e => e.id === we.id) || null;
+  const s = syncedWorldEvent();
+  return s ? s.ev : null;
 }
 // ===== อีเวนต์ประจำสัปดาห์ — หมุนอัตโนมัติแบบ deterministic ตามเลขสัปดาห์ ทุกคนเห็นตรงกัน =====
 const WEEKLY_SHINY_MULT = 1, WEEKLY_COIN_MULT = 1.2, WEEKLY_LEG_MULT = 1.4;   // อีเวนต์สัปดาห์ให้โบนัสเหรียญ/เลเจนดารี — ไม่ดันโอกาส Shiny (คง Shiny ให้หายากคุ้มการหา)
@@ -1438,12 +1450,20 @@ function checkWeeklyEvent() {   // แจ้งเตือนครั้งแ
   logMsg(`📅 อีเวนต์ประจำสัปดาห์: ${wk.emoji} <b>${wk.name}</b> — ${wk.desc} (เหรียญ ×${WEEKLY_COIN_MULT} · เจอเลเจนดารี ×${WEEKLY_LEG_MULT} · ธาตุ ${wk.types.length ? wk.types.join('/') : 'ทุกธาตุ'} ออกบ่อยขึ้น ทั้งสัปดาห์)`, 'big');
   save();
 }
+// เช็คว่าช่องเวลา (อีเวนต์โลก) เปลี่ยนไหม → แจ้งเตือนอีเวนต์ใหม่ (ทุกเครื่องเปลี่ยนพร้อมกัน)
 function tryTriggerRandomEvent() {
-  const now = Date.now();
-  if (currentWorldEvent()) return;                     // มีอีเวนต์ทำงานอยู่แล้ว
-  if (now < (state.nextEventCheck || 0)) return;
-  state.nextEventCheck = now + EVENT_CHECK_MS;
-  if (Math.random() < EVENT_CHANCE) activateRandomEvent();
+  const s = syncedWorldEvent();
+  const curId = s ? s.id : null;
+  if (curId === state._lastSeenEventId) return;   // อีเวนต์ยังเหมือนเดิม
+  state._lastSeenEventId = curId;
+  if (s) {
+    state.eventHistory = [s.id, ...(state.eventHistory || [])].slice(0, 8);
+    const mins = Math.max(1, Math.round((s.until - Date.now()) / 60000));
+    if (state.settings.eventAlerts) { showEventBanner(s.ev, mins); playSfx('rare'); }
+    logMsg(`${s.ev.emoji} <b>อีเวนต์ทั้งเซิร์ฟเวอร์: ${s.ev.name}</b> — ${s.ev.desc} (${mins} นาที)`, 'big');
+    checkAchievements();
+  }
+  renderRegionBanner();
   save();
 }
 function activateRandomEvent(forceId) {
@@ -2090,10 +2110,11 @@ function renderRegionBanner() {
   renderBoostStrip();
   renderStarter();
 
-  const we = currentWorldEvent();
+  const sw = syncedWorldEvent();
+  const we = sw ? sw.ev : null;
   const ribbon = $('#eventRibbon');
   if (we) {
-    const left = Math.max(0, Math.ceil((state.worldEvent.until - Date.now()) / 60000));
+    const left = Math.max(0, Math.ceil((sw.until - Date.now()) / 60000));
     ribbon.innerHTML = `${we.emoji} <b>${we.name}</b> · ${we.desc} · เหลือ ${left} นาที`;
     ribbon.classList.remove('hidden');
     card.querySelector('.scrim').style.background = we.tint;
@@ -3568,6 +3589,7 @@ function renderMenu() {
   renderRival();
   renderCloudUI();
   renderLeaderboard();
+  renderChat();
   renderRaid();
   renderGhostArena();
   renderTrade();
@@ -6288,6 +6310,52 @@ function pvpUpdate(win) {
   if (win) { state.pvpRating = (state.pvpRating || 1000) + 25; state.pvpWins = (state.pvpWins || 0) + 1; if (state.pvpRating > (state.pvpPeak || 0)) state.pvpPeak = state.pvpRating; }
   else { state.pvpRating = Math.max(600, (state.pvpRating || 1000) - 18); state.pvpLosses = (state.pvpLosses || 0) + 1; }
 }
+// ===== แชทออนไลน์ (ตาราง chat + poll ทุก 5 วิ เมื่อเปิดหน้าแชท) =====
+let _chatMsgs = [], _chatSince = '', _chatSeen = new Set(), _lastChatSend = 0, _chatInited = false;
+function renderChat() {
+  const box = $('#chatBox'); if (!box) return;
+  if (!(window.Cloud && Cloud.enabled)) { box.innerHTML = `<div class="sr-sub">ต้องตั้งค่าคลาวด์ก่อนถึงจะแชทได้</div>`; return; }
+  const myName = state.playerName || '';
+  const msgs = _chatMsgs.slice(-60).map(m =>
+    `<div class="chat-msg${m.name === myName ? ' mine' : ''}"><span class="cm-name">${escapeHtml(m.name || '?')}</span><span class="cm-text">${escapeHtml(m.msg || '')}</span></div>`).join('');
+  box.innerHTML = `
+    <div class="chat-list" id="chatList">${msgs || '<div class="sr-sub">ยังไม่มีข้อความ — ทักทายกันได้เลย!</div>'}</div>
+    ${myName ? '' : '<div class="sr-sub" style="color:var(--bad);margin:5px 0">ตั้งชื่อที่ "🏆 กระดานจัดอันดับ" ก่อนถึงจะส่งข้อความได้</div>'}
+    <div class="chat-input-row">
+      <input class="save-io" id="chatInput" maxlength="160" placeholder="พิมพ์ข้อความ..." ${myName ? '' : 'disabled'} style="min-height:auto;padding:9px;flex:1;font-family:inherit;font-size:13px">
+      <button class="set-btn" id="chatSend" ${myName ? '' : 'disabled'}>ส่ง</button>
+    </div>`;
+  const input = $('#chatInput'), send = $('#chatSend');
+  if (send) send.onclick = sendChatMsg;
+  if (input) input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); sendChatMsg(); } };
+  const list = $('#chatList'); if (list) list.scrollTop = list.scrollHeight;
+  if (!_chatInited) { _chatInited = true; pollChat(); }   // โหลดประวัติครั้งแรก
+}
+async function sendChatMsg() {
+  const input = $('#chatInput'); if (!input) return;
+  const msg = (input.value || '').trim(); if (!msg) return;
+  if (!state.playerName) { toast('ตั้งชื่อที่กระดานอันดับก่อน', 'bad'); return; }
+  const now = Date.now();
+  if (now - _lastChatSend < 2000) { toast('พิมพ์ช้าลงหน่อยนะ', 'bad'); return; }   // throttle กันสแปม
+  _lastChatSend = now; input.value = '';
+  const res = await Cloud.sendChat(state.playerName, msg);
+  if (res && res.error) { toast('ส่งไม่สำเร็จ: ' + res.error, 'bad'); return; }
+  pollChat();
+}
+async function pollChat() {
+  if (!(window.Cloud && Cloud.enabled)) return;
+  let rows;
+  try { rows = await Cloud.recentChat(_chatSince || undefined, 40); } catch (e) { return; }
+  let added = false;
+  for (const r of rows) {
+    if (r.id == null || _chatSeen.has(r.id)) continue;
+    _chatSeen.add(r.id); _chatMsgs.push(r); added = true;
+    if (r.created_at && r.created_at > _chatSince) _chatSince = r.created_at;
+  }
+  if (_chatMsgs.length > 100) _chatMsgs = _chatMsgs.slice(-100);
+  if (_chatSeen.size > 500) _chatSeen = new Set(_chatMsgs.map(m => m.id));
+  if (added && currentView === 'menu') renderChat();
+}
 let _ghostCache = null;
 function renderGhostArena() {
   const box = $('#ghostBox'); if (!box) return;
@@ -6611,10 +6679,8 @@ function init() {
   }, 20000);
   // เช็คว่าจะสุ่มเกิดอีเวนต์ฤดูกาล/พ่อค้าเร่ไหม + รีเฟรชป้ายเมื่อหมดเวลา
   setInterval(() => {
-    const before = !!state.worldEvent;
-    tryTriggerRandomEvent();
+    tryTriggerRandomEvent();   // เช็คช่องเวลาอีเวนต์โลก (เปลี่ยน = แจ้ง+รีเฟรชป้ายเองในฟังก์ชัน)
     tryTriggerMerchant();
-    if (before && !state.worldEvent) renderRegionBanner();   // อีเวนต์เพิ่งหมดเวลา
     if (currentView === 'home') renderRegionBanner();
   }, 30000);
   tryTriggerRandomEvent();   // เช็คทันทีตอนเปิดเกมด้วย (มีโอกาสเกิดตั้งแต่แรก)
@@ -6645,6 +6711,7 @@ function init() {
   setInterval(refreshLiveConfig, 5 * 60 * 1000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshLiveConfig(); });
   setInterval(renderRailWidgets, 5 * 60 * 1000);   // รีเฟรชมินิกระดานข้างจอเป็นระยะ
+  setInterval(() => { const sec = $('#chatSec'); if (currentView === 'menu' && sec && sec.open) pollChat(); }, 5000);   // แชท: ดึงข้อความใหม่ทุก 5 วิ เมื่อเปิดหน้าแชท
   setInterval(pollFeed, 20000);   // ฟีดแจ้งเตือนทั้งเซิร์ฟเวอร์ (จับเทพ/ไชนี่/กำไรเมก้า) ทุก 20 วิ
 }
 // โมดูล ES เป็น deferred — ถ้า DOM พร้อมแล้วให้ init ทันที ไม่งั้นรอ event (กันเคสที่ event ยิงไปก่อน)
@@ -6661,6 +6728,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop, abilityFor,
     openIndividualModal, tradeNpc, claimDailyLogin, selectRegion, playSpawnFx, renderHallOfFame,
     get liveConfig() { return liveConfig; }, set liveConfig(v) { liveConfig = { ...LIVE_DEFAULTS, ...v }; renderLiveBanner(); applyLiveTheme(); },
-    shinyMultiplier, liveXpMult, liveCoinMult, celebrate, centerEvent, serverBanner, onGlobalNotice, broadcastNotice, pollFeed,
+    shinyMultiplier, liveXpMult, liveCoinMult, celebrate, centerEvent, serverBanner, onGlobalNotice, broadcastNotice, pollFeed, renderChat, pollChat, syncedWorldEvent, currentWorldEvent,
   };
 }

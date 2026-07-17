@@ -206,6 +206,27 @@ const Cloud = {
     } catch (e) { return []; }
   },
 
+  // ===== แชทออนไลน์ (ตาราง chat + poll) — เสถียร ไม่ต้องพึ่ง Realtime =====
+  async sendChat(name, msg) {
+    if (!this.enabled) return { error: 'cloud ปิดอยู่' };
+    try {
+      const { error } = await this.client.from('chat').insert({
+        name: String(name || 'เทรนเนอร์').slice(0, 24),
+        msg: String(msg || '').slice(0, 160),
+      });
+      return error ? { error: error.message } : { ok: true };
+    } catch (e) { return { error: String(e) }; }
+  },
+  async recentChat(sinceIso, limit) {
+    if (!this.enabled) return [];
+    try {
+      let q = this.client.from('chat').select('id, name, msg, created_at').order('created_at', { ascending: false }).limit(limit || 40);
+      if (sinceIso) q = q.gt('created_at', sinceIso);
+      const { data, error } = await q;
+      return error ? [] : (data || []).reverse();   // เรียงเก่า→ใหม่
+    } catch (e) { return []; }
+  },
+
   // ===== Analytics: log เหตุการณ์สำคัญ (fire-and-forget · ไม่บล็อกเกม · ไม่ล้ม) =====
   // ต้องสร้างตาราง public.events (ดู CLOUD_SETUP.md) · ถ้าไม่มี/ผิดพลาด เงียบไป ไม่กระทบเกม
   logEvent(name, meta) {

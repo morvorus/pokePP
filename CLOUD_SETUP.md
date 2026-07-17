@@ -203,6 +203,34 @@ create trigger feed_guard_trg before insert on public.feed for each row execute 
 ```
 > ไม่สร้างตารางนี้เกมก็เล่นได้ปกติ (แค่ไม่มีแถบแจ้งเตือนทั้งเซิร์ฟเวอร์)
 
+## 2.25 (ตัวเลือก) 💬 แชทออนไลน์
+```sql
+create table if not exists public.chat (
+  id bigint generated always as identity primary key,
+  name text, msg text,
+  created_at timestamptz default now()
+);
+alter table public.chat enable row level security;
+grant select, insert on public.chat to anon, authenticated;
+drop policy if exists "chat read" on public.chat;
+drop policy if exists "chat insert" on public.chat;
+create policy "chat read" on public.chat for select using (true);
+create policy "chat insert" on public.chat for insert with check (true);
+create index if not exists chat_time on public.chat (created_at desc);
+-- กันสแปม: ชื่อเดิมส่งได้ไม่ถี่กว่า 2 วิ + ลบข้อความเก่ากว่า 2 วันอัตโนมัติ
+create or replace function public.chat_guard() returns trigger language plpgsql as $$
+begin
+  if exists (select 1 from public.chat where name = new.name and created_at > now() - interval '2 seconds') then
+    return null;
+  end if;
+  if random() < 0.02 then delete from public.chat where created_at < now() - interval '2 days'; end if;
+  return new;
+end; $$;
+drop trigger if exists chat_guard_trg on public.chat;
+create trigger chat_guard_trg before insert on public.chat for each row execute function public.chat_guard();
+```
+> ไม่สร้างตารางนี้เกมก็เล่นได้ปกติ (แค่หน้าแชทจะว่าง)
+
 ## 2.3 (แนะนำ) 💾 สำรองข้อมูลอัตโนมัติทุกวัน (ฟรี ด้วย GitHub Actions)
 มีเวิร์กโฟลว์ `.github/workflows/backup.yml` ดัมพ์ตาราง saves/leaderboard/trades/raid เป็นไฟล์ทุกวัน
 1. Supabase → **Project Settings → Database → Connection string → URI** (คัดลอก · ใส่รหัสผ่าน DB ที่จดไว้ตอนสร้างโปรเจกต์)
