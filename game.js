@@ -852,6 +852,7 @@ function newSave() {
     avatarKey: null,     // สไปรต์เทรนเนอร์ที่เลือก (null = ค่าเริ่มต้น)
     battleItems: {},     // ไอเทมใช้ตอนต่อสู้ { potion, hyperpotion, ether }
     guildLvlClaimed: 0,  // เลเวลกิลด์สูงสุดที่รับรางวัลไปแล้ว (กันรับซ้ำ/ฟาร์มออก-เข้ากิลด์)
+    friends: [],         // รายชื่อเพื่อน (ชื่อบนกระดาน) — เก็บในเซฟ ดึงสถิติจากกระดานสาธารณะ
     settings: { sound: true, music: false, spawnSpeed: 'normal',
       rareAlerts: true, eventAlerts: true, mascotDeco: true, reduceMotion: false, confirmRelease: true, fastBattle: false, hardcoreMode: false },
     hardcoreDeaths: 0,   // จำนวนตัวที่ถูกปล่อยถาวรจากโหมด Hardcore (สถิติ ไม่รีเซ็ตแม้ปิดโหมด)
@@ -3593,6 +3594,7 @@ function renderMenu() {
   renderLeaderboard();
   renderChat();
   renderGuild();
+  renderFriends();
   renderRaid();
   renderGhostArena();
   renderTrade();
@@ -6532,6 +6534,65 @@ async function doDonate(amount) {
   toast(`🛡️ สมทบ ${amount.toLocaleString()}🪙 เข้ากิลด์!`, 'good'); playSfx('coin');
   renderGuild();
 }
+// ===== รายชื่อเพื่อน (เก็บในเซฟ + ดึงสถิติจากกระดาน · ท้าดวลได้) =====
+let _friendBusy = false;
+function renderFriends() {
+  const box = $('#friendBox'); if (!box) return;
+  if (!(window.Cloud && Cloud.enabled)) { box.innerHTML = `<div class="sr-sub">ต้องตั้งค่าคลาวด์ก่อน</div>`; return; }
+  const friends = state.friends || [];
+  box.innerHTML = `
+    <div class="trade-card" style="margin-bottom:8px">
+      <div class="trade-h">➕ เพิ่มเพื่อน (ใส่ชื่อบนกระดาน)</div>
+      <div style="display:flex;gap:6px">
+        <input class="save-io" id="friendName" maxlength="24" placeholder="ชื่อเพื่อน" style="flex:1;min-height:auto;padding:9px;font-family:inherit;font-size:13px">
+        <button class="set-btn" id="friendAdd">เพิ่ม</button>
+      </div>
+    </div>
+    <div id="friendList">${friends.length ? skelRows(Math.min(friends.length, 4), 40) : emptyState('👥', 'ยังไม่มีเพื่อน', 'เพิ่มเพื่อนด้วยชื่อบนกระดานเพื่อดูสถิติ + ท้าดวล')}</div>`;
+  $('#friendAdd').onclick = addFriend;
+  $('#friendName').onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); addFriend(); } };
+  if (friends.length) loadFriendStats();
+}
+async function loadFriendStats() {
+  const friends = state.friends || [];
+  const stats = await Promise.all(friends.map(n => Cloud.playerByName(n).catch(() => null)));
+  const list = $('#friendList'); if (!list) return;
+  list.innerHTML = friends.map((n, i) => {
+    const s = stats[i];
+    const info = s ? `📖 ${s.dex || 0} · 🗼 ${s.tower || 0} · ${s.pvp > 0 ? pvpTier(s.pvp).emoji : '—'}` : '<span style="opacity:.6">ออฟไลน์/ไม่พบสถิติ</span>';
+    return `<div class="friend-row">
+      <div class="friend-info"><div class="friend-name">👤 ${escapeHtml(n)}</div><div class="sr-sub" style="font-size:10.5px">${info}</div></div>
+      <button class="rt-fight" data-fchal="${escapeHtml(n)}">ท้าดวล</button>
+      <button class="set-btn danger" data-frem="${escapeHtml(n)}" style="padding:6px 9px">✕</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('[data-fchal]').forEach(b => b.onclick = () => challengeFriendByName(b.dataset.fchal));
+  list.querySelectorAll('[data-frem]').forEach(b => b.onclick = () => removeFriend(b.dataset.frem));
+}
+async function addFriend() {
+  const name = ($('#friendName').value || '').trim();
+  if (!name) { toast('กรอกชื่อเพื่อนก่อน', 'bad'); return; }
+  if (name === state.playerName) { toast('นั่นคือชื่อคุณเอง', 'bad'); return; }
+  if ((state.friends || []).includes(name)) { toast('มีเพื่อนคนนี้อยู่แล้ว', ''); return; }
+  if ((state.friends || []).length >= 30) { toast('เพื่อนเต็มแล้ว (30 คน)', 'bad'); return; }
+  if (_friendBusy) return; _friendBusy = true;
+  const p = await Cloud.playerByName(name);
+  _friendBusy = false;
+  if (!p) { toast('ไม่พบผู้เล่นชื่อนี้บนกระดาน (เขาต้องส่งสถิติก่อน)', 'bad'); return; }
+  state.friends = [...(state.friends || []), name]; save();
+  toast(`👥 เพิ่มเพื่อน ${name} แล้ว!`, 'good'); renderFriends();
+}
+function removeFriend(name) {
+  state.friends = (state.friends || []).filter(n => n !== name); save();
+  toast(`ลบเพื่อน ${name} แล้ว`, ''); renderFriends();
+}
+async function challengeFriendByName(name) {
+  toast('⏳ กำลังหาเพื่อน...', '');
+  const res = await Cloud.ghostByName(name);
+  if (res.error) { toast('❌ ' + res.error, 'bad'); return; }
+  if (!res.ghost) { toast('เพื่อนยังไม่ได้ส่งทีมที่กระดาน', 'bad'); return; }
+  startGhostBattle(res.ghost);
+}
 let _ghostCache = null;
 function renderGhostArena() {
   const box = $('#ghostBox'); if (!box) return;
@@ -6904,6 +6965,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop, abilityFor,
     openIndividualModal, tradeNpc, claimDailyLogin, selectRegion, playSpawnFx, renderHallOfFame,
     get liveConfig() { return liveConfig; }, set liveConfig(v) { liveConfig = { ...LIVE_DEFAULTS, ...v }; renderLiveBanner(); applyLiveTheme(); },
-    shinyMultiplier, liveXpMult, liveCoinMult, celebrate, centerEvent, serverBanner, onGlobalNotice, broadcastNotice, pollFeed, renderChat, pollChat, syncedWorldEvent, currentWorldEvent, renderGuild, guildLevel, shareProfileCard,
+    shinyMultiplier, liveXpMult, liveCoinMult, celebrate, centerEvent, serverBanner, onGlobalNotice, broadcastNotice, pollFeed, renderChat, pollChat, syncedWorldEvent, currentWorldEvent, renderGuild, guildLevel, shareProfileCard, renderFriends,
   };
 }

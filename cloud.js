@@ -135,6 +135,16 @@ const Cloud = {
       return { ok: true, rows };
     } catch (e) { return { error: String(e) }; }
   },
+  // ดึงสถิติผู้เล่นจากชื่อ (สำหรับรายชื่อเพื่อน) — อ่านจากกระดานสาธารณะ
+  async playerByName(name) {
+    if (!this.enabled) return null;
+    try {
+      const { data, error } = await this.client.from('leaderboard')
+        .select('name, dex, tower, caught, pvp, playtime, updated_at')
+        .eq('name', name).order('updated_at', { ascending: false }).limit(1).maybeSingle();
+      return error ? null : data;
+    } catch (e) { return null; }
+  },
   // ท้าเพื่อนเจาะจงด้วยชื่อ (friend code = ชื่อที่แสดงบนกระดาน)
   async ghostByName(name) {
     if (!this.enabled) return { error: 'cloud ปิดอยู่' };

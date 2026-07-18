@@ -991,6 +991,11 @@ h2.view-title::after {
 .guild-emoji-sm { font-size: 24px; flex-shrink: 0; }
 .guild-name-sm { font-weight: 800; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* ===== เพื่อน ===== */
+.friend-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: rgba(0,0,0,.2); border-radius: 10px; margin-bottom: 5px; }
+.friend-info { flex: 1; min-width: 0; }
+.friend-name { font-weight: 800; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ===== แชทออนไลน์ ===== */
 .chat-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; padding: 6px; background: rgba(0,0,0,.2); border-radius: 10px; margin-bottom: 8px; }
 .chat-msg { font-size: 12.5px; line-height: 1.4; padding: 5px 9px; border-radius: 9px; background: rgba(255,255,255,.05); align-self: flex-start; max-width: 88%; word-break: break-word; }
