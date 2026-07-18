@@ -3581,6 +3581,7 @@ function renderMenu() {
   $('#profileBox').querySelectorAll('[data-delpreset]').forEach(el => el.onclick = () => deletePreset(+el.dataset.delpreset));
   const pfAv = $('#pfAvatarBtn'); if (pfAv) pfAv.onclick = openAvatarPicker;
   const pfTitle = $('#pfTitleBtn'); if (pfTitle) pfTitle.onclick = openTitlePicker;
+  const pfShare = $('#pfShare'); if (pfShare) pfShare.onclick = shareProfileCard;
   const btnCheckin = $('#btnCheckin'); if (btnCheckin) btnCheckin.onclick = claimDailyLogin;
   renderHallOfFame();
   renderShinyDex();
@@ -4173,6 +4174,64 @@ function openAvatarPicker() {
     toast('🧑‍🎤 เปลี่ยนอวตารแล้ว!', 'good');
   });
 }
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+// วาดการ์ดโปรไฟล์ลง canvas แล้วแชร์/บันทึกเป็นรูป (ไม่โหลดภาพข้ามโดเมน → export ได้ไม่ tainted)
+function shareProfileCard() {
+  const W = 640, H = 360, dpr = 2;
+  const cv = document.createElement('canvas'); cv.width = W * dpr; cv.height = H * dpr;
+  const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, '#3d7dca'); g.addColorStop(1, '#171a35');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  const rg = ctx.createRadialGradient(W * 0.85, -20, 10, W * 0.85, -20, 300);
+  rg.addColorStop(0, 'rgba(255,215,107,.35)'); rg.addColorStop(1, 'rgba(255,215,107,0)');
+  ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+  const t = equippedTitleObj();
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'center'; ctx.font = '86px serif';
+  ctx.fillText(t ? t.ico : '👤', 88, 108);
+  ctx.textAlign = 'left'; ctx.fillStyle = '#fff';
+  ctx.font = '900 34px Kanit, sans-serif';
+  ctx.fillText((state.playerName || 'เทรนเนอร์').slice(0, 18), 160, 62);
+  if (t) { ctx.fillStyle = '#ffd76b'; ctx.font = '800 18px Kanit, sans-serif'; ctx.fillText(`${t.ico} ${t.name}`, 160, 98); }
+  ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.font = '700 16px Kanit, sans-serif';
+  ctx.fillText(`👤 เทรนเนอร์ Lv.${trainerLevel()}  ·  🔥 ${state.streak || 0} วัน`, 160, 128);
+  const stats = [
+    ['📖', `${speciesOwnedCount()}/${MONSTERS.length}`, 'เดกซ์'],
+    ['✨', String(state.caught.filter(c => c.shiny).length), 'Shiny'],
+    ['👑', String(state.caught.filter(c => c.tier === 'legendary').length), 'Legend'],
+    ['🗼', String((state.tower && state.tower.bestFloor) || 0), 'หอคอย'],
+    ['⚔️', pvpTier(state.pvpRating).emoji, 'PvP'],
+    ['🎯', String(state.totalCaught), 'จับรวม'],
+  ];
+  const cols = 3, tw = (W - 60) / cols, th = 72, x0 = 30, y0 = 170;
+  stats.forEach((s, i) => {
+    const x = x0 + (i % cols) * tw, y = y0 + Math.floor(i / cols) * th;
+    ctx.fillStyle = 'rgba(0,0,0,.25)'; roundRect(ctx, x, y, tw - 12, th - 12, 12); ctx.fill();
+    ctx.textAlign = 'center'; ctx.fillStyle = '#fff'; ctx.font = '800 22px Kanit, sans-serif';
+    ctx.fillText(`${s[0]} ${s[1]}`, x + (tw - 12) / 2, y + 26);
+    ctx.fillStyle = 'rgba(255,255,255,.6)'; ctx.font = '600 12px Kanit, sans-serif';
+    ctx.fillText(s[2], x + (tw - 12) / 2, y + 50);
+  });
+  ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.font = '800 14px Kanit, sans-serif';
+  ctx.fillText('🔴 PokePP · morvorus.github.io/pokePP', W - 20, H - 16);
+  const fname = `pokepp-${(state.playerName || 'trainer').replace(/[^\w]/g, '')}.png`;
+  cv.toBlob(async blob => {
+    if (!blob) { toast('สร้างรูปไม่สำเร็จ', 'bad'); return; }
+    const file = new File([blob], fname, { type: 'image/png' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], text: `โปรไฟล์ PokePP ของ ${state.playerName || 'เทรนเนอร์'}! 🔴` }); return; } catch (e) { /* ยกเลิก/ไม่รองรับ → ดาวน์โหลดแทน */ }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = fname; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast('📤 บันทึกการ์ดโปรไฟล์เป็นรูปแล้ว!', 'good');
+  }, 'image/png');
+}
 function renderProfile() {
   const b = getBuddy();
   const tl = trainerLevel();
@@ -4214,6 +4273,7 @@ function renderProfile() {
       <div class="stat-tile"><div class="st-num">${avgIv()}%</div><div class="st-lbl">IV เฉลี่ย</div></div>
       <div class="stat-tile"><div class="st-num">${playH}ชม ${playM}น</div><div class="st-lbl">⏱️ เวลาเล่น</div></div>
     </div>
+    <button class="set-btn" id="pfShare" style="width:100%;margin-top:10px">📤 แชร์การ์ดโปรไฟล์ (รูป)</button>
     <div style="margin-top:10px;font-size:12px;font-weight:700">🔥 สตรีคจับต่อเนื่อง</div>
     <div class="party-strip" style="gap:4px">
       ${TIER_ORDER.map(t => `<span class="pill" style="font-size:10px">${TIER_EMOJI[t]} ${state.streaks[t] || 0}</span>`).join('')}
@@ -6829,6 +6889,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop, abilityFor,
     openIndividualModal, tradeNpc, claimDailyLogin, selectRegion, playSpawnFx, renderHallOfFame,
     get liveConfig() { return liveConfig; }, set liveConfig(v) { liveConfig = { ...LIVE_DEFAULTS, ...v }; renderLiveBanner(); applyLiveTheme(); },
-    shinyMultiplier, liveXpMult, liveCoinMult, celebrate, centerEvent, serverBanner, onGlobalNotice, broadcastNotice, pollFeed, renderChat, pollChat, syncedWorldEvent, currentWorldEvent, renderGuild, guildLevel,
+    shinyMultiplier, liveXpMult, liveCoinMult, celebrate, centerEvent, serverBanner, onGlobalNotice, broadcastNotice, pollFeed, renderChat, pollChat, syncedWorldEvent, currentWorldEvent, renderGuild, guildLevel, shareProfileCard,
   };
 }
