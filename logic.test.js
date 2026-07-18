@@ -3,7 +3,7 @@ import { clamp, typeEffect, movePP, tierOf, isoWeekNumber, UB_LEGENDARY_IDS,
   catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations,
   statStageMult, comboMult, xpToTier, tierForRating,
   xpForLevel, levelFromXp, tmPrice, ivRerollPrice,
-  ivPercentOf, contestBaseScore, rivalBaseScore } from './logic.js';
+  ivPercentOf, contestBaseScore, rivalBaseScore, guildLevel } from './logic.js';
 
 describe('clamp', () => {
   it('จำกัดค่าอยู่ในช่วง', () => {
@@ -301,6 +301,21 @@ describe('rivalBaseScore (คะแนนพื้นฐานคู่แข่
   it('เพิ่มตามเลเวลเทรนเนอร์', () => {
     expect(rivalBaseScore(0)).toBe(30);
     expect(rivalBaseScore(10)).toBe(42);
+  });
+});
+
+describe('guildLevel (เลเวลกิลด์จากพลังรวม)', () => {
+  it('พลัง 0 = เลเวล 0', () => { expect(guildLevel(0)).toBe(0); });
+  it('undefined ถือเป็น 0', () => { expect(guildLevel(undefined)).toBe(0); });
+  it('โค้งรากที่สอง (500/2000/4500/9000 → 1/2/3/4)', () => {
+    expect(guildLevel(500)).toBe(1);
+    expect(guildLevel(2000)).toBe(2);
+    expect(guildLevel(4500)).toBe(3);
+    expect(guildLevel(9000)).toBe(4);
+  });
+  it('monotonic ไม่ลดลง', () => {
+    let prev = 0;
+    for (let c = 0; c <= 100000; c += 1000) { const l = guildLevel(c); expect(l).toBeGreaterThanOrEqual(prev); prev = l; }
   });
 });
 

@@ -158,6 +158,9 @@ export function contestBaseScore({ ivPct, typeMatch, natureMatch, shiny, level }
 // คะแนนพื้นฐานคู่แข่งคอนเทสต์ (ก่อนบวกสุ่ม) จากเลเวลเทรนเนอร์
 export function rivalBaseScore(level) { return 30 + (level || 0) * 1.2; }
 
+// เลเวลกิลด์จากพลังสมทบรวม (โค้งรากที่สอง — ยิ่งสูงยิ่งต้องสมทบเยอะ)
+export function guildLevel(contrib) { return Math.floor(Math.sqrt((contrib || 0) / 500)); }
+
 // หาแรงก์จากคะแนน (tiers เรียงจากมากไปน้อยด้วย min) — คืน tier แรกที่ rating ถึง min
 export function tierForRating(rating, tiers) {
   return tiers.find(t => (rating || 0) >= t.min) || tiers[tiers.length - 1];

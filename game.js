@@ -5,7 +5,7 @@
 'use strict';
 import { MONSTERS } from './monsters-data.js';
 import { SPECIES_ABILITY, ABILITY_DEFS, HIDDEN_ABILITY } from './abilities-data.js';
-import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations, statStageMult, comboMult, xpToTier, tierForRating, xpForLevel, levelFromXp, tmPrice, ivRerollPrice, ivPercentOf, contestBaseScore, rivalBaseScore } from './logic.js';
+import { clamp, TYPE_CHART, typeEffect, movePP, UB_LEGENDARY_IDS, tierOf, isoWeekNumber, catchChance, statsForBase, rarityFromRoll, damageCore, runMigrations, statStageMult, comboMult, xpToTier, tierForRating, xpForLevel, levelFromXp, tmPrice, ivRerollPrice, ivPercentOf, contestBaseScore, rivalBaseScore, guildLevel } from './logic.js';
 import { TIER_LABEL, TIER_ORDER, TIER_EMOJI, TIER_LEVEL, TIER_WEIGHTS, TYPE_EMOJI, TYPE_TH, WEATHERS, NIGHT_BOOST, DAY_BOOST, Z_MOVES, PVP_TIERS } from './content.js';
 import { bus } from './bus.js';
 import { startFishMinigame } from './fish-minigame.js';
@@ -6451,8 +6451,7 @@ async function pollChat() {
   if (_chatSeen.size > 500) _chatSeen = new Set(_chatMsgs.map(m => m.id));
   if (added && currentView === 'menu') renderChat();
 }
-// ===== กิลด์/ทีม (ต้องล็อกอิน + ตั้งชื่อ) =====
-function guildLevel(contrib) { return Math.floor(Math.sqrt((contrib || 0) / 500)); }
+// ===== กิลด์/ทีม (ต้องล็อกอิน + ตั้งชื่อ) — guildLevel ย้ายไป logic.js แล้ว =====
 let _guildBusy = false;
 async function renderGuild() {
   const box = $('#guildBox'); if (!box) return;
