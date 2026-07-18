@@ -1572,6 +1572,37 @@ function setupErrorTracking() {
   window.addEventListener('error', e => report(`${e.message} @ ${(e.filename || '').split('/').pop()}:${e.lineno || 0}`));
   window.addEventListener('unhandledrejection', e => report(`promise: ${(e.reason && e.reason.message) || e.reason || ''}`));
 }
+// ===== PWA install prompt — ชวนติดตั้งเป็นแอป (เล่นเต็มจอ ลื่นกว่า retention ดีขึ้น) =====
+let _deferredInstall = null;
+function isStandalone() {
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+}
+function setupInstallPrompt() {
+  if (isStandalone()) return;   // ติดตั้งแล้ว ไม่ต้องชวน
+  try { if (localStorage.getItem('pp_installDismissed')) return; } catch (e) { /* private */ }
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); _deferredInstall = e; showInstallChip(false); });
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent)) setTimeout(() => { if (!_deferredInstall && !isStandalone()) showInstallChip(true); }, 5000);   // iOS ไม่มี beforeinstallprompt
+}
+function dismissInstall() { const el = $('#installChip'); if (el) el.remove(); try { localStorage.setItem('pp_installDismissed', '1'); } catch (e) { /* private */ } }
+function showInstallChip(iosHint) {
+  if ($('#installChip')) return;
+  const el = document.createElement('div');
+  el.id = 'installChip'; el.className = 'install-chip';
+  el.innerHTML = iosHint
+    ? `📲 ติดตั้งเกม: แตะ <b>แชร์</b> ⬆️ → <b>เพิ่มไปหน้าจอโฮม</b> <span class="ic-x" title="ปิด">✕</span>`
+    : `📲 <b>ติดตั้งเป็นแอป</b> — เล่นเต็มจอ ลื่นกว่า <span class="ic-x" title="ปิด">✕</span>`;
+  document.body.appendChild(el);
+  el.querySelector('.ic-x').onclick = ev => { ev.stopPropagation(); dismissInstall(); };
+  if (!iosHint) el.onclick = async () => {
+    if (!_deferredInstall) return;
+    _deferredInstall.prompt();
+    let outcome = 'dismissed';
+    try { outcome = (await _deferredInstall.userChoice).outcome; } catch (e) { /* ยกเลิก */ }
+    _deferredInstall = null; el.remove();
+    if (outcome === 'accepted') { toast('📲 ติดตั้งแล้ว! เปิดจากหน้าจอโฮมได้เลย', 'good'); track('pwa_install'); }
+    else { try { localStorage.setItem('pp_installDismissed', '1'); } catch (e) { /* private */ } }
+  };
+}
 // Skeleton loader — แถบ shimmer แทนหน้าโล่ง/สปินเนอร์ ระหว่างโหลดข้อมูล async
 function skelRows(n, h) {
   let s = '';
@@ -6949,6 +6980,7 @@ function init() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshLiveConfig(); });
   setInterval(renderRailWidgets, 5 * 60 * 1000);   // รีเฟรชมินิกระดานข้างจอเป็นระยะ
   setInterval(() => { const sec = $('#chatSec'); if (currentView === 'menu' && sec && sec.open) pollChat(); }, 5000);   // แชท: ดึงข้อความใหม่ทุก 5 วิ เมื่อเปิดหน้าแชท
+  setupInstallPrompt();   // ชวนติดตั้งเป็นแอป (ถ้ายังไม่ได้ติดตั้ง/ไม่ได้ปิดไป)
   setInterval(pollFeed, 20000);   // ฟีดแจ้งเตือนทั้งเซิร์ฟเวอร์ (จับเทพ/ไชนี่/กำไรเมก้า) ทุก 20 วิ
 }
 // โมดูล ES เป็น deferred — ถ้า DOM พร้อมแล้วให้ init ทันที ไม่งั้นรอ event (กันเคสที่ event ยิงไปก่อน)
@@ -6965,6 +6997,6 @@ if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
     renderMenu, startRaidBattle, raidBossForWeek, faintActive, grantAmuletDrop, abilityFor,
     openIndividualModal, tradeNpc, claimDailyLogin, selectRegion, playSpawnFx, renderHallOfFame,
     get liveConfig() { return liveConfig; }, set liveConfig(v) { liveConfig = { ...LIVE_DEFAULTS, ...v }; renderLiveBanner(); applyLiveTheme(); },
-    shinyMultiplier, liveXpMult, liveCoinMult, celebrate, centerEvent, serverBanner, onGlobalNotice, broadcastNotice, pollFeed, renderChat, pollChat, syncedWorldEvent, currentWorldEvent, renderGuild, guildLevel, shareProfileCard, renderFriends,
+    shinyMultiplier, liveXpMult, liveCoinMult, celebrate, centerEvent, serverBanner, onGlobalNotice, broadcastNotice, pollFeed, renderChat, pollChat, syncedWorldEvent, currentWorldEvent, renderGuild, guildLevel, shareProfileCard, renderFriends, showInstallChip,
   };
 }
