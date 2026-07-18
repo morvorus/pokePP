@@ -851,6 +851,7 @@ function newSave() {
     equippedTitle: null, // id ของ achievement ที่เลือกโชว์เป็น Title (ต้องปลดล็อกก่อน)
     avatarKey: null,     // สไปรต์เทรนเนอร์ที่เลือก (null = ค่าเริ่มต้น)
     battleItems: {},     // ไอเทมใช้ตอนต่อสู้ { potion, hyperpotion, ether }
+    guildLvlClaimed: 0,  // เลเวลกิลด์สูงสุดที่รับรางวัลไปแล้ว (กันรับซ้ำ/ฟาร์มออก-เข้ากิลด์)
     settings: { sound: true, music: false, spawnSpeed: 'normal',
       rareAlerts: true, eventAlerts: true, mascotDeco: true, reduceMotion: false, confirmRelease: true, fastBattle: false, hardcoreMode: false },
     hardcoreDeaths: 0,   // จำนวนตัวที่ถูกปล่อยถาวรจากโหมด Hardcore (สถิติ ไม่รีเซ็ตแม้ปิดโหมด)
@@ -6451,6 +6452,7 @@ async function renderMyGuild(box, mine) {
         <div class="sr-sub" style="font-size:10px;margin-top:3px">พลังกิลด์รวม ${total.toLocaleString()} · คุณสมทบ ${(mine.contrib || 0).toLocaleString()}</div>
       </div>
     </div>
+    ${glv > (state.guildLvlClaimed || 0) ? `<button class="claim-btn st-claim" id="gClaim" style="width:100%;margin-top:8px">🎁 รับรางวัลกิลด์เลเวล ${(state.guildLvlClaimed || 0) + 1}${glv > (state.guildLvlClaimed || 0) + 1 ? `-${glv}` : ''}!</button>` : ''}
     <div class="sr-sub" style="margin:8px 0 4px">สมทบเหรียญเพิ่มพลังกิลด์ (ช่วยกันไต่เลเวล):</div>
     <div style="display:flex;gap:6px;margin-bottom:8px">
       <button class="set-btn" id="gDonate1" style="flex:1">สมทบ 1,000🪙</button>
@@ -6461,6 +6463,19 @@ async function renderMyGuild(box, mine) {
   $('#gDonate1').onclick = () => doDonate(1000);
   $('#gDonate5').onclick = () => doDonate(5000);
   $('#gLeave').onclick = doLeaveGuild;
+  const gc = $('#gClaim'); if (gc) gc.onclick = () => claimGuildLevels(glv);
+}
+// รับรางวัลทุกเลเวลกิลด์ที่ยังไม่รับ (จนถึงเลเวลปัจจุบัน) — รางวัลไล่ระดับ
+function claimGuildLevels(glv) {
+  const from = (state.guildLvlClaimed || 0) + 1;
+  if (glv < from) return;
+  let coins = 0, lockbox = 0, checkin = 0;
+  for (let lv = from; lv <= glv; lv++) { coins += lv * 2000; lockbox += 1; checkin += lv >= 5 ? 2 : 1; }
+  state.coins += coins; state.lockboxes = (state.lockboxes || 0) + lockbox; state.checkinCoins = (state.checkinCoins || 0) + checkin;
+  state.guildLvlClaimed = glv;
+  save(); bus.emit('currency:changed');
+  toast(`🎁 รับรางวัลกิลด์เลเวล ${from}-${glv}! +${coins.toLocaleString()}🪙 +${lockbox}🎁 +${checkin}🗓️`, 'good');
+  playSfx('rare'); renderGuild();
 }
 async function renderGuildBrowse(box) {
   const ranking = await Cloud.guildRanking(20);
